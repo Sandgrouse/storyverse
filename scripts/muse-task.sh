@@ -47,6 +47,12 @@ echo "Muse log: $log"
 
 if [ -n "$(git status --porcelain)" ]; then
   git add -A
+  staged="$(git diff --cached --name-only | wc -l | tr -d ' ')"
+  if [ "$staged" -gt 200 ]; then
+    git reset --quiet
+    echo "Refusing to commit $staged leftover files. Check .gitignore." >&2
+    exit 1
+  fi
   git commit -m "$slug: uncommitted Muse Code changes"
 fi
 

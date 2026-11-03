@@ -9,3 +9,4 @@ node_modules/
 coverage/
 data/local/
 .claude/
+.pnpm-store/
