@@ -195,20 +195,36 @@ export function stripImageData(world: World): World {
 const STORAGE_KEY = "storyverse-world-v1";
 
 export function loadPersistedWorld(): { world: World; sample: boolean } | null {
+  const discard = () => {
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {
+      // The next load retries the discard.
+    }
+  };
   try {
     if (typeof window === "undefined") return null;
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const json: unknown = JSON.parse(raw);
-    if (json === null || typeof json !== "object") return null;
+    if (json === null || typeof json !== "object") {
+      discard();
+      return null;
+    }
     const record = json as Record<string, unknown>;
     const world = WorldSchema.safeParse(record.world);
-    if (!world.success) return null;
+    if (!world.success) {
+      discard();
+      return null;
+    }
     return {
       world: world.data,
       sample: record.sample === true,
     };
   } catch {
+    discard();
     return null;
   }
 }

@@ -28,6 +28,19 @@ function errorResponse(status: number, code: string, message: string) {
 }
 
 /**
+ * A short slice of an API error body for the server log. Error payloads
+ * hold no image data; the slice keeps the log to status and message.
+ */
+async function errorSnippet(res: Response): Promise<string> {
+  try {
+    const text = await res.text();
+    return text.slice(0, 200).replace(/\s+/g, " ").trim();
+  } catch {
+    return "";
+  }
+}
+
+/**
  * One SAM 3.1 cutout. Streams the Responses API, normalizes the events
  * for the parser, and returns the largest mask for the client to
  * composite as alpha at the source image's own size. The body must fit
@@ -84,6 +97,10 @@ export async function POST(req: Request) {
       const status =
         res.status >= 400 && res.status < 600 ? res.status : 502;
       if (res.status === 400 || res.status === 422) {
+        const detail = await errorSnippet(res);
+        console.error(
+          `[cutout] rejected: ${res.status} CUTOUT_REJECTED${detail ? ` ${detail}` : ""}`,
+        );
         return errorResponse(status, "CUTOUT_REJECTED", "The cutout failed.");
       }
       throw new MetaApiError(status, "cutout_failed");
@@ -95,6 +112,7 @@ export async function POST(req: Request) {
     const masks = recordsOfKind(result.records, "mask");
     const best = selectLargestMask(masks);
     if (!best) {
+      console.error("[cutout] no mask: 422 NO_CUTOUT");
       return errorResponse(
         422,
         "NO_CUTOUT",

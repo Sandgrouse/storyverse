@@ -43,8 +43,32 @@ export type CutoutResponse = z.infer<typeof CutoutResponseSchema>;
 export const CUTOUT_NO_KEY_MESSAGE =
   "Cutouts are not available on this server.";
 
-/** The concept sent for a sheet view: one centered figure on plain dark. */
-export const SHEET_CUTOUT_CONCEPT = "figure";
+/** The concept sent for a sheet view: one centered person on plain dark. */
+export const SHEET_CUTOUT_CONCEPT = "person";
+
+/**
+ * Second try when "person" finds no mask. The route reports NO_CUTOUT,
+ * so the client retries once with this before showing the failure.
+ */
+export const SHEET_CUTOUT_FALLBACK_CONCEPT = "figure";
+
+/** The route's error message, or the generic cutout failure. Pure. */
+export function readCutoutError(json: unknown): { code?: string; message: string } {
+  const record =
+    json !== null && typeof json === "object"
+      ? (json as Record<string, unknown>)
+      : null;
+  const error =
+    record?.error !== null && typeof record?.error === "object"
+      ? (record.error as Record<string, unknown>)
+      : null;
+  const message =
+    typeof error?.message === "string" && error.message.length > 0
+      ? error.message
+      : "The cutout failed.";
+  const code = typeof error?.code === "string" ? error.code : undefined;
+  return code === undefined ? { message } : { code, message };
+}
 
 /** One Responses request body for a SAM cutout. */
 export function cutoutRequestBody(concept: string, dataUrl: string) {
@@ -207,6 +231,39 @@ function loadImage(source: string): Promise<HTMLImageElement> {
 }
 
 /**
+ * Read one source pixel of a cutout mask. The raster is row-major over
+ * its own width and height, which are usually smaller than the
+ * source-pixel box it covers, so the box pixel scales down into the
+ * raster. Zero outside the box. Pure and canvas-free, so tests cover it.
+ */
+export function sampleCutoutMask(
+  raster: Uint8Array,
+  maskWidth: number,
+  maskHeight: number,
+  bounds: CutoutBounds,
+  x: number,
+  y: number,
+): number {
+  const boxWidth = bounds.right - bounds.left;
+  const boxHeight = bounds.bottom - bounds.top;
+  if (boxWidth <= 0 || boxHeight <= 0 || maskWidth <= 0 || maskHeight <= 0) {
+    return 0;
+  }
+  if (x < bounds.left || x >= bounds.right || y < bounds.top || y >= bounds.bottom) {
+    return 0;
+  }
+  const mx = Math.min(
+    maskWidth - 1,
+    Math.floor(((x - bounds.left) * maskWidth) / boxWidth),
+  );
+  const my = Math.min(
+    maskHeight - 1,
+    Math.floor(((y - bounds.top) * maskHeight) / boxHeight),
+  );
+  return raster[my * maskWidth + mx] ?? 0;
+}
+
+/**
  * Composite a cutout mask as alpha over the source image at its own size
  * and return a transparent PNG data URL. Browser only.
  */
@@ -225,21 +282,16 @@ export async function compositeCutout(
   ctx.drawImage(img, 0, 0);
   const image = ctx.getImageData(0, 0, width, height);
   const raster = base64ToRaster(cutout.maskBase64);
-  const { left, top, right, bottom } = cutout.bounds;
-  const span = Math.max(1, right - left);
   for (let y = 0; y < height; y += 1) {
-    if (y < top || y >= bottom) {
-      for (let x = 0; x < width; x += 1) {
-        image.data[(y * width + x) * 4 + 3] = 0;
-      }
-      continue;
-    }
-    const row = y - top;
     for (let x = 0; x < width; x += 1) {
-      const alpha =
-        x >= left && x < right
-          ? (raster[row * span + (x - left)] ?? 0)
-          : 0;
+      const alpha = sampleCutoutMask(
+        raster,
+        cutout.width,
+        cutout.height,
+        cutout.bounds,
+        x,
+        y,
+      );
       image.data[(y * width + x) * 4 + 3] = alpha ? 255 : 0;
     }
   }

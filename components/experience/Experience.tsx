@@ -55,15 +55,12 @@ function sceneFromHash(): SceneId {
 }
 
 export default function Experience({ seed }: { seed: World }) {
-  const [world, setWorld] = useState<World>(() => {
-    const persisted = loadPersistedWorld();
-    // Stored refs resolve just after first paint; drop them until then so
-    // no broken image flashes.
-    return persisted ? dropStoredRefs(persisted.world) : seed;
-  });
-  const [sample, setSample] = useState<boolean>(
-    () => loadPersistedWorld()?.sample ?? false,
-  );
+  // The first client paint matches the server: the seed. The persisted
+  // world loads in the mount effect below, so saved data never skews
+  // hydration.
+  const [world, setWorld] = useState<World>(seed);
+  const [sample, setSample] = useState<boolean>(false);
+  const [restored, setRestored] = useState(false);
   const [files, setFiles] = useState<ClientFile[]>([]);
   const [idea, setIdea] = useState("");
   const [scene, setScene] = useState<SceneId>("arrival");
@@ -75,21 +72,36 @@ export default function Experience({ seed }: { seed: World }) {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  useEffect(() => {
-    persistWorld(world, sample);
-  }, [world, sample]);
-
-  // Stored images load back after the first paint.
+  // The persisted world loads after mount. Stored refs drop until their
+  // images resolve, so no broken image flashes.
   useEffect(() => {
     let live = true;
-    void hydrateWorld(world).then((hydrated) => {
-      if (live && hydrated !== world) setWorld(hydrated);
+    const persisted = loadPersistedWorld();
+    if (!persisted) {
+      setRestored(true);
+      return () => {
+        live = false;
+      };
+    }
+    setWorld(dropStoredRefs(persisted.world));
+    setSample(persisted.sample);
+    void hydrateWorld(persisted.world).then((hydrated) => {
+      if (!live) return;
+      setWorld(hydrated);
+      setRestored(true);
     });
     return () => {
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Persist only after the restore above, so the first paint never
+  // overwrites saved image refs with the seed.
+  useEffect(() => {
+    if (!restored) return;
+    persistWorld(world, sample);
+  }, [world, sample, restored]);
 
   const go = useCallback((id: SceneId) => {
     window.location.hash = id;

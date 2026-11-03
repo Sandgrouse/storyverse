@@ -5,6 +5,8 @@ import {
   CutoutResponseSchema,
   cutoutRequestBody,
   normalizedCutoutEvents,
+  readCutoutError,
+  sampleCutoutMask,
   selectLargestMask,
   type CutoutResponse,
 } from "@/lib/cutout";
@@ -262,6 +264,63 @@ describe("selectLargestMask", () => {
   });
 });
 
+describe("sampleCutoutMask", () => {
+  it("scales a mask smaller than its box with row-major reads", () => {
+    // A 2x2 raster over a 4x4 box: each mask pixel covers 2x2 source pixels.
+    const raster = new Uint8Array([1, 0, 0, 1]);
+    const bounds = { left: 0, top: 0, right: 4, bottom: 4 };
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 0, 0)).toBe(1);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 1, 1)).toBe(1);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 2, 0)).toBe(0);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 3, 1)).toBe(0);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 0, 2)).toBe(0);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 1, 3)).toBe(0);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 2, 2)).toBe(1);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 3, 3)).toBe(1);
+  });
+
+  it("reads zero outside the box", () => {
+    const raster = new Uint8Array([1, 1, 1, 1]);
+    const bounds = { left: 2, top: 2, right: 4, bottom: 4 };
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 0, 0)).toBe(0);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 1, 3)).toBe(0);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 4, 2)).toBe(0);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 2, 4)).toBe(0);
+    expect(sampleCutoutMask(raster, 2, 2, bounds, 3, 3)).toBe(1);
+  });
+
+  it("keeps real-world mismatched sizes in range", () => {
+    // Seen in production: a 365x1024 raster for a 666x1870 box.
+    const maskWidth = 365;
+    const maskHeight = 1024;
+    const raster = new Uint8Array(maskWidth * maskHeight).fill(1);
+    const bounds = { left: 0, top: 0, right: 666, bottom: 1870 };
+    expect(sampleCutoutMask(raster, maskWidth, maskHeight, bounds, 0, 0)).toBe(1);
+    expect(
+      sampleCutoutMask(raster, maskWidth, maskHeight, bounds, 665, 1869),
+    ).toBe(1);
+    expect(
+      sampleCutoutMask(raster, maskWidth, maskHeight, bounds, 333, 935),
+    ).toBe(1);
+  });
+});
+
+describe("readCutoutError", () => {
+  it("reads the route's message and code", () => {
+    expect(
+      readCutoutError({ error: { code: "NO_CUTOUT", message: "No figure was found to cut out." } }),
+    ).toEqual({ code: "NO_CUTOUT", message: "No figure was found to cut out." });
+  });
+
+  it("falls back to the generic failure", () => {
+    expect(readCutoutError(null)).toEqual({ message: "The cutout failed." });
+    expect(readCutoutError({ error: { code: "X" } })).toEqual({
+      code: "X",
+      message: "The cutout failed.",
+    });
+  });
+});
+
 describe("POST /api/art/cutout", () => {
   it("returns the largest mask from a streaming response", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(samStream());
@@ -309,6 +368,40 @@ describe("POST /api/art/cutout", () => {
 
     expect(res.status).toBe(422);
     expect((await res.json()).error.code).toBe("NO_CUTOUT");
+  });
+
+  it("logs a rejected cutout with its status", async () => {
+    const logged: unknown[][] = [];
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      logged.push(args);
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(new Response("bad prompt", { status: 400 })),
+    );
+
+    const res = await cutoutPOST(post(BODY));
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("CUTOUT_REJECTED");
+    expect(logged.some(([line]) => String(line).includes("CUTOUT_REJECTED"))).toBe(true);
+    expect(logged.some(([line]) => String(line).includes("400"))).toBe(true);
+  });
+
+  it("logs a stream with no mask", async () => {
+    const logged: unknown[][] = [];
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      logged.push(args);
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(samStream("a quiet field\n")),
+    );
+
+    const res = await cutoutPOST(post(BODY));
+
+    expect(res.status).toBe(422);
+    expect(logged.some(([line]) => String(line).includes("NO_CUTOUT"))).toBe(true);
   });
 
   it("rejects bad bodies, oversized bodies, and a missing key", async () => {
