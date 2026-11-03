@@ -10,6 +10,54 @@ if (typeof window !== "undefined") {
 export const META_RESPONSES_URL = "https://api.meta.ai/v1/responses";
 export const RIPPLE_MODEL = "muse-spark-1.3";
 
+/**
+ * One retry after this delay when the image service answers 502/503 or
+ * the request fails to reach it. Never applied to 4xx.
+ */
+export const RETRY_DELAY_MS = 2000;
+
+/**
+ * Skip the retry when more than this long has passed since the call
+ * started, so the route stays under its 60-second maxDuration.
+ */
+export const RETRY_ELAPSED_BUDGET_MS = 35000;
+
+const RETRYABLE_STATUSES = new Set([502, 503]);
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isRetryableStatus(status: number): boolean {
+  return RETRYABLE_STATUSES.has(status);
+}
+
+/**
+ * POST once, then once more after RETRY_DELAY_MS when the first attempt
+ * gets a 502/503 or never reaches the API. 4xx is never retried, and the
+ * retry is skipped when RETRY_ELAPSED_BUDGET_MS has passed since start.
+ */
+export async function postWithRetry(
+  url: string,
+  init: RequestInit,
+  startedAt: number,
+): Promise<Response> {
+  let first: Response | null = null;
+  try {
+    first = await fetch(url, init);
+  } catch (error) {
+    if (Date.now() - startedAt > RETRY_ELAPSED_BUDGET_MS) throw error;
+    await sleep(RETRY_DELAY_MS);
+    return fetch(url, init);
+  }
+  if (!isRetryableStatus(first.status)) return first;
+  if (Date.now() - startedAt > RETRY_ELAPSED_BUDGET_MS) return first;
+  await sleep(RETRY_DELAY_MS);
+  return fetch(url, init);
+}
+
 export class MetaApiError extends Error {
   status: number;
   code: string;
@@ -85,6 +133,7 @@ export async function generateImage(
   if (!apiKey) {
     throw new Error("MODEL_API_KEY is not set");
   }
+  const startedAt = Date.now();
 
   const content: Array<Record<string, string>> = [
     { type: "input_text", text: request.prompt },
@@ -102,14 +151,18 @@ export async function generateImage(
     body.previous_response_id = request.previousResponseId;
   }
 
-  const res = await fetch(META_RESPONSES_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+  const res = await postWithRetry(
+    META_RESPONSES_URL,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    startedAt,
+  );
 
   const payload: unknown = await res.json().catch(() => null);
   if (!res.ok) {
@@ -221,28 +274,33 @@ export async function completeJson<T>(
   if (!apiKey) {
     throw new Error("MODEL_API_KEY is not set");
   }
+  const startedAt = Date.now();
 
-  const res = await fetch(META_RESPONSES_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: RIPPLE_MODEL,
-      reasoning: { effort: "low" },
-      instructions: request.instructions,
-      input: request.input,
-      text: {
-        format: {
-          type: "json_schema",
-          name: request.schemaName,
-          strict: true,
-          schema: request.jsonSchema,
-        },
+  const res = await postWithRetry(
+    META_RESPONSES_URL,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       },
-    }),
-  });
+      body: JSON.stringify({
+        model: RIPPLE_MODEL,
+        reasoning: { effort: "low" },
+        instructions: request.instructions,
+        input: request.input,
+        text: {
+          format: {
+            type: "json_schema",
+            name: request.schemaName,
+            strict: true,
+            schema: request.jsonSchema,
+          },
+        },
+      }),
+    },
+    startedAt,
+  );
 
   const payload: unknown = await res.json().catch(() => null);
   if (!res.ok) {

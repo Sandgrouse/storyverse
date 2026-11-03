@@ -27,6 +27,7 @@ import {
 import rippleSeed from "@/data/seed/anukili-ripple.json";
 import CastDrawer from "./CastDrawer";
 import PackDrawer from "./PackDrawer";
+import StoryPackDrawer from "./StoryPackDrawer";
 
 /** The sample project's suggestion lives in the seed ripple, not the world. */
 const SAMPLE_SUGGESTION =
@@ -119,7 +120,9 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world]);
   const [bookOpen, setBookOpen] = useState(false);
-  const [drawer, setDrawer] = useState<"cast" | "pack" | null>(null);
+  const [drawer, setDrawer] = useState<"cast" | "pack" | "story" | null>(
+    null,
+  );
 
   // The ask bar suggests the sample project's change, from the seed
   // ripple data. Any other world starts empty.
@@ -696,14 +699,15 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
           )}
         </div>
         <div className="side">
-          <button onClick={() => setDrawer("pack")}>Story Pack</button>
-          {part.imagePath ? (
-            <button>Send to video</button>
-          ) : sceneState.kind === "working" ? (
-            <button disabled>Making the art…</button>
-          ) : (
-            <button onClick={() => void makeSceneArt(part)}>Make the art</button>
-          )}
+          <button onClick={() => setDrawer("story")}>Story Pack</button>
+          {!part.imagePath &&
+            (sceneState.kind === "working" ? (
+              <button disabled>Making the art…</button>
+            ) : (
+              <button onClick={() => void makeSceneArt(part)}>
+                Make the art
+              </button>
+            ))}
           <button onClick={() => setBookOpen((v) => !v)}>Open</button>
         </div>
       </div>
@@ -1043,6 +1047,7 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
 
       <CastDrawer world={liveWorld} open={drawer === "cast"} onClose={() => setDrawer(null)} onWorld={setWorld} />
       <PackDrawer world={liveWorld} open={drawer === "pack"} onClose={() => setDrawer(null)} />
+      <StoryPackDrawer world={liveWorld} partId={part.id} open={drawer === "story"} onClose={() => setDrawer(null)} onWorld={setWorld} />
     </section>
   );
 }

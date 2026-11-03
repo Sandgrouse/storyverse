@@ -4,6 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Character, World } from "@/lib/world/schemas";
 import { SHEET_VIEWS } from "@/lib/art";
 import {
+  SHEET_CUTOUT_CONCEPT,
+  SHEET_CUTOUT_FALLBACK_CONCEPT,
+  CutoutResponseSchema,
+  compositeCutout,
+  readCutoutError,
+  type CutoutResponse,
+} from "@/lib/cutout";
+import {
+  artToDataUrl,
   postArtRoute,
   sheetReferenceFor,
   styleImageFor,
@@ -23,6 +32,11 @@ type SlotState =
   | { kind: "error"; message: string }
   | { kind: "blocked"; message: string; description: string };
 
+type CutoutState =
+  | { kind: "idle" }
+  | { kind: "working" }
+  | { kind: "error"; message: string };
+
 
 
 export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
@@ -32,7 +46,9 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
 
   const [slots, setSlots] = useState<Record<string, SlotState>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [cutouts, setCutouts] = useState<Record<string, CutoutState>>({});
   const [running, setRunning] = useState(false);
+  const [cuttingAll, setCuttingAll] = useState(false);
   const runRef = useRef(0);
   const respIds = useRef<Record<string, string>>({});
 
@@ -40,9 +56,15 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
   useEffect(() => {
     setSlots({});
     setDrafts({});
+    setCutouts({});
     setRunning(false);
+    setCuttingAll(false);
     runRef.current += 1;
   }, [selected?.id]);
+
+  /** True while any cutout is in flight: sheet work waits for cutouts. */
+  const cutting =
+    cuttingAll || Object.values(cutouts).some((s) => s.kind === "working");
 
   const appearsIn = useMemo(() => {
     if (!selected) return "";
@@ -89,6 +111,7 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
   });
 
   const runSheet = async (character: Character) => {
+    if (cutting) return;
     const run = runRef.current + 1;
     runRef.current = run;
     respIds.current = {};
@@ -162,6 +185,7 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
   };
 
   const retryView = async (character: Character, viewId: string) => {
+    if (running || cutting) return;
     const run = runRef.current + 1;
     runRef.current = run;
     setRunning(true);
@@ -236,6 +260,116 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     return map;
   }, [selected]);
 
+  const cutoutByView = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const view of selected?.sheet ?? []) {
+      if (view.cutoutPath) map.set(view.view, view.cutoutPath);
+    }
+    return map;
+  }, [selected]);
+
+  const applyCutout = (
+    base: World,
+    characterId: string,
+    viewId: string,
+    cutoutPath: string,
+  ): World => ({
+    ...base,
+    characters: base.characters.map((c) => {
+      if (c.id !== characterId) return c;
+      return {
+        ...c,
+        sheet: c.sheet.map((v) =>
+          v.view === viewId ? { ...v, cutoutPath } : v,
+        ),
+      };
+    }),
+  });
+
+  type CutoutFetch =
+    | { ok: true; cutout: CutoutResponse }
+    | { ok: false; code?: string; message: string };
+
+  const postCutout = async (
+    dataUrl: string,
+    concept: string,
+  ): Promise<CutoutFetch> => {
+    let res: Response;
+    try {
+      res = await fetch("/api/art/cutout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageDataUrl: dataUrl, concept }),
+      });
+    } catch {
+      return { ok: false, message: "The cutout failed." };
+    }
+    if (!res.ok) {
+      return { ok: false, ...readCutoutError(await res.json().catch(() => null)) };
+    }
+    const parsed = CutoutResponseSchema.safeParse(
+      await res.json().catch(() => null),
+    );
+    if (!parsed.success) return { ok: false, message: "The cutout failed." };
+    return { ok: true, cutout: parsed.data };
+  };
+
+  /** Cut one view out of its background. A failure fails only this view. */
+  const runCutout = async (
+    base: World,
+    character: Character,
+    viewId: string,
+    source: string,
+  ): Promise<World> => {
+    if (running) return base;
+    setCutouts((prev) => ({ ...prev, [viewId]: { kind: "working" } }));
+    try {
+      const dataUrl = await artToDataUrl(source);
+      if (!dataUrl) throw new Error("Could not read that image.");
+      let result = await postCutout(dataUrl, SHEET_CUTOUT_CONCEPT);
+      if (!result.ok && result.code === "NO_CUTOUT") {
+        result = await postCutout(dataUrl, SHEET_CUTOUT_FALLBACK_CONCEPT);
+      }
+      if (!result.ok) throw new Error(result.message);
+      const png = await compositeCutout(dataUrl, result.cutout);
+      const next = applyCutout(base, character.id, viewId, png);
+      onWorld(next);
+      setCutouts((prev) => ({ ...prev, [viewId]: { kind: "idle" } }));
+      return next;
+    } catch (error) {
+      setCutouts((prev) => ({
+        ...prev,
+        [viewId]: {
+          kind: "error",
+          message:
+            error instanceof Error ? error.message : "The cutout failed.",
+        },
+      }));
+      return base;
+    }
+  };
+
+  /**
+   * Cut every generated view one at a time, in order. Each view stands
+   * alone: one failure blocks nothing else.
+   */
+  const runCutoutAll = async (character: Character) => {
+    if (running || cuttingAll) return;
+    setCuttingAll(true);
+    try {
+      let current: World = world;
+      for (const view of SHEET_VIEWS) {
+        const entry = current.characters
+          .find((c) => c.id === character.id)
+          ?.sheet.find((v) => v.view === view.id);
+        if (!entry?.imagePath) continue;
+        current = await runCutout(current, character, view.id, entry.imagePath);
+      }
+    } finally {
+      setCuttingAll(false);
+    }
+  };
+
   return (
     <div className={`drawer${open ? " on" : ""}`} aria-hidden={!open}>
       <button
@@ -300,16 +434,30 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
                 type="button"
                 className="pill"
                 onClick={() => void runSheet(selected)}
+                disabled={cutting}
                 tabIndex={open ? 0 : -1}
               >
                 Generate full sheet
               </button>
             ))}
+          {selected && SHEET_VIEWS.some((view) => sheetByView.get(view.id)) && (
+            <button
+              type="button"
+              className="quiet"
+              onClick={() => void runCutoutAll(selected)}
+              disabled={running || cutting}
+              tabIndex={open ? 0 : -1}
+            >
+              Cut out all
+            </button>
+          )}
         </div>
         <div className="sheetgrid">
           {SHEET_VIEWS.map((view) => {
             const image = sheetByView.get(view.id);
             const state = slots[view.id] ?? { kind: "idle" as const };
+            const cutout = cutoutByView.get(view.id);
+            const cutoutState = cutouts[view.id] ?? { kind: "idle" as const };
             return (
               <div key={view.id} className="slot">
                 <div
@@ -335,6 +483,7 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
                     type="button"
                     className="quiet"
                     onClick={() => selected && void retryView(selected, view.id)}
+                    disabled={running || cutting}
                     tabIndex={open ? 0 : -1}
                   >
                     Retry
@@ -350,6 +499,53 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
                     rows={3}
                     tabIndex={open ? 0 : -1}
                   />
+                )}
+                {image && cutout && (
+                  <div
+                    className="slotimg"
+                    style={{
+                      backgroundImage: `url(${cutout}), conic-gradient(#d9d3c5 0 25%, #f5f2ea 0 50%, #d9d3c5 0 75%, #f5f2ea 0)`,
+                      backgroundSize: "contain, 14px 14px",
+                      backgroundRepeat: "no-repeat, repeat",
+                      backgroundPosition: "center",
+                    }}
+                    role="img"
+                    aria-label={`${selected?.name} ${view.label} cutout`}
+                  />
+                )}
+                {image && !cutout && cutoutState.kind === "working" && (
+                  <div className="slotimg busy">
+                    <span>Cutting…</span>
+                  </div>
+                )}
+                {image && !cutout && cutoutState.kind === "error" && (
+                  <span className="slotmsg">{cutoutState.message}</span>
+                )}
+                {image && selected && !cutout && cutoutState.kind !== "working" && (
+                  <button
+                    type="button"
+                    className="quiet"
+                    onClick={() =>
+                      void runCutout(world, selected, view.id, image)
+                    }
+                    disabled={running || cutting}
+                    tabIndex={open ? 0 : -1}
+                  >
+                    {cutoutState.kind === "error" ? "Retry cutout" : "Cut out"}
+                  </button>
+                )}
+                {image && cutout && selected && (
+                  <button
+                    type="button"
+                    className="quiet"
+                    onClick={() =>
+                      void runCutout(world, selected, view.id, image)
+                    }
+                    disabled={running || cutting}
+                    tabIndex={open ? 0 : -1}
+                  >
+                    Cut out again
+                  </button>
                 )}
               </div>
             );

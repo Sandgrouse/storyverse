@@ -1,7 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { World } from "@/lib/world/schemas";
+import {
+  buildAgentZip,
+  packageTree,
+  planAgentFiles,
+} from "@/lib/package";
 
 type Props = {
   world: World;
@@ -9,41 +14,45 @@ type Props = {
   onClose: () => void;
 };
 
+type ExportState = { kind: "idle" } | { kind: "working" } | { kind: "error" };
+
 export default function PackDrawer({ world, open, onClose }: Props) {
-  const tree = useMemo(() => {
-    const game =
-      world.channels.find((c) => c.kind === "game") ?? world.channels[0];
-    const gameKnown = world.secrets.filter((s) =>
-      game ? s.knownThrough.includes(game.id) : false,
+  const [channelId, setChannelId] = useState(world.channels[0]?.id ?? "");
+  const [state, setState] = useState<ExportState>({ kind: "idle" });
+
+  useEffect(() => {
+    setChannelId((prev) =>
+      world.channels.some((c) => c.id === prev)
+        ? prev
+        : (world.channels[0]?.id ?? ""),
     );
-    const rest = world.secrets.filter(
-      (s) => !(game && s.knownThrough.includes(game.id)),
-    );
-    const brief =
-      gameKnown.length > 0
-        ? `Players may learn ${gameKnown.map((s) => s.text).join("; ")}. They may not learn ${rest.map((s) => s.text).join("; ")}.`
-        : `They may not learn ${rest.map((s) => s.text).join("; ")}.`;
-    const gameBeats = game
-      ? world.beats.filter((b) => b.channelId === game.id)
-      : [];
-    const lines = [
-      `${world.id}-game/`,
-      `├─ AGENT_BRIEF.md       ${brief}`,
-      "├─ manifest.json",
-      "├─ canon/               world, timeline, and secrets for this channel only",
-      "├─ characters/",
-    ];
-    world.characters.forEach((c) => {
-      lines.push(`│  └─ ${c.id}/    sheet views, plus cutouts`);
-    });
-    lines.push("└─ levels/");
-    gameBeats.forEach((b, i) => {
-      lines.push(
-        `   ${i === gameBeats.length - 1 ? "└" : "├"}─ ${b.id}.md`,
-      );
-    });
-    return lines.join("\n");
+    setState({ kind: "idle" });
   }, [world]);
+
+  const files = useMemo(
+    () => (channelId ? planAgentFiles(world, channelId) : []),
+    [world, channelId],
+  );
+  const tree = useMemo(() => packageTree(files), [files]);
+
+  const exportZip = async () => {
+    if (!channelId || state.kind === "working") return;
+    setState({ kind: "working" });
+    try {
+      const { blob } = await buildAgentZip(world, channelId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${world.id}-${channelId}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setState({ kind: "idle" });
+    } catch {
+      setState({ kind: "error" });
+    }
+  };
 
   return (
     <div className={`drawer${open ? " on" : ""}`} aria-hidden={!open}>
@@ -56,10 +65,35 @@ export default function PackDrawer({ world, open, onClose }: Props) {
       </button>
       <div className="kicker">Agent package</div>
       <h2>Hand it to any coding agent</h2>
+      <div className="castlist">
+        {world.channels.map((channel) => (
+          <button
+            key={channel.id}
+            className={channel.id === channelId ? "on" : ""}
+            onClick={() => {
+              setChannelId(channel.id);
+              setState({ kind: "idle" });
+            }}
+            tabIndex={open ? 0 : -1}
+          >
+            {channel.name}
+          </button>
+        ))}
+      </div>
       <div className="tree">{tree}</div>
+      {state.kind === "error" && (
+        <div className="artstate" role="status">
+          <p>The export failed.</p>
+        </div>
+      )}
       <div style={{ marginTop: 18, textAlign: "right" }}>
-        <button className="pill" tabIndex={open ? 0 : -1}>
-          Export package
+        <button
+          className="pill"
+          onClick={() => void exportZip()}
+          disabled={!channelId || state.kind === "working"}
+          tabIndex={open ? 0 : -1}
+        >
+          {state.kind === "working" ? "Exporting…" : "Export package"}
         </button>
       </div>
     </div>
