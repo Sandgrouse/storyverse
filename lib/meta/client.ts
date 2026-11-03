@@ -39,7 +39,7 @@ function isRetryableStatus(status: number): boolean {
  * gets a 502/503 or never reaches the API. 4xx is never retried, and the
  * retry is skipped when RETRY_ELAPSED_BUDGET_MS has passed since start.
  */
-async function postWithRetry(
+export async function postWithRetry(
   url: string,
   init: RequestInit,
   startedAt: number,
