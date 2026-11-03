@@ -1254,6 +1254,79 @@ p {
   padding: 22px 26px;
   box-shadow: var(--lift);
 }
+
+/* Character sheet */
+.sheetwrap {
+  margin-top: 18px;
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+  padding-bottom: 10px;
+}
+.sheethead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sheethead .pill {
+  height: 40px;
+  padding: 0 20px;
+  font-size: 13.5px;
+}
+.sheetgrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.slotimg {
+  aspect-ratio: 2 / 3;
+  border-radius: 8px;
+  background-color: var(--sheet);
+  background-size: cover;
+  background-position: center top;
+  box-shadow: var(--lift);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  text-align: center;
+  color: var(--soft);
+  font-size: 12px;
+}
+.slotimg.busy {
+  animation: throb 1.4s ease-in-out infinite;
+}
+.slot small {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--soft);
+}
+.slot .slotmsg {
+  font: 300 13px/1.35 var(--serif);
+  color: var(--ink);
+}
+.slot textarea {
+  font: 300 13px/1.4 var(--sans);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--sheet);
+  color: var(--ink);
+  resize: vertical;
+  min-height: 56px;
+}
+.slot .quiet {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .tree b {
   color: var(--clay);
   font-weight: 500;

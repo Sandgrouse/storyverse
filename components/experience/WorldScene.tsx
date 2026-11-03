@@ -751,7 +751,7 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
         </div>
       </aside>
 
-      <CastDrawer world={liveWorld} open={drawer === "cast"} onClose={() => setDrawer(null)} />
+      <CastDrawer world={liveWorld} open={drawer === "cast"} onClose={() => setDrawer(null)} onWorld={setWorld} />
       <PackDrawer world={liveWorld} open={drawer === "pack"} onClose={() => setDrawer(null)} />
     </section>
   );
