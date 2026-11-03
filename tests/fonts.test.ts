@@ -17,4 +17,18 @@ describe("fonts", () => {
     expect(css).toContain("var(--font-serif)");
     expect(css).toContain("var(--font-sans)");
   });
+
+  it("app/layout.tsx applies font variables on the <html> element", async () => {
+    const layout = await readFile(
+      join(process.cwd(), "app", "layout.tsx"),
+      "utf-8",
+    );
+    const htmlTag = layout.match(/<html[^>]*>/)?.[0] ?? "";
+    expect(htmlTag, "<html> must apply serif.variable").toContain(
+      "serif.variable",
+    );
+    expect(htmlTag, "<html> must apply sans.variable").toContain(
+      "sans.variable",
+    );
+  });
 });
