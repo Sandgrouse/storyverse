@@ -142,6 +142,7 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
   const [failure, setFailure] = useState("");
   const [sample, setSample] = useState(false);
   const [applyState, setApplyState] = useState<Record<string, "working" | "error">>({});
+  const [applyMessages, setApplyMessages] = useState<Record<string, string>>({});
   const [oldContent, setOldContent] = useState<Record<string, string>>({});
   const [showOld, setShowOld] = useState<Record<string, boolean>>({});
   const [checking, setChecking] = useState(false);
@@ -228,6 +229,25 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
     setCracks((prev) => [...prev, d]);
   };
 
+  /** The server's message when it has one, so a budget stop reads as one. */
+  const responseMessage = async (
+    res: Response,
+    fallback: string,
+  ): Promise<string> => {
+    const json: unknown = await res.json().catch(() => null);
+    const record =
+      json !== null && typeof json === "object"
+        ? (json as Record<string, unknown>)
+        : null;
+    const error =
+      record?.error !== null && typeof record?.error === "object"
+        ? (record.error as Record<string, unknown>)
+        : null;
+    return typeof error?.message === "string" && error.message.length > 0
+      ? error.message
+      : fallback;
+  };
+
   const runCheck = async (decidedChange: string, nextWorld: World) => {
     setChecking(true);
     setCheckFailed(false);
@@ -241,13 +261,19 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
           world: stripImageData(nextWorld),
         }),
       });
-      if (!res.ok) throw new Error(`check failed: ${res.status}`);
+      if (!res.ok) {
+        throw new Error(
+          await responseMessage(res, "Could not check the new canon."),
+        );
+      }
       const json = CheckResponseSchema.parse(await res.json());
       if (json.sample) setSample(true);
       setVerdict(json.note);
-    } catch {
+    } catch (e) {
       setCheckFailed(true);
-      setVerdict("Could not check the new canon.");
+      setVerdict(
+        e instanceof Error ? e.message : "Could not check the new canon.",
+      );
     } finally {
       setChecking(false);
     }
@@ -274,6 +300,7 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
     setCracks([]);
     setSample(false);
     setApplyState({});
+    setApplyMessages({});
     setCheckFailed(false);
     setSceneArt({});
     setSceneDrafts({});
@@ -300,7 +327,11 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
         }),
       });
       if (requestId.current !== id) return;
-      if (!res.ok) throw new Error(`ripple failed: ${res.status}`);
+      if (!res.ok) {
+        throw new Error(
+          await responseMessage(res, "The ripple failed. Try again."),
+        );
+      }
       const result = RippleResultSchema.parse(await res.json());
       clearTimers();
       if (requestId.current !== id) return;
@@ -335,11 +366,11 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
           }, start + i * gap),
         );
       });
-    } catch {
+    } catch (e) {
       if (requestId.current !== id) return;
       clearTimers();
       setPhase("error");
-      setFailure("The ripple failed. Try again.");
+      setFailure(e instanceof Error ? e.message : "The ripple failed. Try again.");
       setVerdict("");
     }
   };
@@ -380,7 +411,11 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
         }),
       });
       if (requestId.current !== rippleId) return;
-      if (!res.ok) throw new Error(`apply failed: ${res.status}`);
+      if (!res.ok) {
+        throw new Error(
+          await responseMessage(res, "Applying the fix failed."),
+        );
+      }
       const json = ApplyResponseSchema.parse(await res.json());
       if (json.sample) setSample(true);
       const base = worldRef.current;
@@ -405,9 +440,14 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
         void regenSceneArt(fix, oldImage);
       }
       settleIfDone(progress, fix.id, "applied", nextWorld);
-    } catch {
+    } catch (e) {
       if (requestId.current !== rippleId) return;
       setApplyState((prev) => ({ ...prev, [fix.id]: "error" }));
+      setApplyMessages((prev) => ({
+        ...prev,
+        [fix.id]:
+          e instanceof Error ? e.message : "Applying the fix failed.",
+      }));
     }
   };
 
@@ -884,6 +924,10 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
                     <b>Fix:</b> {fix.proposal}
                   </p>
                   {!decision && (
+                    <>
+                    {applyFailed && applyMessages[fix.id] && (
+                      <p className="state">{applyMessages[fix.id]}</p>
+                    )}
                     <div className="acts">
                       <button
                         type="button"
@@ -906,6 +950,7 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
                         Keep as is
                       </button>
                     </div>
+                    </>
                   )}
                   {decision === "applied" && beat && (
                     <div className="newscene">

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { budgetMessage, checkBudget } from "@/lib/budget";
 import {
   ContentPolicyBlockedError,
   MetaApiError,
@@ -60,6 +61,11 @@ export async function POST(req: Request) {
 
   if (!process.env.MODEL_API_KEY) {
     return errorResponse(503, "NO_API_KEY", NO_KEY_MESSAGE);
+  }
+
+  const charge = await checkBudget("scene", req);
+  if (!charge.allowed) {
+    return errorResponse(429, "BUDGET", budgetMessage(charge.scope));
   }
 
   const attempt = (text: string | undefined) =>

@@ -9,14 +9,28 @@
       "name": "Anukili Ugama",
       "canon": "Huge and tall, with tough, coarse skin, a stomach like a big water pot, a scarred face, bloodshot eyes, lips as thick as tree bark and teeth like elephant tusks. He carries a tree stump, a bow and arrows, and a big stick with thorns at the head.",
       "artPath": "/anukili/anukili.webp",
-      "sheet": []
+      "sheet": [
+        { "view": "front", "imagePath": "/anukili/sheets/anukili-ugama/front.webp" },
+        { "view": "left", "imagePath": "/anukili/sheets/anukili-ugama/left.webp" },
+        { "view": "right", "imagePath": "/anukili/sheets/anukili-ugama/right.webp" },
+        { "view": "back", "imagePath": "/anukili/sheets/anukili-ugama/back.webp" },
+        { "view": "walking", "imagePath": "/anukili/sheets/anukili-ugama/walking.webp" },
+        { "view": "crouching", "imagePath": "/anukili/sheets/anukili-ugama/crouching.webp" }
+      ]
     },
     {
       "id": "enyinyi",
       "name": "Enyinyi",
       "canon": "Anukili's confidant and medicine man.",
       "artPath": "/anukili/enyinyi.webp",
-      "sheet": []
+      "sheet": [
+        { "view": "front", "imagePath": "/anukili/sheets/enyinyi/front.webp" },
+        { "view": "left", "imagePath": "/anukili/sheets/enyinyi/left.webp" },
+        { "view": "right", "imagePath": "/anukili/sheets/enyinyi/right.webp" },
+        { "view": "back", "imagePath": "/anukili/sheets/enyinyi/back.webp" },
+        { "view": "walking", "imagePath": "/anukili/sheets/enyinyi/walking.webp" },
+        { "view": "crouching", "imagePath": "/anukili/sheets/enyinyi/crouching.webp" }
+      ]
     },
     {
       "id": "anukilis-father",
