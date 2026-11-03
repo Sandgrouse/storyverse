@@ -19,19 +19,19 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
-git fetch origin --quiet
-if [ $# -ge 2 ]; then
-  git switch "$branch"
-else
-  git switch -c "$branch" origin/main
-fi
-
 prompt="$(mktemp)"
 {
   echo "Follow the project rules in AGENTS.md. Your task:"
   echo
   cat "$task_file"
 } > "$prompt"
+
+git fetch origin --quiet
+if [ $# -ge 2 ]; then
+  git switch "$branch"
+else
+  git switch -c "$branch" origin/main
+fi
 
 muse exec \
   --json \
