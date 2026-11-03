@@ -45,7 +45,7 @@ describe("experience scenes", () => {
       ["bring", <BringScene active files={[]} onFiles={noop} seed={world} sample={false} onSample={noop} onBack={noop} onRead={noop} />],
       ["reading", <ReadingScene active files={[]} idea="" seed={world} sample onFiles={noop} onDone={noop} />],
       ["understood", <UnderstoodScene active world={world} onWorld={noop} onBack={noop} onOpen={noop} />],
-      ["channels", <ChannelsScene active world={world} onOpen={noop} />],
+      ["channels", <ChannelsScene active world={world} onWorld={noop} onOpen={noop} />],
       ["world", <WorldScene active world={world} onWorld={noop} onStartOver={noop} />],
       ["experience", <Experience seed={world} />],
     ];

@@ -1,6 +1,13 @@
 import type { ReadModelOutput } from "@/lib/read";
 import type { PlanBeat, PlanChannel, PlanSecret } from "@/lib/plan";
 import { WorldSchema, type World } from "@/lib/world/schemas";
+import {
+  clearImages,
+  extractImageEntries,
+  loadImages,
+  restoreImageRefs,
+  saveImage,
+} from "@/lib/images";
 
 export const PART_TINTS = [
   "#e9e0ce",
@@ -204,19 +211,42 @@ export function loadPersistedWorld(): { world: World; sample: boolean } | null {
 export function persistWorld(world: World, sample: boolean): void {
   try {
     if (typeof window === "undefined") return;
+    // Data URLs move to the image store; only tiny refs persist.
+    const { world: refs, entries } = extractImageEntries(world);
+    for (const entry of entries) {
+      void saveImage(world.id, entry.name, entry.dataUrl).catch(() => {
+        // Memory already holds it; the reload copy is best effort.
+      });
+    }
     window.sessionStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ world: stripImageData(world), sample }),
+      JSON.stringify({ world: refs, sample }),
     );
   } catch {
     // Ignore quota and serialization failures; memory state still holds.
   }
 }
 
-export function clearPersistedWorld(): void {
+/** Fill a persisted world's image refs back in from the image store. */
+export async function hydrateWorld(world: World): Promise<World> {
+  try {
+    if (typeof window === "undefined") return world;
+    const images = await loadImages(world.id);
+    return restoreImageRefs(world, images);
+  } catch {
+    return world;
+  }
+}
+
+export function clearPersistedWorld(worldId?: string): void {
   try {
     if (typeof window === "undefined") return;
     window.sessionStorage.removeItem(STORAGE_KEY);
+    if (worldId) {
+      void clearImages(worldId).catch(() => {
+        // Memory is already dropped with the session state.
+      });
+    }
   } catch {
     // Ignore failures; in-memory state still resets.
   }
