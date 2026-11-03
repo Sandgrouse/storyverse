@@ -17,8 +17,20 @@ import {
   type RippleProgress,
 } from "@/lib/ripple";
 import { channelColorByIndex, stripImageData } from "@/lib/story";
+import rippleSeed from "@/data/seed/anukili-ripple.json";
 import CastDrawer from "./CastDrawer";
 import PackDrawer from "./PackDrawer";
+
+/** The sample project's suggestion lives in the seed ripple, not the world. */
+const SAMPLE_SUGGESTION =
+  typeof (rippleSeed as { change?: unknown }).change === "string"
+    ? (rippleSeed as { change: string }).change
+    : "";
+
+function suggestionFor(world: World): string {
+  if (world.sampleChange) return world.sampleChange;
+  return world.id === "anukili" ? SAMPLE_SUGGESTION : "";
+}
 
 const KIND_LABEL: Record<RippleFixKind, string> = {
   contradiction: "Now false",
@@ -91,8 +103,8 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
   const [drawer, setDrawer] = useState<"cast" | "pack" | null>(null);
 
   // The ask bar suggests the sample project's change, from the seed
-  // data. Any other world starts empty.
-  const [ask, setAsk] = useState(world.sampleChange ?? "");
+  // ripple data. Any other world starts empty.
+  const [ask, setAsk] = useState(() => suggestionFor(world));
   const [change, setChange] = useState("");
   const [phase, setPhase] = useState<"idle" | "waiting" | "done" | "error">(
     "idle",
@@ -140,10 +152,12 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
   }, [world]);
 
   // A new project gets its own bar: the sample suggestion, or empty.
+  // Any new world resets it, so an upload never keeps the old sentence.
+  const worldIdentity = `${world.id}::${world.sampleChange ?? ""}`;
   useEffect(() => {
-    setAsk(world.sampleChange ?? "");
+    setAsk(suggestionFor(world));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [world.id]);
+  }, [worldIdentity]);
 
   const beatsHere = (channelId: string, pid: string) =>
     liveWorld.beats.some((b) => b.channelId === channelId && b.partId === pid);

@@ -64,6 +64,8 @@ export const SecretSchema = z.object({
   text: z.string(),
   knownThrough: z.array(z.string()),
   note: z.string(),
+  /** True when the planner invented this secret; the creator confirms it. */
+  suggested: z.boolean().default(false),
 });
 
 export const GapSchema = z.object({

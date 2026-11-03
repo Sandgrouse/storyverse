@@ -166,6 +166,7 @@ export default function Experience({ seed }: { seed: World }) {
       <ChannelsScene
         active={scene === "channels"}
         world={world}
+        onWorld={handleWorld}
         onOpen={() => go("world")}
       />
       <WorldScene

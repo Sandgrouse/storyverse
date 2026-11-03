@@ -145,6 +145,7 @@ export function buildWorld(
       text: secret.text,
       knownThrough: secret.knownThrough,
       note: secret.note,
+      suggested: true,
     })),
     gaps: canon.gaps.map((gap) => ({ id: gap.id, question: gap.question })),
     canonChanges: [],

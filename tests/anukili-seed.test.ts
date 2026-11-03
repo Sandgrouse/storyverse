@@ -96,6 +96,46 @@ describe("anukili seed world", () => {
     }
   });
 
+  it("keeps the sample suggestion out of the seed world", async () => {
+    const raw = await readFile(
+      join(process.cwd(), "data", "seed", "anukili.json"),
+      "utf-8",
+    );
+    expect("sampleChange" in JSON.parse(raw)).toBe(false);
+  });
+
+  it("reads the owner's sentence from the seed ripple", async () => {
+    const raw = await readFile(
+      join(process.cwd(), "data", "seed", "anukili-ripple.json"),
+      "utf-8",
+    );
+    const ripple = RippleResultSchema.parse(JSON.parse(raw));
+    expect(ripple.change).toBe("Enyinyi told them how to kill him.");
+  });
+
+  it("marks planned secrets as suggestions", async () => {
+    const { buildWorld } = await import("@/lib/story");
+    const { ReadModelOutputSchema } = await import("@/lib/read");
+    const canon = ReadModelOutputSchema.parse({
+      title: "T",
+      logline: "L.",
+      characters: [],
+      locations: [],
+      parts: [],
+      gaps: [],
+    });
+    const world = buildWorld(
+      canon,
+      {
+        channels: [],
+        beats: [],
+        secrets: [{ id: "s1", text: "Hidden.", knownThrough: [], note: "N." }],
+      },
+      () => "",
+    );
+    expect(world.secrets.map((s) => s.suggested)).toEqual([true]);
+  });
+
   it("covers every channel secret from the treatment", async () => {
     const raw = await readFile(
       join(process.cwd(), "data", "seed", "anukili.json"),
