@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storyverse experience prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Spectral:ital,wght@0,300;0,400;1,300&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --night: #08090b;
+  --char: #121316;
+  --smoke: rgba(255, 244, 230, .13);
+  --bone: #f3ecdf;
+  --ash: #a79f92;
+  --ember: #f2703a;
+  --gold: #e3b45f;
+  --series: #e3b45f;
+  --game: #6fb7c9;
+  --shorts: #d98ba0;
+  --heal: #8ed0a4;
+  --display: "Cinzel", Georgia, serif;
+  --story: "Spectral", Georgia, serif;
+  --ui: "Manrope", system-ui, sans-serif;
+  --ease: cubic-bezier(.2, .7, .1, 1);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--night); color: var(--bone); font: 15px/1.5 var(--ui); overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+h1, h2, h3, p { margin: 0; }
+
+.scene { position: fixed; inset: 0; opacity: 0; pointer-events: none; transition: opacity .9s ease; }
+.scene.on { opacity: 1; pointer-events: auto; }
+.art { position: absolute; inset: 0; background-size: cover; background-position: center; }
+.veil { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,9,11,.35), rgba(8,9,11,.1) 40%, rgba(8,9,11,.92)); }
+.drift { animation: drift 34s ease-in-out infinite alternate; }
+@keyframes drift { from { transform: scale(1.02); } to { transform: scale(1.13) translate(-1.5%, -1%); } }
+
+.cta { display: inline-flex; align-items: center; gap: 12px; height: 54px; padding: 0 30px; background: var(--bone); color: #17130c; border-radius: 2px; font-weight: 600; letter-spacing: .01em; transition: background .25s, transform .25s; }
+.cta:hover { background: #fff; transform: translateY(-1px); }
+.cta[disabled] { opacity: .35; cursor: default; transform: none; }
+.quiet { color: var(--ash); padding: 10px 2px; transition: color .2s; }
+.quiet:hover { color: var(--bone); }
+.mark { position: absolute; top: 28px; left: 36px; font: 500 17px var(--display); letter-spacing: .18em; z-index: 5; }
+
+/* Arrival */
+#arrival .center { position: absolute; left: 0; right: 0; bottom: 13vh; padding: 0 8vw; }
+#arrival h1 { font: 500 clamp(44px, 7.4vw, 112px)/1.04 var(--display); letter-spacing: .01em; max-width: 14ch; }
+.moment { position: absolute; left: 8vw; bottom: 13vh; right: 8vw; opacity: 0; transform: translateY(14px); transition: opacity 1s, transform 1.4s var(--ease); pointer-events: none; }
+.moment.on { opacity: 1; transform: none; pointer-events: auto; }
+.moment p { font: 300 clamp(20px, 2.2vw, 30px)/1.35 var(--story); color: var(--bone); max-width: 30em; margin-top: 18px; }
+.moment .row { display: flex; gap: 22px; align-items: center; margin-top: 34px; }
+.pips { position: absolute; right: 36px; top: 34px; display: flex; gap: 8px; z-index: 5; align-items: center; }
+.pips i { width: 26px; height: 2px; background: var(--smoke); }
+.pips i.on { background: var(--bone); }
+
+/* Fork */
+#fork { display: grid; grid-template-columns: 1fr 1fr; transition: opacity .9s, grid-template-columns .7s var(--ease); }
+#fork:has(.door:first-of-type:hover) { grid-template-columns: 1.25fr 1fr; }
+#fork:has(.door:last-of-type:hover) { grid-template-columns: 1fr 1.25fr; }
+.door { position: relative; overflow: hidden; text-align: left; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 5vw 12vh; min-width: 0; }
+.door .art { filter: brightness(.45) saturate(.85); transition: filter .7s, transform 1.6s var(--ease); }
+.door:hover .art { filter: brightness(.75); transform: scale(1.04); }
+.door::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, rgba(8,9,11,.92)); }
+.door > div:last-child { position: relative; z-index: 1; }
+.door small { color: var(--gold); font-weight: 600; letter-spacing: .14em; text-transform: uppercase; font-size: 11.5px; }
+.door h2 { font: 500 clamp(30px, 3.6vw, 52px)/1.1 var(--display); margin: 10px 0 12px; }
+.door p { font: 300 19px/1.4 var(--story); color: #d9d2c5; max-width: 26em; }
+.forkq { position: absolute; left: 0; right: 0; top: 11vh; text-align: center; font: 300 clamp(22px, 2.4vw, 32px) var(--story); z-index: 3; pointer-events: none; }
+
+/* Bring */
+.page { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 11vh 8vw 7vh; overflow: auto; }
+.page h2 { font: 500 clamp(30px, 3.6vw, 50px)/1.12 var(--display); }
+.lede { font: 300 21px/1.4 var(--story); color: #d9d2c5; margin-top: 12px; max-width: 34em; }
+.drop { margin-top: 30px; flex: 1; min-height: 240px; border: 1px dashed rgba(255,244,230,.28); border-radius: 3px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; transition: border-color .3s, background .3s; text-align: center; }
+.drop:hover { border-color: var(--gold); background: rgba(227,180,95,.05); }
+.drop b { font: 400 24px var(--story); }
+.drop span { color: var(--ash); }
+.items { display: none; margin-top: 30px; flex: 1; gap: 14px; grid-template-columns: repeat(4, 1fr); align-content: start; }
+.items.on { display: grid; }
+.item { opacity: 0; transform: translateY(16px); animation: rise .8s var(--ease) forwards; border: 1px solid var(--smoke); background: var(--char); min-width: 0; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+.item .pic { height: 150px; background-size: cover; background-position: center top; }
+.item .doc { height: 150px; padding: 16px; font: 300 13.5px/1.4 var(--story); color: #bdb5a7; overflow: hidden; }
+.item div.t { padding: 12px 14px; }
+.item b { display: block; font-weight: 600; font-size: 14px; }
+.item i { font-style: normal; color: var(--gold); font-size: 12.5px; }
+.note { margin-top: 18px; color: #d9d2c5; font: 300 18px var(--story); min-height: 28px; }
+.bar { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; }
+
+/* Reading */
+#reading { background: var(--night); }
+.flow { position: absolute; inset: 0 0 44vh 0; padding: 9vh 12vw 0; font: 300 clamp(17px, 1.65vw, 24px)/1.7 var(--story); color: rgba(243,236,223,.16); overflow: hidden; }
+.flow em { font-style: normal; transition: color 1s, text-shadow 1s; }
+.flow em.lit { color: var(--gold); text-shadow: 0 0 26px rgba(227,180,95,.55); }
+.cast { position: absolute; inset: auto 0 9vh 0; display: flex; justify-content: center; gap: 22px; }
+.bust { width: clamp(130px, 13vw, 190px); opacity: 0; transform: translateY(20px); filter: brightness(.2); transition: opacity 1.4s, transform 1.6s var(--ease), filter 2.2s; text-align: center; }
+.bust.on { opacity: 1; transform: none; filter: none; }
+.bust .pic { aspect-ratio: 3/4; background-size: cover; background-position: center top; border: 1px solid var(--smoke); }
+.bust b { display: block; margin-top: 10px; font: 500 14px var(--display); letter-spacing: .08em; }
+.bust small { color: var(--ash); }
+.status { position: absolute; top: 30px; right: 36px; color: var(--ash); font-size: 13.5px; }
+
+/* Understood */
+.columns { display: grid; grid-template-columns: 1.35fr 1fr; gap: 6vw; margin-top: 30px; flex: 1; min-height: 0; }
+.logline { font: 300 clamp(22px, 2.3vw, 31px)/1.36 var(--story); }
+.names { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px; }
+.names span { padding: 5px 12px; border: 1px solid var(--smoke); border-radius: 99px; color: #d9d2c5; font-size: 13.5px; }
+.gapq { border-left: 2px solid var(--gold); padding: 2px 0 2px 18px; margin-bottom: 22px; }
+.gapq small { color: var(--gold); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; font-size: 11px; }
+.gapq p { font: 300 19px/1.35 var(--story); margin-top: 4px; }
+.gapq div { display: flex; gap: 14px; margin-top: 6px; color: var(--ash); font-size: 13.5px; }
+
+/* Channels */
+.chs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 30px; flex: 1; min-height: 0; }
+.ch { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 22px; text-align: left; border: 1px solid var(--smoke); min-height: 300px; }
+.ch .art { filter: brightness(.5); transition: filter .5s, transform 1.4s var(--ease); }
+.ch:hover .art { filter: brightness(.7); transform: scale(1.04); }
+.ch > div:last-child { position: relative; }
+.ch::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 25%, rgba(8,9,11,.95)); }
+.ch > div:last-child { z-index: 1; }
+.ch h3 { font: 500 24px var(--display); }
+.ch small { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.ch p { margin-top: 8px; font: 300 17px/1.35 var(--story); color: #e4ddcf; }
+.ch p b { font-weight: 400; color: var(--gold); }
+
+/* World */
+#world .hero { position: absolute; inset: 0; transition: transform 1.3s var(--ease), filter 1.3s; transform-origin: 50% 25%; }
+#world .art { opacity: 0; transition: opacity 1.1s; }
+#world .art.on { opacity: 1; }
+#world .veil { background: linear-gradient(180deg, rgba(8,9,11,.5), transparent 26%, transparent 42%, rgba(8,9,11,.96) 78%); }
+.title { position: absolute; left: 36px; bottom: 306px; right: 36px; transition: opacity .6s; max-width: 760px; }
+.title small { color: var(--gold); font-weight: 600; letter-spacing: .13em; text-transform: uppercase; font-size: 11.5px; }
+.title h2 { font: 500 clamp(34px, 4.6vw, 66px)/1.05 var(--display); margin-top: 6px; }
+.title p { font: 300 19px/1.4 var(--story); color: #e8e1d3; margin-top: 10px; }
+.tools { position: absolute; top: 22px; right: 36px; display: flex; gap: 4px; z-index: 5; }
+.tools button { padding: 8px 13px; color: #e8e1d3; font-size: 13.5px; border-radius: 2px; }
+.tools button:hover { background: rgba(255,255,255,.1); }
+
+.strand { position: absolute; left: 0; right: 0; bottom: 0; height: 292px; padding: 0 36px 16px 36px; transition: height 1.2s var(--ease), right 1.2s var(--ease); display: flex; flex-direction: column; }
+.map { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: 76px repeat(5, 1fr); grid-template-rows: minmax(84px, 1fr) repeat(3, 26px); column-gap: 8px; row-gap: 2px; }
+.film { all: unset; cursor: pointer; position: relative; overflow: hidden; background-size: cover; background-position: center; opacity: .62; transition: opacity .3s, box-shadow .3s; }
+.film:hover { opacity: .88; }
+.film.on { opacity: 1; box-shadow: inset 0 -2px 0 var(--bone); }
+.film:focus-visible { outline: 2px solid var(--gold); }
+.film span { position: absolute; left: 9px; bottom: 6px; font: 500 12.5px var(--display); letter-spacing: .05em; text-shadow: 0 1px 8px #000; }
+.film.hit { opacity: 1; box-shadow: 0 0 0 1px var(--ember), 0 0 24px rgba(242,112,58,.5); }
+.film.healed { opacity: 1; box-shadow: 0 0 0 1px var(--heal); }
+.lab { font-size: 11.5px; font-weight: 600; align-self: center; }
+.cell { position: relative; align-self: center; height: 26px; }
+.cell::before { content: ""; position: absolute; left: -8px; right: 0; top: 12.5px; height: 1px; background: var(--c); opacity: .3; }
+.node { position: absolute; left: 50%; top: 13px; width: 11px; height: 11px; border-radius: 50%; transform: translate(-50%, -50%); background: var(--c); box-shadow: 0 0 10px var(--c); transition: background .4s, box-shadow .4s; }
+.node.hit { background: var(--ember); box-shadow: 0 0 0 4px rgba(242,112,58,.25), 0 0 18px var(--ember); animation: pulse 1.5s ease-in-out infinite; }
+.node.healed { background: var(--heal); box-shadow: 0 0 12px var(--heal); animation: none; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(242,112,58,.08), 0 0 26px var(--ember); } }
+.crack { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 3; }
+.crack path { fill: none; stroke: var(--ember); stroke-width: 2.2; filter: drop-shadow(0 0 7px var(--ember)); }
+
+.ask { display: flex; gap: 10px; margin-top: 14px; }
+.ask input { flex: 1; min-width: 0; height: 50px; padding: 0 18px; background: rgba(255,244,230,.07); border: 1px solid var(--smoke); color: var(--bone); font: 300 19px var(--story); border-radius: 2px; }
+.ask input::placeholder { color: var(--ash); }
+.ask .cta { height: 50px; }
+
+/* Ripple mode */
+#world.ripple .hero { filter: brightness(.3) saturate(.6); transform: scale(1.04); }
+#world.ripple .title { opacity: 0; pointer-events: none; }
+#world.ripple .strand { height: 72vh; right: 430px; }
+#world.ripple .map { grid-template-rows: minmax(120px, 1fr) repeat(3, 56px); }
+#world.ripple .cell { height: 56px; }
+#world.ripple .cell::before { top: 27.5px; }
+#world.ripple .node { top: 28px; }
+.heading { position: absolute; left: 36px; top: 11vh; right: 466px; opacity: 0; transition: opacity .9s .3s; pointer-events: none; }
+#world.ripple .heading { opacity: 1; }
+.heading small { color: var(--ember); font-weight: 600; letter-spacing: .13em; text-transform: uppercase; font-size: 11.5px; }
+.heading h2 { font: 300 clamp(26px, 3vw, 40px)/1.2 var(--story); font-style: italic; margin-top: 6px; }
+.panel { position: absolute; top: 0; right: 0; bottom: 0; width: 430px; padding: 76px 26px 22px; background: rgba(13,13,15,.96); border-left: 1px solid var(--smoke); transform: translateX(100%); transition: transform 1s var(--ease); overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+#world.ripple .panel { transform: none; }
+.fix { border: 1px solid var(--smoke); padding: 16px; opacity: 0; transform: translateX(16px); transition: opacity .7s, transform .7s var(--ease), border-color .4s; }
+.fix.in { opacity: 1; transform: none; }
+.fix small { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.fix h3 { font: 400 20px/1.25 var(--story); margin: 5px 0 6px; }
+.fix p { color: var(--ash); font-size: 13.5px; }
+.fix p b { color: var(--bone); font-weight: 500; }
+.fix .acts { display: flex; gap: 8px; margin-top: 12px; }
+.fix .acts button { flex: 1; height: 38px; border: 1px solid var(--smoke); font-size: 13.5px; border-radius: 2px; }
+.fix .acts .yes { background: var(--bone); color: #17130c; font-weight: 600; border-color: var(--bone); }
+.fix.done { border-color: var(--heal); }
+.fix.done .acts, .fix.kept .acts { display: none; }
+.fix .state { display: none; margin-top: 8px; color: var(--heal); font-size: 12.5px; }
+.fix.done .state { display: block; }
+.fix.kept { opacity: .45; }
+.verdict { margin-top: auto; padding-top: 14px; }
+.verdict p { font: 300 19px/1.35 var(--story); min-height: 28px; }
+.verdict .cta { margin-top: 12px; width: 100%; justify-content: center; }
+.verdict .cta:not(.show) { display: none; }
+
+/* Drawer */
+.drawer { position: absolute; inset: 0; background: rgba(8,9,11,.97); transform: translateY(100%); transition: transform .8s var(--ease); padding: 70px 36px 26px; z-index: 10; display: flex; flex-direction: column; }
+.drawer.on { transform: none; }
+.drawer h2 { font: 500 34px var(--display); }
+.drawer .close { position: absolute; top: 22px; right: 36px; color: var(--ash); }
+.sheet { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 300px)) 1fr; gap: 24px; margin-top: 20px; }
+.sheet .pic { background-size: contain; background-repeat: no-repeat; background-position: center top; }
+.sheet .side p { font: 300 18px/1.4 var(--story); color: #e4ddcf; margin-bottom: 14px; }
+.sheet .side small { color: var(--gold); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; font-size: 11px; display: block; margin-bottom: 2px; }
+.pkg { font: 13.5px/1.9 ui-monospace, Menlo, monospace; white-space: pre; color: #d9d2c5; margin-top: 18px; overflow: auto; flex: 1; }
+.pkg b { color: var(--gold); font-weight: 500; }
+
+.sample { position: fixed; left: 50%; transform: translateX(-50%); top: 8px; color: rgba(167,159,146,.55); white-space: nowrap; font-size: 11px; z-index: 20; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .drift { animation: none; } * { transition-duration: .01s !important; } }
+</style>
+</head>
+<body>
+
+<section class="scene on" id="arrival">
+  <div class="art drift" style="background-image:url(anukili/storm.webp)"></div>
+  <div class="veil"></div>
+  <div class="mark">STORYVERSE</div>
+  <div class="pips" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+  <div class="moment on" data-m="0">
+    <h1 style="font:500 clamp(44px,7.4vw,112px)/1.04 var(--display);max-width:13ch">One story. Every screen.</h1>
+    <p>A great story never fits in one place. It wants a series, a game, a thousand shorter tellings.</p>
+    <div class="row"><button class="cta" data-next>Show me</button><button class="quiet" data-skip>Skip the intro</button></div>
+  </div>
+  <div class="moment" data-m="1">
+    <h1 style="font:500 clamp(36px,5.6vw,84px)/1.08 var(--display);max-width:15ch">Give each screen its own secret.</h1>
+    <p>The show tells one side. The game hides another. Your fans follow you across all of them to get the whole truth.</p>
+    <div class="row"><button class="cta" data-next>Continue</button><button class="quiet" data-skip>Skip the intro</button></div>
+  </div>
+  <div class="moment" data-m="2">
+    <h1 style="font:500 clamp(36px,5.6vw,84px)/1.08 var(--display);max-width:15ch">Change it once. It follows everywhere.</h1>
+    <p>Storyverse keeps your characters and your canon in one place, and shows you what breaks when the story turns.</p>
+    <div class="row"><button class="cta" data-go="fork">Begin a story</button></div>
+  </div>
+</section>
+
+<section class="scene" id="fork">
+  <div class="forkq">Where are you with your story?</div>
+  <button class="door" data-go="bring">
+    <div class="art" style="background-image:url(anukili/roots.webp)"></div>
+    <div><small>Start from nothing</small><h2>I have an idea</h2><p>Tell me what's in your head. I'll ask a few questions, then build the world with you.</p></div>
+  </button>
+  <button class="door" data-go="bring">
+    <div class="art" style="background-image:url(anukili/omabala.webp)"></div>
+    <div><small>Pick up where you left off</small><h2>I already have material</h2><p>Scripts, a treatment, reference art, clips. Bring whatever you've got, in whatever state it's in.</p></div>
+  </button>
+</section>
+
+<section class="scene" id="bring">
+  <div class="page">
+    <h2>Bring me what you have</h2>
+    <p class="lede">Don't sort it first. I'll work out what each piece is.</p>
+    <button class="drop" id="drop"><b>Drop files here</b><span>Prototype: click to bring in the Anukili project</span></button>
+    <div class="items" id="items"></div>
+    <p class="note" id="note"></p>
+    <div class="bar"><button class="quiet" data-go="fork">Back</button><button class="cta" id="readBtn" disabled>Read my story</button></div>
+  </div>
+</section>
+
+<section class="scene" id="reading">
+  <div class="status" id="status">Reading anukili-treatment.md</div>
+  <div class="flow" id="flow"></div>
+  <div class="cast">
+    <div class="bust" data-b="0"><div class="pic" style="background-image:url(anukili/anukili.webp)"></div><b>ANUKILI UGAMA</b><small>The titan</small></div>
+    <div class="bust" data-b="1"><div class="pic" style="background-image:url(anukili/enyinyi.webp)"></div><b>ENYINYI</b><small>Medicine man</small></div>
+    <div class="bust" data-b="2"><div class="pic" style="background-image:url(anukili/pots.webp);background-position:center"></div><b>EZIAGULU</b><small>His own people</small></div>
+    <div class="bust" data-b="3"><div class="pic" style="background-image:url(anukili/omabala.webp);background-position:center"></div><b>THE OMABALA</b><small>The river they crossed</small></div>
+  </div>
+</section>
+
+<section class="scene" id="understood">
+  <div class="page">
+    <h2>Here's what I understood</h2>
+    <div class="columns">
+      <div>
+        <p class="logline">A child born with teeth and a fist of roots grows into the titan who saves Aguleri, then becomes the thing it fears most, until his own people put fire on his head.</p>
+        <div class="names"><span>Anukili Ugama</span><span>Enyinyi</span><span>Anukili's father</span><span>The people of Eziagulu</span><span>Aguleri</span><span>The Omabala</span><span>The stream</span></div>
+      </div>
+      <div>
+        <div class="gapq"><small>A gap</small><p>Why did the baby live past the fourth day? Your treatment doesn't say.</p><div><button class="quiet">Answer now</button><button class="quiet">Keep it a secret</button></div></div>
+        <div class="gapq"><small>A gap</small><p>Who came up with the plan that finally worked? It's the biggest open question in the story.</p><div><button class="quiet">Answer now</button><button class="quiet">Keep it a secret</button></div></div>
+      </div>
+    </div>
+    <div class="bar"><button class="quiet" data-go="bring">Add more material</button><button class="cta" data-go="channels">That's my story</button></div>
+  </div>
+</section>
+
+<section class="scene" id="channels">
+  <div class="page">
+    <h2>Where should it live?</h2>
+    <p class="lede">Here's how I'd split it, so each screen holds something the others don't.</p>
+    <div class="chs">
+      <button class="ch"><div class="art" style="background-image:url(anukili/fire.webp)"></div><div><small style="color:var(--series)">Series</small><h3>Five episodes</h3><p>His whole life. <b>Only here:</b> why the baby lived.</p></div></button>
+      <button class="ch"><div class="art" style="background-image:url(anukili/hippo.webp)"></div><div><small style="color:var(--game)">Game</small><h3>The hunt at the stream</h3><p>You face the hippopotamus. <b>Only here:</b> what the stream hides.</p></div></button>
+      <button class="ch"><div class="art" style="background-image:url(anukili/pots.webp)"></div><div><small style="color:var(--shorts)">Shorts</small><h3>The women of Eziagulu</h3><p>Each tells her own story. <b>Only here:</b> who first spoke the vow.</p></div></button>
+    </div>
+    <div class="bar"><button class="quiet">Add a channel</button><button class="cta" data-go="world">Open my world</button></div>
+  </div>
+</section>
+
+<section class="scene" id="world">
+  <div class="hero" id="hero"></div>
+  <div class="veil"></div>
+  <div class="mark">ANUKILI</div>
+  <div class="tools">
+    <button data-drawer="sheet">Characters</button>
+    <button data-drawer="package">Agent package</button>
+  </div>
+  <div class="title" id="title"></div>
+  <div class="heading"><small>The change</small><h2 id="changeText"></h2></div>
+  <div class="strand">
+    <div class="map" id="map"></div>
+    <form class="ask" id="ask">
+      <input id="change" aria-label="Change the story" placeholder="What if…" value="Enyinyi told them how to kill him." autocomplete="off">
+      <button class="cta" type="submit">Follow the change</button>
+    </form>
+  </div>
+  <aside class="panel" aria-label="What breaks">
+    <div id="fixes" style="display:flex;flex-direction:column;gap:12px"></div>
+    <div class="verdict"><p id="verdict"></p><button class="cta" id="backBtn">Back to my world</button></div>
+  </aside>
+
+  <div class="drawer" id="sheet">
+    <button class="close" data-close>Close</button>
+    <h2>Anukili Ugama</h2>
+    <div class="sheet">
+      <div class="pic" style="background-image:url(anukili/anukili.webp)"></div>
+      <div class="pic" style="background-image:url(anukili/enyinyi.webp)"></div>
+      <div class="side">
+        <small>Canon</small><p>Huge and tall, with tough, coarse skin, a scarred face, bloodshot eyes and teeth like elephant tusks.</p>
+        <small>Carries</small><p>A tree stump, a bow and arrows, and a big stick with thorns at the head.</p>
+        <small>Appears in</small><p>Series: all five episodes. Game: the hunt at the stream. Shorts: every telling.</p>
+        <button class="cta">Generate full sheet</button>
+      </div>
+    </div>
+  </div>
+  <div class="drawer" id="package">
+    <button class="close" data-close>Close</button>
+    <h2>Hand it to any coding agent</h2>
+    <div class="pkg"><b>anukili-game/</b>
+├─ AGENT_BRIEF.md       <b>Players may learn what the stream hides. They may not learn why the baby lived.</b>
+├─ manifest.json
+├─ canon/               world, timeline, secrets for this channel only
+├─ characters/
+│  └─ anukili-ugama/    sheet views, plus cutouts from SAM 3.1
+└─ levels/
+   └─ the-stream.md</div>
+    <div class="bar"><span></span><button class="cta">Export package</button></div>
+  </div>
+</section>
+
+<div class="sample">Design prototype. Sample results, no live model calls. Art made with Muse Image.</div>
+
+<script>
+const PARTS = [
+  { t: "The Omen", art: "roots", line: "Born legs first, with teeth, clutching roots in both hands." },
+  { t: "The Weight", art: "anukili", line: "He eats for thirty men, and whatever he touches comes crashing down." },
+  { t: "The Stream", art: "hippo", line: "A hippopotamus is killing people at the stream. He calls it tiny." },
+  { t: "The Pots", art: "pots", line: "At thirty, he breaks the women's water pots with one finger." },
+  { t: "The Fire", art: "fire", line: "Their first plan fails. Their next puts fire on his head." },
+];
+const LANES = [
+  { id: "series", name: "Series", c: "var(--series)", at: [0, 1, 2, 3, 4] },
+  { id: "game", name: "Game", c: "var(--game)", at: [2] },
+  { id: "shorts", name: "Shorts", c: "var(--shorts)", at: [3, 4] },
+];
+const FIXES = [
+  { id: "cure", lane: "series", part: 4, ch: "Series · Episode 5", c: "var(--series)", h: "The cure now means something else", p: "He calls Enyinyi a man of God, then Enyinyi gives them the plan.", fix: "Keep the line. Hold on Enyinyi's face a beat too long.", state: "Applied to the Episode 5 script" },
+  { id: "stream", lane: "game", part: 2, ch: "Game · The Stream", c: "var(--game)", h: "The stream's secret needs a new clue", p: "Nothing in the game hints at Enyinyi yet.", fix: "Leave his herb pouch on the bank where players can find it.", state: "Scene image regenerated, game brief updated" },
+  { id: "vow", lane: "shorts", part: 3, ch: "Shorts · The Pots", c: "var(--shorts)", h: "The women have seen something", p: "One of them would have noticed him on the path at night.", fix: "Add one line: she saw the medicine man near the elders' house.", state: "Applied to the short" },
+];
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+function go(id) {
+  $$(".scene").forEach(s => s.classList.toggle("on", s.id === id));
+  if (id === "reading") startReading();
+}
+document.addEventListener("click", e => {
+  const g = e.target.closest("[data-go]");
+  if (g) go(g.dataset.go);
+});
+
+/* Arrival */
+let m = 0;
+function moment(n) {
+  m = n;
+  $$(".moment").forEach(x => x.classList.toggle("on", +x.dataset.m === n));
+  $$(".pips i").forEach((p, i) => p.classList.toggle("on", i <= n));
+}
+$$("[data-next]").forEach(b => b.addEventListener("click", () => moment(m + 1)));
+$$("[data-skip]").forEach(b => b.addEventListener("click", () => go("fork")));
+
+/* Bring */
+const FOUND = [
+  { name: "anukili-treatment.md", is: "Story treatment, five parts", doc: "A boy is born in Aguleri legs first, with upper and lower teeth, clutching roots and herbs in both hands…" },
+  { name: "anukili-reference.webp", is: "Character art: Anukili", pic: "anukili" },
+  { name: "enyinyi-reference.webp", is: "Character art: Enyinyi", pic: "enyinyi" },
+  { name: "stream-hippo.webp", is: "Scene art: The Stream", pic: "hippo" },
+];
+$("#drop").addEventListener("click", () => {
+  $("#drop").style.display = "none";
+  const box = $("#items");
+  box.classList.add("on");
+  FOUND.forEach((f, i) => {
+    const el = document.createElement("div");
+    el.className = "item";
+    el.style.animationDelay = `${i * .28}s`;
+    el.innerHTML = (f.pic ? `<div class="pic" style="background-image:url(anukili/${f.pic}.webp)"></div>` : `<div class="doc">${f.doc}</div>`) + `<div class="t"><b>${f.name}</b><i>${f.is}</i></div>`;
+    box.append(el);
+  });
+  setTimeout(() => {
+    $("#note").textContent = "You have a story and some art. You don't have character sheets or a channel plan yet. I can make both.";
+    $("#readBtn").disabled = false;
+  }, 1500);
+});
+$("#readBtn").addEventListener("click", () => go("reading"));
+
+/* Reading */
+const TEXT = `A boy is born in <em>Aguleri</em> legs first, with upper and lower teeth, clutching roots and herbs in both hands. His father calls it an abomination. The child lives. He cannot cry until he is seven years old. <em>Anukili Ugama</em> becomes a leader with no training at all. He eats the food meant for thirty men. Anything he touches comes crashing to the ground. <em>Enyinyi</em>, his confidant and medicine man, stays at his side. A hippopotamus starts attacking people at the stream. He calls it tiny, and he kills it. At thirty, he turns on his own people in <em>Eziagulu</em>. He snatches the women's water pots and breaks them with one finger. One night they run across the <em>Omabala</em> to escape him. He finds them. Owl's droppings blind him, and <em>Enyinyi</em>'s herbs restore his sight. Their first plan fails. Their next puts burning fire on his head.`;
+let read = false;
+function startReading() {
+  if (read) return;
+  read = true;
+  $("#flow").innerHTML = TEXT;
+  const ems = $$("#flow em");
+  const busts = $$(".bust");
+  const steps = ["Reading anukili-treatment.md", "Found the people", "Found the places", "Building the timeline", "Looking for gaps"];
+  [[0, 0], [1, 1], [3, 2], [4, 3]].forEach(([e, b], i) => setTimeout(() => {
+    ems[e].classList.add("lit");
+    if (ems[e + 1] && e === 1) ems[5].classList.add("lit");
+    busts[b].classList.add("on");
+    $("#status").textContent = steps[i + 1] || steps[0];
+  }, 900 + i * 1300));
+  setTimeout(() => go("understood"), 7400);
+}
+
+/* World */
+const hero = $("#hero");
+PARTS.forEach((p, i) => {
+  const a = document.createElement("div");
+  a.className = "art" + (i === 2 ? " on" : "");
+  a.style.backgroundImage = `url(anukili/${p.art}.webp)`;
+  hero.append(a);
+});
+function show(i) {
+  $$(".art", hero).forEach((a, x) => a.classList.toggle("on", x === i));
+  $$(".film").forEach((f, x) => f.classList.toggle("on", x === i));
+  $("#title").innerHTML = `<small>Part ${i + 1} of 5</small><h2>${PARTS[i].t}</h2><p>${PARTS[i].line}</p>`;
+}
+const map = $("#map");
+map.append(Object.assign(document.createElement("div"), { className: "lab" }));
+PARTS.forEach((p, i) => {
+  const b = document.createElement("button");
+  b.className = "film";
+  b.dataset.part = i;
+  b.style.backgroundImage = `url(anukili/${p.art}.webp)`;
+  b.innerHTML = `<span>${p.t}</span>`;
+  b.addEventListener("click", () => show(i));
+  map.append(b);
+});
+LANES.forEach(l => {
+  const lab = document.createElement("div");
+  lab.className = "lab";
+  lab.style.color = l.c;
+  lab.textContent = l.name;
+  map.append(lab);
+  PARTS.forEach((_, i) => {
+    const c = document.createElement("div");
+    c.className = "cell";
+    c.style.setProperty("--c", l.c);
+    if (l.at.includes(i)) {
+      const n = document.createElement("div");
+      n.className = "node";
+      n.dataset.key = `${l.id}-${i}`;
+      c.append(n);
+    }
+    map.append(c);
+  });
+});
+show(2);
+
+function drawCrack(from, to) {
+  const svg = $(".crack") || map.appendChild(Object.assign(document.createElementNS("http://www.w3.org/2000/svg", "svg"), {}));
+  svg.setAttribute("class", "crack");
+  const R = map.getBoundingClientRect();
+  const A = from.getBoundingClientRect(), B = to.getBoundingClientRect();
+  const x1 = A.left + A.width / 2 - R.left, y1 = A.top + A.height / 2 - R.top;
+  const x2 = B.left + B.width / 2 - R.left, y2 = B.top + B.height / 2 - R.top;
+  let d = `M${x1} ${y1}`;
+  const steps = 7;
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    d += ` L${x1 + (x2 - x1) * t + (i % 2 ? 7 : -7)} ${y1 + (y2 - y1) * t + (i % 2 ? -11 : 11)}`;
+  }
+  d += ` L${x2} ${y2}`;
+  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("d", d);
+  svg.append(p);
+  const len = p.getTotalLength();
+  p.style.strokeDasharray = len;
+  p.style.strokeDashoffset = len;
+  p.getBoundingClientRect();
+  p.style.transition = "stroke-dashoffset .9s ease-out";
+  p.style.strokeDashoffset = 0;
+}
+
+let open = 0;
+$("#ask").addEventListener("submit", e => {
+  e.preventDefault();
+  const world = $("#world");
+  world.classList.add("ripple");
+  $("#changeText").textContent = `“${$("#change").value}”`;
+  $("#verdict").textContent = "Reading every channel against the change…";
+  $("#backBtn").classList.remove("show");
+  $(".crack")?.remove();
+  const box = $("#fixes");
+  box.innerHTML = "";
+  open = FIXES.length;
+  setTimeout(() => {
+    const origin = $('[data-key="series-4"]');
+    FIXES.forEach((f, i) => setTimeout(() => {
+      const node = $(`[data-key="${f.lane}-${f.part}"]`);
+      if (i > 0) drawCrack(origin, node);
+      node.classList.add("hit");
+      $(`.film[data-part="${f.part}"]`).classList.add("hit");
+      const c = document.createElement("article");
+      c.className = "fix";
+      c.innerHTML = `<small style="color:${f.c}">${f.ch}</small><h3>${f.h}</h3><p>${f.p}</p><p style="margin-top:6px"><b>Fix:</b> ${f.fix}</p><div class="acts"><button class="yes">Apply</button><button class="no">Keep as is</button></div><div class="state">${f.state}</div>`;
+      box.append(c);
+      requestAnimationFrame(() => c.classList.add("in"));
+      const settle = () => {
+        open--;
+        $("#verdict").textContent = open ? `${open} left to decide. Nothing changes until you say so.` : "Checked again. All channels agree with the new canon.";
+        if (!open) $("#backBtn").classList.add("show");
+      };
+      $(".yes", c).addEventListener("click", () => {
+        c.classList.add("done");
+        node.classList.remove("hit");
+        node.classList.add("healed");
+        const film = $(`.film[data-part="${f.part}"]`);
+        film.classList.remove("hit");
+        film.classList.add("healed");
+        settle();
+      });
+      $(".no", c).addEventListener("click", () => { c.classList.add("kept"); settle(); });
+      if (i === FIXES.length - 1) $("#verdict").textContent = `${FIXES.length} scenes affected. Nothing changes until you say so.`;
+    }, i * 800));
+  }, 1350);
+});
+$("#backBtn").addEventListener("click", () => $("#world").classList.remove("ripple"));
+
+$$("[data-drawer]").forEach(b => b.addEventListener("click", () => $("#" + b.dataset.drawer).classList.add("on")));
+$$("[data-close]").forEach(b => b.addEventListener("click", () => b.parentElement.classList.remove("on")));
+</script>
+</body>
+</html>
