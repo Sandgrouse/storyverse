@@ -8,6 +8,7 @@ import {
   loadPersistedWorld,
   persistWorld,
 } from "@/lib/story";
+import { dropStoredRefs } from "@/lib/images";
 import ArrivalScene from "./ArrivalScene";
 import IdeaScene from "./IdeaScene";
 import BringScene from "./BringScene";
@@ -54,7 +55,12 @@ function sceneFromHash(): SceneId {
 }
 
 export default function Experience({ seed }: { seed: World }) {
-  const [world, setWorld] = useState<World>(() => loadPersistedWorld()?.world ?? seed);
+  const [world, setWorld] = useState<World>(() => {
+    const persisted = loadPersistedWorld();
+    // Stored refs resolve just after first paint; drop them until then so
+    // no broken image flashes.
+    return persisted ? dropStoredRefs(persisted.world) : seed;
+  });
   const [sample, setSample] = useState<boolean>(
     () => loadPersistedWorld()?.sample ?? false,
   );

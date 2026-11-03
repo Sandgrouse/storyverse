@@ -1,4 +1,71 @@
 import type { World } from "@/lib/world/schemas";
+import { downscaleImageDataUrl } from "@/lib/files";
+import { z } from "zod";
+
+const ArtSuccessSchema = z.object({
+  imageBase64: z.string().min(1),
+  responseId: z.string(),
+});
+
+export type ArtPostResult =
+  | { ok: true; imageBase64: string; responseId: string }
+  | { ok: false; kind: "blocked"; message: string; description: string }
+  | { ok: false; kind: "error"; message: string };
+
+/**
+ * POST one view or scene to an art route. Reads the shared error shape:
+ * 422 content_policy_blocked carries the rewritten description in
+ * error.details for the creator to edit and retry.
+ */
+export async function postArtRoute(
+  path: string,
+  payload: Record<string, unknown>,
+): Promise<ArtPostResult> {
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    return { ok: false, kind: "error", message: "The image failed." };
+  }
+  const json: unknown = await res.json().catch(() => null);
+  if (res.ok) {
+    const parsed = ArtSuccessSchema.safeParse(json);
+    if (!parsed.success) {
+      return { ok: false, kind: "error", message: "The image failed." };
+    }
+    return { ok: true, ...parsed.data };
+  }
+  const record =
+    json !== null && typeof json === "object"
+      ? (json as Record<string, unknown>)
+      : null;
+  const error =
+    record?.error !== null && typeof record?.error === "object"
+      ? (record.error as Record<string, unknown>)
+      : null;
+  const message =
+    typeof error?.message === "string" && error.message.length > 0
+      ? error.message
+      : "The image failed.";
+  if (res.status === 422 && error?.code === "content_policy_blocked") {
+    const details =
+      error?.details !== null && typeof error?.details === "object"
+        ? (error.details as Record<string, unknown>)
+        : null;
+    return {
+      ok: false,
+      kind: "blocked",
+      message,
+      description:
+        typeof details?.description === "string" ? details.description : "",
+    };
+  }
+  return { ok: false, kind: "error", message };
+}
 
 /**
  * Generated images are too large for sessionStorage. They live here:
@@ -111,6 +178,37 @@ export function restoreImageRefs(
     beats: world.beats.map((beat) => ({
       ...beat,
       imagePath: fill(beat.imagePath),
+    })),
+  };
+}
+
+/** Drop stored refs to empty so nothing renders a broken image. */
+export function dropStoredRefs(world: World): World {
+  const drop = (path: string | undefined): string => {
+    if (!path || isStoredRef(path)) return "";
+    return path;
+  };
+  return {
+    ...world,
+    characters: world.characters.map((character) => ({
+      ...character,
+      artPath: character.artPath && isStoredRef(character.artPath) ? undefined : character.artPath,
+      sheet: character.sheet.map((view) => ({
+        ...view,
+        imagePath: drop(view.imagePath),
+      })),
+    })),
+    channels: world.channels.map((channel) => ({
+      ...channel,
+      imagePath: drop(channel.imagePath),
+    })),
+    parts: world.parts.map((part) => ({
+      ...part,
+      imagePath: drop(part.imagePath),
+    })),
+    beats: world.beats.map((beat) => ({
+      ...beat,
+      imagePath: beat.imagePath ? drop(beat.imagePath) : undefined,
     })),
   };
 }
@@ -288,6 +386,65 @@ export async function clearImages(worldId: string): Promise<void> {
     if (key.startsWith(prefix)) memory.delete(key);
   }
   idbClear(worldId);
+}
+
+/** Downscale to 1024px on the long side so art requests stay small. */
+export async function shrinkArt(dataUrl: string): Promise<string> {
+  try {
+    return await downscaleImageDataUrl(dataUrl);
+  } catch {
+    return dataUrl;
+  }
+}
+
+async function sendable(src: string | undefined): Promise<string | undefined> {
+  if (!src || src.startsWith(REF_PREFIX)) return undefined;
+  const dataUrl = await artToDataUrl(src);
+  if (!dataUrl) return undefined;
+  return shrinkArt(dataUrl);
+}
+
+/** A character's art as a sendable reference, if there is any. */
+export async function sheetReferenceFor(
+  artPath: string | undefined,
+): Promise<string | undefined> {
+  return sendable(artPath);
+}
+
+/** Any world art as a style anchor when a character has none. */
+export async function styleImageFor(world: World): Promise<string | undefined> {
+  for (const part of world.parts) {
+    const image = await sendable(part.imagePath);
+    if (image) return image;
+  }
+  for (const character of world.characters) {
+    const art = await sendable(character.artPath);
+    if (art) return art;
+    for (const view of character.sheet) {
+      const sheet = await sendable(view.imagePath);
+      if (sheet) return sheet;
+    }
+  }
+  return undefined;
+}
+
+/** Up to three sendable references: sheet fronts or art, in part order. */
+export async function sceneReferences(
+  world: World,
+  characterIds: string[],
+): Promise<string[]> {
+  const out: string[] = [];
+  for (const id of characterIds) {
+    if (out.length >= 3) break;
+    const character = world.characters.find((c) => c.id === id);
+    if (!character) continue;
+    const front =
+      character.sheet.find((view) => view.view === "front")?.imagePath ??
+      character.artPath;
+    const image = await sendable(front);
+    if (image) out.push(image);
+  }
+  return out;
 }
 
 /** Turn a stored or remote art path into a sendable data URL, or null. */

@@ -700,6 +700,73 @@ p {
 .side button:hover {
   color: var(--clay);
 }
+.side button[disabled] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.artstate {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--soft);
+}
+.artstate p,
+.regenfail p {
+  font-size: 13px;
+  color: var(--soft);
+}
+.artstate .quiet,
+.regenfail .quiet {
+  align-self: flex-start;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.artstate textarea,
+.regenfail textarea {
+  font: 300 13px/1.4 var(--sans);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+  color: var(--ink);
+  resize: vertical;
+  min-height: 56px;
+}
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.compare figure {
+  margin: 0;
+  min-width: 0;
+}
+.cmpimg {
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--rule);
+}
+.compare figcaption {
+  font-size: 11px;
+  color: var(--soft);
+  margin-top: 3px;
+}
+.regenfail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.regenwait {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--soft);
+}
 
 /* The book */
 .book {

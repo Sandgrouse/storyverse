@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as sheetPOST } from "@/app/api/art/sheet-view/route";
 import { POST as scenePOST } from "@/app/api/art/scene/route";
 import { ART_REQUEST_LIMIT_BYTES, BLOCKED_MESSAGE } from "@/lib/art";
+import { postArtRoute } from "@/lib/images";
 
 function post(url: string, body: unknown): Request {
   return new Request(url, {
@@ -204,6 +205,59 @@ describe("POST /api/art/sheet-view", () => {
     expect(typeof json.error.message).toBe("string");
     expect(json.error.message.length).toBeGreaterThan(0);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("postArtRoute", () => {
+  function routeMock(status: number, body: unknown): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(body), { status })),
+    );
+  }
+
+  it("returns the image on success", async () => {
+    routeMock(200, { imageBase64: "QUJD", responseId: "r1" });
+    await expect(
+      postArtRoute("/api/art/scene", { part: "p1" }),
+    ).resolves.toEqual({ ok: true, imageBase64: "QUJD", responseId: "r1" });
+  });
+
+  it("reads a persistent block with its rewritten description", async () => {
+    routeMock(422, {
+      error: {
+        code: "content_policy_blocked",
+        message: BLOCKED_MESSAGE,
+        details: { description: "Gentle aftermath." },
+      },
+    });
+    await expect(
+      postArtRoute("/api/art/sheet-view", { view: "front" }),
+    ).resolves.toEqual({
+      ok: false,
+      kind: "blocked",
+      message: BLOCKED_MESSAGE,
+      description: "Gentle aftermath.",
+    });
+  });
+
+  it("surfaces server errors and network failures as errors", async () => {
+    routeMock(503, {
+      error: { code: "NO_API_KEY", message: "Image generation is not available." },
+    });
+    await expect(postArtRoute("/api/art/scene", {})).resolves.toEqual({
+      ok: false,
+      kind: "error",
+      message: "Image generation is not available.",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("down");
+      }),
+    );
+    const failed = await postArtRoute("/api/art/scene", {});
+    expect(failed.ok).toBe(false);
   });
 });
 

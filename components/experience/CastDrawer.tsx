@@ -2,9 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Character, World } from "@/lib/world/schemas";
-import { SHEET_VIEWS, SheetViewResponseSchema } from "@/lib/art";
-import { artToDataUrl } from "@/lib/images";
-import { downscaleImageDataUrl } from "@/lib/files";
+import { SHEET_VIEWS } from "@/lib/art";
+import {
+  postArtRoute,
+  sheetReferenceFor,
+  styleImageFor,
+  type ArtPostResult,
+} from "@/lib/images";
 
 type Props = {
   world: World;
@@ -19,37 +23,7 @@ type SlotState =
   | { kind: "error"; message: string }
   | { kind: "blocked"; message: string; description: string };
 
-async function shrink(dataUrl: string): Promise<string> {
-  try {
-    return await downscaleImageDataUrl(dataUrl);
-  } catch {
-    return dataUrl;
-  }
-}
 
-/** Character art as a sendable data URL, downscaled, if there is any. */
-async function referenceFor(character: Character): Promise<string | undefined> {
-  if (!character.artPath) return undefined;
-  const dataUrl = await artToDataUrl(character.artPath);
-  if (!dataUrl) return undefined;
-  return shrink(dataUrl);
-}
-
-/** Any world art as a style anchor when the character has none. */
-async function styleFor(world: World): Promise<string | undefined> {
-  const sources: Array<string | undefined> = [];
-  for (const part of world.parts) sources.push(part.imagePath);
-  for (const character of world.characters) {
-    sources.push(character.artPath);
-    for (const view of character.sheet) sources.push(view.imagePath);
-  }
-  for (const src of sources) {
-    if (!src || src.startsWith("idb:")) continue;
-    const dataUrl = await artToDataUrl(src);
-    if (dataUrl) return shrink(dataUrl);
-  }
-  return undefined;
-}
 
 export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
   const [selectedId, setSelectedId] = useState(world.characters[0]?.id);
@@ -86,63 +60,8 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
   const markSlot = (view: string, state: SlotState) =>
     setSlots((prev) => ({ ...prev, [view]: state }));
 
-  type PostResult =
-    | { ok: true; imageBase64: string; responseId: string }
-    | { ok: false; kind: "blocked"; message: string; description: string }
-    | { ok: false; kind: "error"; message: string };
-
-  const postView = async (payload: Record<string, unknown>): Promise<PostResult> => {
-    let res: Response;
-    try {
-      res = await fetch("/api/art/sheet-view", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      return { ok: false, kind: "error", message: "The sheet view failed." };
-    }
-    const json: unknown = await res.json().catch(() => null);
-    if (res.ok) {
-      const parsed = SheetViewResponseSchema.safeParse(json);
-      if (!parsed.success) {
-        return { ok: false, kind: "error", message: "The sheet view failed." };
-      }
-      return { ok: true, ...parsed.data };
-    }
-    const record =
-      json !== null && typeof json === "object"
-        ? (json as Record<string, unknown>)
-        : null;
-    const error =
-      record?.error !== null && typeof record?.error === "object"
-        ? (record.error as Record<string, unknown>)
-        : null;
-    if (res.status === 422 && error?.code === "content_policy_blocked") {
-      const details =
-        error?.details !== null && typeof error?.details === "object"
-          ? (error.details as Record<string, unknown>)
-          : null;
-      return {
-        ok: false,
-        kind: "blocked",
-        message:
-          typeof error?.message === "string" && error.message.length > 0
-            ? error.message
-            : "That view was blocked.",
-        description:
-          typeof details?.description === "string" ? details.description : "",
-      };
-    }
-    return {
-      ok: false,
-      kind: "error",
-      message:
-        typeof error?.message === "string" && error.message.length > 0
-          ? error.message
-          : "The sheet view failed.",
-    };
-  };
+  const postView = (payload: Record<string, unknown>): Promise<ArtPostResult> =>
+    postArtRoute("/api/art/sheet-view", payload);
 
   const applyView = (
     base: World,
@@ -181,9 +100,9 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
 
     let current: World = world;
     const hadArt = (character.artPath?.length ?? 0) > 0;
-    const reference = await referenceFor(character);
+    const reference = await sheetReferenceFor(character.artPath);
     if (runRef.current !== run) return;
-    const style = reference ? undefined : await styleFor(world);
+    const style = reference ? undefined : await styleImageFor(world);
     if (runRef.current !== run) return;
 
     // Start clean; each view fills its slot as it arrives.
@@ -260,7 +179,7 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     const draft = drafts[viewId]?.trim();
     if (draft) payload.description = draft;
     if (index <= 0) {
-      const reference = await referenceFor(character);
+      const reference = await sheetReferenceFor(character.artPath);
       if (runRef.current !== run) return;
       if (reference && !draft) payload.referenceImage = reference;
     } else {
@@ -269,7 +188,7 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
       if (prevResponse && !draft) {
         payload.previousResponseId = prevResponse;
       } else {
-        const reference = await referenceFor(character);
+        const reference = await sheetReferenceFor(character.artPath);
         if (runRef.current !== run) return;
         if (reference && !draft) payload.referenceImage = reference;
       }
