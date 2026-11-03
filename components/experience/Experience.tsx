@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { SecretUpdate, World } from "@/lib/world/schemas";
+import type { World } from "@/lib/world/schemas";
 import ArrivalScene from "./ArrivalScene";
 import IdeaScene from "./IdeaScene";
 import BringScene from "./BringScene";
@@ -68,16 +68,8 @@ export default function Experience({ seed }: { seed: World }) {
     return paths;
   }, [world]);
 
-  const applySecretUpdates = useCallback((updates: SecretUpdate[]) => {
-    setWorld((prev) => ({
-      ...prev,
-      secrets: prev.secrets.map((secret) => {
-        const update = updates.find((u) => u.secretId === secret.id);
-        return update
-          ? { ...secret, text: update.text, note: update.note }
-          : secret;
-      }),
-    }));
+  const handleWorld = useCallback((next: World) => {
+    setWorld(next);
   }, []);
 
   return (
@@ -118,7 +110,7 @@ export default function Experience({ seed }: { seed: World }) {
       <WorldScene
         active={scene === "world"}
         world={world}
-        onSecrets={applySecretUpdates}
+        onWorld={handleWorld}
       />
       <div className="smallscreen" role="note">
         <div>

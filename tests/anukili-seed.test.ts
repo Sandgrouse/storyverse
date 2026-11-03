@@ -54,16 +54,26 @@ describe("anukili seed world", () => {
       "utf-8",
     );
     const ripple = RippleResultSchema.parse(JSON.parse(rippleRaw));
-    const secrets = new Set(world.secrets.map((s) => s.id));
+    expect(ripple.sample ?? false).toBe(false);
     for (const fix of ripple.fixes) {
       expect(channels.has(fix.channelId), `fix ${fix.id} channel`).toBe(true);
       expect(parts.has(fix.partId), `fix ${fix.id} part`).toBe(true);
       expect(beats.has(fix.beatId), `fix ${fix.id} beat`).toBe(true);
+      expect(["contradiction", "meaning", "setup"]).toContain(fix.kind);
+      expect(fix.quote.length).toBeGreaterThan(0);
+      expect("appliedMessage" in fix).toBe(false);
+      const beat = world.beats.find((b) => b.id === fix.beatId);
+      expect(beat?.channelId, `fix ${fix.id} beat channel`).toBe(fix.channelId);
+      expect(beat?.partId, `fix ${fix.id} beat part`).toBe(fix.partId);
+      expect(beat?.content, `fix ${fix.id} quote in beat`).toContain(fix.quote);
     }
+    const secretsById = new Map(world.secrets.map((s) => [s.id, s]));
+    expect(ripple.secretUpdates.length).toBeGreaterThan(0);
     for (const update of ripple.secretUpdates) {
-      expect(secrets.has(update.secretId), `secret update ${update.secretId}`).toBe(
-        true,
-      );
+      expect(
+        secretsById.has(update.secretId),
+        `secret update ${update.secretId} resolves`,
+      ).toBe(true);
     }
   });
 

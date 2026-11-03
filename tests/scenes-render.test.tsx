@@ -46,7 +46,7 @@ describe("experience scenes", () => {
       ["reading", <ReadingScene active world={world} onDone={noop} />],
       ["understood", <UnderstoodScene active world={world} onBack={noop} onOpen={noop} />],
       ["channels", <ChannelsScene active world={world} onOpen={noop} />],
-      ["world", <WorldScene active world={world} onSecrets={noop} />],
+      ["world", <WorldScene active world={world} onWorld={noop} />],
       ["experience", <Experience seed={world} />],
     ];
     for (const [name, node] of scenes) {
@@ -72,7 +72,7 @@ describe("experience scenes", () => {
     expect(understood).toContain(world.logline.slice(0, 40));
     expect(understood).toContain(world.gaps[0].question);
     const { html: shelf } = renderQuiet(
-      <WorldScene active world={world} onSecrets={noop} />,
+      <WorldScene active world={world} onWorld={noop} />,
     );
     for (const part of world.parts) {
       expect(shelf).toContain(part.title);

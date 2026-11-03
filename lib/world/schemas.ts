@@ -80,24 +80,34 @@ export const WorldSchema = z.object({
   beats: z.array(BeatSchema),
   secrets: z.array(SecretSchema),
   gaps: z.array(GapSchema),
+  canonChanges: z.array(z.string()).default([]),
 });
 
 export const FixStatusSchema = z.enum(["pending", "applied", "rejected"]);
 
+export const RippleDecisionSchema = z.enum(["applied", "kept"]);
+
+export const RippleFixKindSchema = z.enum([
+  "contradiction",
+  "meaning",
+  "setup",
+]);
+
 export const RippleFixSchema = z.object({
   id: z.string(),
+  beatId: z.string(),
   channelId: z.string(),
   partId: z.string(),
-  beatId: z.string(),
+  kind: RippleFixKindSchema,
   title: z.string(),
   problem: z.string(),
   proposal: z.string(),
-  appliedMessage: z.string(),
+  quote: z.string(),
   regeneratesImage: z.boolean(),
-  status: FixStatusSchema,
+  status: FixStatusSchema.default("pending"),
 });
 
-export const SecretUpdateSchema = z.object({
+export const RippleSecretUpdateSchema = z.object({
   secretId: z.string(),
   text: z.string(),
   note: z.string(),
@@ -107,7 +117,8 @@ export const RippleResultSchema = z.object({
   change: z.string(),
   summary: z.string(),
   fixes: z.array(RippleFixSchema),
-  secretUpdates: z.array(SecretUpdateSchema),
+  secretUpdates: z.array(RippleSecretUpdateSchema).default([]),
+  sample: z.boolean().optional(),
 });
 
 export type SheetView = z.infer<typeof SheetViewSchema>;
@@ -121,6 +132,8 @@ export type Secret = z.infer<typeof SecretSchema>;
 export type Gap = z.infer<typeof GapSchema>;
 export type World = z.infer<typeof WorldSchema>;
 export type FixStatus = z.infer<typeof FixStatusSchema>;
+export type RippleDecision = z.infer<typeof RippleDecisionSchema>;
+export type RippleFixKind = z.infer<typeof RippleFixKindSchema>;
 export type RippleFix = z.infer<typeof RippleFixSchema>;
-export type SecretUpdate = z.infer<typeof SecretUpdateSchema>;
+export type RippleSecretUpdate = z.infer<typeof RippleSecretUpdateSchema>;
 export type RippleResult = z.infer<typeof RippleResultSchema>;
