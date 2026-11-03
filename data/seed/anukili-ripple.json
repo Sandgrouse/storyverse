@@ -4,46 +4,42 @@
   "fixes": [
     {
       "id": "cure-meaning",
+      "beatId": "beat-series-5",
       "channelId": "series",
       "partId": "part-5",
-      "beatId": "beat-series-5",
+      "kind": "meaning",
       "title": "The cure now means something else",
-      "problem": "He calls Enyinyi a man of God, then Enyinyi gives them the plan.",
+      "problem": "The cure scene still plays, but now it reads as Enyinyi preparing the betrayal.",
       "proposal": "Keep the line. Hold on Enyinyi's face a beat too long.",
-      "appliedMessage": "Applied to the Episode 5 script",
+      "quote": "Owl's droppings blind Anukili, and Enyinyi's herbs restore his sight.",
       "regeneratesImage": false,
       "status": "pending"
     },
     {
       "id": "stream-clue",
+      "beatId": "beat-game-3",
       "channelId": "game",
       "partId": "part-3",
-      "beatId": "beat-game-3",
+      "kind": "setup",
       "title": "The stream's secret needs a new clue",
       "problem": "Nothing in the game hints at Enyinyi yet.",
       "proposal": "Leave his herb pouch on the bank where players can find it.",
-      "appliedMessage": "Scene image regenerated, game brief updated",
+      "quote": "He tells them to show him where it waits, then he kills it.",
       "regeneratesImage": true,
       "status": "pending"
     },
     {
       "id": "women-saw",
+      "beatId": "beat-shorts-4",
       "channelId": "shorts",
       "partId": "part-4",
-      "beatId": "beat-shorts-4",
+      "kind": "setup",
       "title": "The women have seen something",
       "problem": "One of them would have noticed him on the path at night.",
       "proposal": "Add one line: she saw the medicine man near the elders' house.",
-      "appliedMessage": "Applied to the short",
+      "quote": "One night they run across the Omabala to escape him.",
       "regeneratesImage": false,
       "status": "pending"
-    }
-  ],
-  "secretUpdates": [
-    {
-      "secretId": "fire-plan",
-      "text": "Enyinyi told them how to kill him.",
-      "note": "The series, the game and the shorts now agree."
     }
   ]
 }
