@@ -10,6 +10,7 @@ import {
   buildReadContent,
   buildReadInput,
   sanitizeArtFiles,
+  type ReadModelOutput,
 } from "@/lib/read";
 import {
   PLAN_INSTRUCTIONS,
@@ -90,15 +91,7 @@ const READ_MODEL = {
   gaps: [{ id: "g1", question: "Why did it happen?" }],
 };
 
-const CANON = {
-  title: "Test Story",
-  logline: "A short logline.",
-  files: READ_MODEL.files,
-  characters: READ_MODEL.characters,
-  locations: READ_MODEL.locations,
-  parts: READ_MODEL.parts,
-  gaps: READ_MODEL.gaps,
-};
+const CANON: ReadModelOutput = ReadModelOutputSchema.parse(READ_MODEL);
 
 beforeEach(() => {
   vi.stubEnv("MODEL_API_KEY", "test-key");
@@ -390,6 +383,25 @@ describe("POST /api/plan", () => {
     ).toEqual(["s1"]);
   });
 
+  it("keeps a shorts channel and its secrets", async () => {
+    const channels = toPlanChannels([
+      { id: "ch1", name: "Series", kind: "series", title: "T", pitch: "P" },
+      { id: "ch2", name: "Shorts", kind: "shorts", title: "T", pitch: "P" },
+    ]);
+    expect(channels.map((c) => c.id)).toEqual(["ch1", "ch2"]);
+    const secrets = toPlanSecrets(
+      [{ id: "s1", text: "Known.", knownThrough: ["ch2"], note: "N" }],
+      channels.map((c) => c.id),
+    );
+    expect(secrets.map((s) => s.id)).toEqual(["s1"]);
+    const schema = planModelJsonSchema(CANON) as {
+      properties: { channels: { items: { properties: { kind: { enum: string[] } } } } };
+    };
+    expect(
+      schema.properties.channels.items.properties.kind.enum,
+    ).toContain("shorts");
+  });
+
   it("reports channels left with no secret", async () => {
     const channels = toPlanChannels([
       { id: "ch1", name: "Series", kind: "series", title: "T", pitch: "P" },
@@ -430,7 +442,7 @@ describe("POST /api/plan", () => {
       new Response(
         JSON.stringify(
           modelPayload(
-            JSON.stringify(fetchMock.mock.calls.length === 0 ? thin : fullPlan),
+            JSON.stringify(fetchMock.mock.calls.length <= 1 ? thin : fullPlan),
           ),
         ),
         { status: 200 },
@@ -441,7 +453,7 @@ describe("POST /api/plan", () => {
     expect(res.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const json = await res.json();
-    expect(json.secrets.map((s: { id: string }) => s.id).toEqual([
+    expect(json.secrets.map((s: { id: string }) => s.id)).toEqual([
       "s1",
       "s2",
     ]);

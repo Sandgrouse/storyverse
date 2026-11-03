@@ -4,7 +4,12 @@ import type { ReadModelOutput } from "@/lib/read";
 export const PLAN_INSTRUCTIONS =
   "You plan how one story spreads across channels. Propose three channels unless the material names others. Give each channel its own piece of the story, so that each holds at least one secret the others don't, and fans must follow several to get the whole truth. Every channel must hold at least one secret. A secret's knownThrough lists the ids of the channels in this same response. name is one plain word for the format, such as Series, Game or Shorts. title is the name of the work. Every part must appear in at least one channel. Beat content is two to four sentences. Invented secrets are additions: keep them consistent with the canon, and never change a name or an established detail.";
 
-export const PlanChannelKindSchema = z.enum(["series", "game", "press"]);
+export const PlanChannelKindSchema = z.enum([
+  "series",
+  "game",
+  "shorts",
+  "press",
+]);
 
 export const PlanChannelSchema = z.object({
   id: z.string().min(1),
@@ -274,7 +279,10 @@ export function planModelJsonSchema(canon: ReadModelOutput): Record<string, unkn
           properties: {
             id: { type: "string" },
             name: { type: "string" },
-            kind: { type: "string", enum: ["series", "game", "press"] },
+            kind: {
+              type: "string",
+              enum: ["series", "game", "shorts", "press"],
+            },
             title: { type: "string" },
             pitch: { type: "string" },
           },
