@@ -10,8 +10,8 @@
   --series: #a9771f;
   --game: #2c7f93;
   --shorts: #a8476a;
-  --serif: "Newsreader", Georgia, serif;
-  --sans: "Instrument Sans", system-ui, sans-serif;
+  --serif: var(--font-serif), Georgia, serif;
+  --sans: var(--font-sans), system-ui, sans-serif;
   --lift: 0 24px 50px -18px rgba(50, 35, 15, 0.45),
     0 4px 12px rgba(50, 35, 15, 0.12);
   --ease: cubic-bezier(0.2, 0.75, 0.12, 1);

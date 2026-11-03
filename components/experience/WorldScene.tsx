@@ -12,6 +12,16 @@ const KIND_COLORS: Record<string, string> = {
   shorts: "var(--shorts)",
 };
 
+// Where Anukili's face sits in the current art, so cropped surfaces
+// (the wash, the covers, the shelf) keep framing him. His portrait is a
+// tall frame with his face top-center; the stream scene is wide with him
+// standing left-of-center. Other art keeps its CSS default.
+function facePosition(imagePath: string): string | undefined {
+  if (imagePath.endsWith("/anukili.webp")) return "50% 0%";
+  if (imagePath.endsWith("/hippo.webp")) return "32% 32%";
+  return undefined;
+}
+
 function channelColor(kind: string) {
   return KIND_COLORS[kind] ?? "#6f675a";
 }
@@ -173,7 +183,10 @@ export default function WorldScene({ active, world, onSecrets }: Props) {
     >
       <div
         className="artwash"
-        style={{ backgroundImage: `url(${part.imagePath})` }}
+        style={{
+          backgroundImage: `url(${part.imagePath})`,
+          backgroundPosition: facePosition(part.imagePath),
+        }}
       />
       <div className="logo">{world.title}</div>
       <nav className="nav" aria-label="Sections">
@@ -234,7 +247,10 @@ export default function WorldScene({ active, world, onSecrets }: Props) {
         </div>
         <div
           className="cover"
-          style={{ backgroundImage: `url(${part.imagePath})` }}
+          style={{
+            backgroundImage: `url(${part.imagePath})`,
+            backgroundPosition: facePosition(part.imagePath),
+          }}
         >
           <span>{part.title}</span>
           <small>{world.title}</small>
@@ -262,7 +278,10 @@ export default function WorldScene({ active, world, onSecrets }: Props) {
             >
               <div
                 className="thumb"
-                style={{ backgroundImage: `url(${p.imagePath})` }}
+                style={{
+                  backgroundImage: `url(${p.imagePath})`,
+                  backgroundPosition: facePosition(p.imagePath),
+                }}
               />
               <div className="label">
                 <b>{p.title}</b>
