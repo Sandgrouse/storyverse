@@ -11,6 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@meta-sam/parser": "^0.1.0",
+    "jszip": "^3.10.2",
     "next": "15.5.4",
     "react": "19.1.1",
     "react-dom": "19.1.1",

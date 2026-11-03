@@ -171,6 +171,11 @@ export function stripImageData(world: World): World {
     characters: world.characters.map((character) => ({
       ...character,
       artPath: clean(character.artPath),
+      sheet: character.sheet.map((view) => ({
+        ...view,
+        imagePath: clean(view.imagePath) ?? "",
+        cutoutPath: view.cutoutPath ? clean(view.cutoutPath) : undefined,
+      })),
     })),
     channels: world.channels.map((channel) => ({
       ...channel,

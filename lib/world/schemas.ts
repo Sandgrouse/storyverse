@@ -3,6 +3,8 @@ import { z } from "zod";
 export const SheetViewSchema = z.object({
   view: z.string(),
   imagePath: z.string(),
+  /** Transparent PNG cut out of this view, stored beside the sheet. */
+  cutoutPath: z.string().optional(),
 });
 
 export const CharacterSchema = z.object({

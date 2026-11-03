@@ -127,6 +127,13 @@ export function extractImageEntries(world: World): {
             entryName("sheet", character.id, view.view),
             entries,
           ),
+          cutoutPath: view.cutoutPath
+            ? swap(
+                view.cutoutPath,
+                entryName("cutout", character.id, view.view),
+                entries,
+              )
+            : undefined,
         })),
       })),
       channels: world.channels.map((channel) => ({
@@ -165,6 +172,7 @@ export function restoreImageRefs(
       sheet: character.sheet.map((view) => ({
         ...view,
         imagePath: fill(view.imagePath),
+        cutoutPath: view.cutoutPath ? fill(view.cutoutPath) : undefined,
       })),
     })),
     channels: world.channels.map((channel) => ({
@@ -196,6 +204,7 @@ export function dropStoredRefs(world: World): World {
       sheet: character.sheet.map((view) => ({
         ...view,
         imagePath: drop(view.imagePath),
+        cutoutPath: view.cutoutPath ? drop(view.cutoutPath) : undefined,
       })),
     })),
     channels: world.channels.map((channel) => ({
