@@ -52,12 +52,6 @@ export default function ReadingScene({
     return (name: string) => map.get(name) ?? "";
   }, [files]);
 
-  const displayWorld: World | null = useMemo(() => {
-    if (sample && phase !== "error") return seed;
-    if (!canon) return null;
-    return null;
-  }, [sample, seed, phase, canon]);
-
   const names = useMemo(() => {
     const source = canon
       ? [
@@ -321,7 +315,6 @@ export default function ReadingScene({
               <span>{bust.name}</span>
             </div>
           ))}
-        {displayWorld && null}
       </div>
       <p className="status">
         {phase === "error" ? (
