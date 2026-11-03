@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storyverse prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0d1417;
+  --ink-2: #131d21;
+  --ink-3: #1b282d;
+  --line: #2a3a40;
+  --text: #e8e6df;
+  --muted: #93a3a6;
+  --lamp: #f2b84b;
+  --lamp-soft: rgba(242, 184, 75, .14);
+  --break: #ef7a5d;
+  --break-soft: rgba(239, 122, 93, .13);
+  --fix: #7fc8a9;
+  --fix-soft: rgba(127, 200, 169, .13);
+  --game: #7fb4e0;
+  --series: #c79ae0;
+  --press: #d9c9a3;
+  --serif: "Instrument Serif", Georgia, serif;
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--ink); color: var(--text); font: 14px/1.45 var(--sans); }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+
+.app { display: grid; grid-template-columns: 208px 1fr; height: 100%; }
+
+/* Rail */
+.rail { border-right: 1px solid var(--line); padding: 20px 14px; display: flex; flex-direction: column; gap: 24px; background: var(--ink-2); }
+.logo { font: 26px/1 var(--serif); padding: 0 8px; }
+.logo span { color: var(--lamp); }
+.world { padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.eyebrow { font: 500 10.5px/1.3 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.world b { display: block; font: 22px/1.2 var(--serif); font-weight: 400; margin-top: 4px; }
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav button { all: unset; cursor: pointer; padding: 8px; border-radius: 6px; color: var(--muted); }
+.nav button:hover { color: var(--text); background: var(--ink-3); }
+.nav button[aria-current="page"] { color: var(--text); background: var(--ink-3); box-shadow: inset 2px 0 0 var(--lamp); }
+.nav button:focus-visible { outline: 2px solid var(--lamp); }
+.foot { margin-top: auto; font: 11px/1.5 var(--mono); color: var(--muted); padding: 0 8px; }
+
+.main { display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; }
+.view { display: none; flex: 1; min-height: 0; }
+.view.on { display: flex; }
+
+/* Map */
+.map { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.head { padding: 20px 24px 14px; display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+h1 { font: 34px/1.05 var(--serif); font-weight: 400; margin: 2px 0 0; }
+.legend { display: flex; gap: 14px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.board { flex: 1; overflow: auto; padding: 0 24px 20px; }
+.grid { display: grid; grid-template-columns: 96px repeat(8, minmax(128px, 1fr)); gap: 8px; min-width: 1120px; }
+.col-h { font: 11px/1.3 var(--mono); color: var(--muted); padding: 2px 4px 6px; }
+.lane { font-weight: 500; font-size: 12.5px; padding: 10px 4px; position: sticky; left: 0; background: var(--ink); z-index: 2; }
+.lane small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; }
+.cell { min-height: 168px; border-radius: 8px; background: repeating-linear-gradient(135deg, transparent 0 7px, rgba(255,255,255,.012) 7px 8px); }
+
+.beat { all: unset; display: flex; flex-direction: column; width: 100%; height: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--ink-3); cursor: pointer; transition: border-color .25s, box-shadow .25s, transform .25s; }
+.beat:hover { transform: translateY(-1px); border-color: #4a5e65; }
+.beat:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
+.thumb { height: 92px; flex: none; position: relative; }
+.t1 { background: radial-gradient(circle at 70% 25%, #f2b84b 0 3px, transparent 18px), linear-gradient(#17252e, #0b1317); }
+.t2 { background: linear-gradient(170deg, #2c4a58, #101b20 70%), #000; }
+.t3 { background: linear-gradient(120deg, #58492f, #1f1c15); }
+.t4 { background: repeating-linear-gradient(0deg, #cfc6ae 0 3px, #bdb398 3px 6px); }
+.t5 { background: linear-gradient(100deg, #39304a, #15131d); }
+.t6 { background: radial-gradient(circle at 40% 60%, #a6462c 0 2px, transparent 14px), linear-gradient(#22282a, #101416); }
+.t7 { background: repeating-linear-gradient(0deg, #bdb398 0 2px, #d6ccb2 2px 7px); }
+.t8 { background: linear-gradient(190deg, #6d5c7e, #1d1a25 65%); }
+.beat .body { padding: 8px 9px 10px; }
+.beat .ttl { font-weight: 500; font-size: 12.5px; line-height: 1.25; }
+.beat .meta { margin-top: 3px; font: 10.5px/1.3 var(--mono); color: var(--muted); }
+.flag { display: none; position: absolute; left: 6px; top: 6px; padding: 1px 6px; border-radius: 4px; font: 500 10px/1.5 var(--mono); }
+
+.rippled .beat.hit { border-color: var(--break); box-shadow: 0 0 0 3px var(--break-soft); }
+.rippled .beat.hit .flag { display: block; background: var(--break); color: #1b0f0b; }
+.rippled .beat.done { border-color: var(--fix); box-shadow: 0 0 0 3px var(--fix-soft); }
+.rippled .beat.done .flag { display: block; background: var(--fix); color: #0b1a14; }
+.rippled .beat:not(.hit):not(.done) { opacity: .5; }
+
+.secret { grid-column: span 3; border: 1px dashed var(--line); border-radius: 8px; padding: 9px 11px; font-size: 12.5px; }
+.secret b { font-weight: 500; }
+.secret small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.rippled .secret.moved { border-color: var(--lamp); background: var(--lamp-soft); }
+
+/* Command */
+.cmd { border-top: 1px solid var(--line); padding: 14px 24px; display: flex; gap: 10px; align-items: center; background: var(--ink-2); }
+.cmd label { font: 21px/1 var(--serif); white-space: nowrap; }
+.cmd input { flex: 1; min-width: 0; height: 42px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0 14px; color: var(--text); font: inherit; font-size: 15px; }
+.btn { height: 42px; padding: 0 18px; border: 0; border-radius: 8px; background: var(--lamp); color: #201704; font-weight: 600; white-space: nowrap; }
+.btn:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); font-weight: 500; }
+
+/* Ripple panel */
+.panel { width: 0; overflow: hidden; border-left: 0 solid var(--line); background: var(--ink-2); transition: width .3s ease; flex: none; }
+.rippled-root .panel { width: 372px; border-left-width: 1px; }
+.panel-in { width: 372px; height: 100%; overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.panel h2 { font: 26px/1.1 var(--serif); font-weight: 400; margin: 4px 0 2px; }
+.summary { color: var(--muted); font-size: 13px; margin: 0 0 4px; }
+.fix { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--ink-3); }
+.fix .ch { font: 500 10.5px/1.3 var(--mono); text-transform: uppercase; letter-spacing: .07em; }
+.fix h3 { font-size: 14px; font-weight: 500; margin: 4px 0; }
+.fix p { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+.fix p em { font-style: normal; color: var(--text); }
+.fix .art { display: flex; gap: 6px; align-items: center; margin: 8px 0; font: 11px var(--mono); color: var(--muted); }
+.fix .art div { width: 70px; height: 46px; border-radius: 4px; }
+.acts { display: flex; gap: 6px; margin-top: 8px; }
+.acts button { flex: 1; height: 32px; border-radius: 6px; border: 1px solid var(--line); background: transparent; font-size: 12.5px; }
+.acts button.ok { background: var(--fix); color: #0b1a14; border-color: var(--fix); font-weight: 600; }
+.fix.applied { border-color: var(--fix); }
+.fix.applied .acts { display: none; }
+.fix .state { display: none; color: var(--fix); font: 11px var(--mono); margin-top: 6px; }
+.fix.applied .state { display: block; }
+.fix.rejected { opacity: .45; }
+.fix.rejected .acts { display: none; }
+
+/* Characters */
+.page { flex: 1; overflow: auto; padding: 24px 28px; }
+.who { display: flex; gap: 8px; margin: 16px 0 20px; }
+.who button { padding: 6px 12px; border-radius: 999px; background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.who button[aria-pressed="true"] { color: var(--text); border-color: var(--lamp); background: var(--lamp-soft); }
+.sheet { display: grid; grid-template-columns: repeat(6, minmax(120px, 1fr)); gap: 10px; }
+.shot { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--ink-3); }
+.fig { aspect-ratio: 3 / 4; display: grid; place-items: center; background: linear-gradient(#dfe2df, #bfc6c5); color: #2c3a3f; font: 11px var(--mono); }
+.shot span { display: block; padding: 7px 9px; font-size: 12px; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+.fact { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.fact p { margin: 6px 0 0; font-size: 13px; }
+
+/* Package */
+.pkg { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; margin-top: 18px; }
+.tree { font: 12.5px/1.8 var(--mono); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; background: var(--ink-2); white-space: pre; overflow: auto; }
+.tree b { color: var(--lamp); font-weight: 500; }
+.brief { border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.brief h3 { font: 24px/1.1 var(--serif); font-weight: 400; margin: 6px 0 8px; }
+.brief p { margin: 0 0 10px; color: var(--muted); }
+.brief .changed { padding: 8px 10px; border-left: 2px solid var(--fix); background: var(--fix-soft); color: var(--text); font-size: 13px; }
+
+/* New world */
+.start { max-width: 660px; }
+.start textarea { width: 100%; height: 124px; margin: 14px 0; background: var(--ink-2); border: 1px solid var(--line); border-radius: 8px; padding: 14px; color: var(--text); font: 22px/1.3 var(--serif); resize: vertical; }
+.steps { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 8px; }
+.steps li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.steps li span:last-child { color: var(--muted); font: 11.5px var(--mono); white-space: nowrap; }
+.steps li.go { border-color: var(--lamp); }
+</style>
+</head>
+<body>
+<div class="app" id="root">
+  <aside class="rail">
+    <div class="logo">Story<span>verse</span></div>
+    <div class="world">
+      <div class="eyebrow">World</div>
+      <b>Saltlight</b>
+    </div>
+    <nav class="nav" aria-label="Sections">
+      <button data-view="map" aria-current="page">Story map</button>
+      <button data-view="chars">Characters</button>
+      <button data-view="pkg">Agent package</button>
+      <button data-view="new">New world</button>
+    </nav>
+    <div class="foot">Prototype. Sample content, no model calls.</div>
+  </aside>
+
+  <main class="main">
+    <section class="view on" id="v-map">
+      <div class="map" id="mapArea">
+        <header class="head">
+          <div>
+            <div class="eyebrow">One story, three channels</div>
+            <h1>Who learns what, and where</h1>
+          </div>
+          <div class="legend" aria-hidden="true">
+            <span><i style="background:var(--game)"></i>Game</span>
+            <span><i style="background:var(--series)"></i>Web series</span>
+            <span><i style="background:var(--press)"></i>Newspaper</span>
+          </div>
+        </header>
+        <div class="board">
+          <div class="grid">
+            <div></div>
+            <div class="col-h">01 · Night of</div><div class="col-h">02 · Night of</div><div class="col-h">03 · Day 1</div><div class="col-h">04 · Day 1</div><div class="col-h">05 · Day 2</div><div class="col-h">06 · Day 3</div><div class="col-h">07 · Day 4</div><div class="col-h">08 · Day 6</div>
+
+            <div class="lane" style="color:var(--game)">Game<small>Saltlight: Tides</small></div>
+            <div class="cell"></div>
+            <div class="cell"><button class="beat"><div class="thumb t2"></div><div class="body"><div class="ttl">The Wren runs aground</div><div class="meta">Level 1</div></div></button></div>
+            <div class="cell"><button class="beat"><div class="thumb t3"></div><div class="body"><div class="ttl">The torn logbook</div><div class="meta">Level 2</div></div></button></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"><button class="beat" data-hit="wire"><div class="thumb t6"><span class="flag">BREAKS</span></div><div class="body"><div class="ttl">A cut wire in the lamp room</div><div class="meta">Level 3</div></div></button></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+
+            <div class="lane" style="color:var(--series)">Web series<small>The Dark Hour</small></div>
+            <div class="cell"><button class="beat"><div class="thumb t1"></div><div class="body"><div class="ttl">The lamp goes dark</div><div class="meta">Episode 1</div></div></button></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"><button class="beat" data-hit="alibi"><div class="thumb t5"><span class="flag">BREAKS</span></div><div class="body"><div class="ttl">Mara's causeway alibi</div><div class="meta">Episode 2</div></div></button></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"><button class="beat"><div class="thumb t8"></div><div class="body"><div class="ttl">Elias seen on the mainland</div><div class="meta">Episode 3</div></div></button></div>
+
+            <div class="lane" style="color:var(--press)">Newspaper<small>The Harbor Ledger</small></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"><button class="beat" data-hit="ledger"><div class="thumb t4"><span class="flag">BREAKS</span></div><div class="body"><div class="ttl">"Apprentice kept vigil"</div><div class="meta">Front page</div></div></button></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"><button class="beat"><div class="thumb t7"></div><div class="body"><div class="ttl">Ines names the salvagers</div><div class="meta">Editorial</div></div></button></div>
+            <div class="cell"></div>
+
+            <div class="lane">Secrets<small>Only here</small></div>
+            <div class="secret"><b>The Wren was lured onto the rocks</b><small>Only game players know</small></div>
+            <div class="secret moved"><b id="secretA">Someone cut the lamp wire</b><small id="secretB">Game players find it, but not who did it</small></div>
+            <div class="secret" style="grid-column: span 2"><b>Elias is alive</b><small>Only series viewers know</small></div>
+          </div>
+        </div>
+        <form class="cmd" id="cmd">
+          <label for="change">Change canon</label>
+          <input id="change" value="Mara cut the lamp herself." autocomplete="off">
+          <button class="btn" type="submit">Follow the change</button>
+        </form>
+      </div>
+
+      <aside class="panel" aria-label="Ripple results">
+        <div class="panel-in">
+          <div>
+            <div class="eyebrow">Ripple · muse-spark-1.3</div>
+            <h2>3 scenes break across 3 channels</h2>
+            <p class="summary" id="count">Nothing changes until you approve it.</p>
+          </div>
+          <article class="fix" data-fix="alibi">
+            <div class="ch" style="color:var(--series)">Web series · Episode 2</div>
+            <h3>The alibi no longer holds</h3>
+            <p>Canon now puts Mara in the lamp room, but she says she was on the causeway.</p>
+            <p><em>Fix:</em> keep her line, and show wet boots by the tower door so viewers can catch the lie.</p>
+            <div class="acts"><button class="ok">Apply fix</button><button class="no">Keep as is</button></div>
+            <div class="state">Applied to the Episode 2 script</div>
+          </article>
+          <article class="fix" data-fix="wire">
+            <div class="ch" style="color:var(--game)">Game · Level 3</div>
+            <h3>The clue points at the wrong person</h3>
+            <p>The cut wire sits by Teo's salvage knife.</p>
+            <p><em>Fix:</em> replace the knife with Mara's brass lantern, and regenerate the scene.</p>
+            <div class="art"><div class="t6"></div>→<div class="t3"></div><span>Same character sheet</span></div>
+            <div class="acts"><button class="ok">Apply and regenerate</button><button class="no">Keep as is</button></div>
+            <div class="state">Image updated · game brief updated</div>
+          </article>
+          <article class="fix" data-fix="ledger">
+            <div class="ch" style="color:var(--press)">Newspaper · Front page</div>
+            <h3>The paper calls her a hero</h3>
+            <p>This still works, because the paper doesn't know yet. It now reads as irony.</p>
+            <p><em>Fix:</em> add a line where Ines notes that nobody else saw the vigil.</p>
+            <div class="acts"><button class="ok">Apply fix</button><button class="no">Keep as is</button></div>
+            <div class="state">Applied to the article</div>
+          </article>
+        </div>
+      </aside>
+    </section>
+
+    <section class="view" id="v-chars">
+      <div class="page">
+        <div class="eyebrow">Character sheet · muse-image-1.0</div>
+        <h1>Mara Quill</h1>
+        <div class="who" role="group" aria-label="Character">
+          <button aria-pressed="true">Mara Quill</button><button aria-pressed="false">Teo Bram</button><button aria-pressed="false">Ines Okoro</button><button aria-pressed="false">Elias Vane</button><button class="add" aria-pressed="false">+ New character</button>
+        </div>
+        <div class="sheet">
+          <div class="shot"><div class="fig">image</div><span>Front</span></div>
+          <div class="shot"><div class="fig">image</div><span>Left</span></div>
+          <div class="shot"><div class="fig">image</div><span>Right</span></div>
+          <div class="shot"><div class="fig">image</div><span>Back</span></div>
+          <div class="shot"><div class="fig">image</div><span>Pose: running</span></div>
+          <div class="shot"><div class="fig">image</div><span>Pose: crouching</span></div>
+        </div>
+        <div class="facts">
+          <div class="fact"><div class="eyebrow">Canon</div><p>Keeper's apprentice. Silver-streaked hair, scar through the left eyebrow, mustard oilskin, brass lantern.</p></div>
+          <div class="fact"><div class="eyebrow">Secret</div><p>She cut the lamp herself.</p></div>
+          <div class="fact"><div class="eyebrow">Used in</div><p>Web series episodes 1 and 2, game level 3, Ledger front page.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="v-pkg">
+      <div class="page">
+        <div class="eyebrow">Hand off to any coding agent</div>
+        <h1>Game package</h1>
+        <div class="pkg">
+          <div class="tree"><b>saltlight-game/</b>
+├─ AGENT_BRIEF.md
+├─ manifest.json
+├─ canon/
+│  ├─ world.md
+│  ├─ timeline.json
+│  └─ secrets.json       <b>game players only</b>
+├─ characters/
+│  └─ mara-quill/
+│     ├─ sheet/           front, left, right, back, poses
+│     └─ cutouts/         SAM 3.1 transparent PNGs
+└─ levels/
+   └─ 03-lamp-room.md</div>
+          <div class="brief">
+            <div class="eyebrow">AGENT_BRIEF.md</div>
+            <h3>Build what the player may know, and nothing more</h3>
+            <p>Players can learn that the wire was cut. They must not learn that Elias is alive, because that belongs to the web series.</p>
+            <div class="changed">Changed by the last ripple: Level 3 clue is now Mara's brass lantern.</div>
+            <div class="acts" style="margin-top:14px"><button class="ok" style="background:var(--lamp);border-color:var(--lamp);color:#201704;font-weight:600;height:42px">Export package</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="v-new">
+      <div class="page">
+        <div class="start">
+          <div class="eyebrow">Start a world</div>
+          <h1>What's the story?</h1>
+          <textarea aria-label="Story premise">A lighthouse keeper vanishes from a tidal island on the night a supply ship is wrecked. Everyone on the island has a different version of what happened.</textarea>
+          <button class="btn">Build the world</button>
+          <ol class="steps">
+            <li class="go"><span>Canon: characters, places, timeline, secrets</span><span>muse-spark-1.3</span></li>
+            <li><span>Channel plan: who reveals what</span><span>muse-spark-1.3</span></li>
+            <li><span>Character sheets</span><span>muse-image-1.0</span></li>
+            <li><span>Scene images and cutouts</span><span>muse-image-1.0, sam-3.1</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+const root = document.getElementById('root');
+const area = document.getElementById('mapArea');
+const beats = id => document.querySelector(`.beat[data-hit="${id}"]`);
+
+document.querySelectorAll('.nav button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.nav button').forEach(x => x.removeAttribute('aria-current'));
+  b.setAttribute('aria-current', 'page');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
+  document.getElementById('v-' + b.dataset.view).classList.add('on');
+}));
+
+document.getElementById('cmd').addEventListener('submit', e => {
+  e.preventDefault();
+  root.classList.add('rippled-root');
+  area.classList.add('rippled');
+  document.querySelectorAll('.beat[data-hit]').forEach((b, i) => setTimeout(() => {
+    b.classList.add('hit');
+    b.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, 180 * i + 320));
+  document.getElementById('secretA').textContent = 'Mara cut the lamp wire';
+  document.getElementById('secretB').textContent = 'Series viewers can catch her lie. Game players only suspect.';
+});
+
+let open = 3;
+document.querySelectorAll('.fix').forEach(f => {
+  const settle = () => {
+    open -= 1;
+    document.getElementById('count').textContent = open ? `${open} left to decide.` : 'All channels agree with canon again.';
+  };
+  f.querySelector('.ok').addEventListener('click', () => {
+    f.classList.add('applied');
+    const b = beats(f.dataset.fix);
+    b.classList.remove('hit');
+    b.classList.add('done');
+    b.querySelector('.flag').textContent = 'FIXED';
+    settle();
+  });
+  f.querySelector('.no').addEventListener('click', () => { f.classList.add('rejected'); settle(); });
+});
+
+document.querySelectorAll('.who button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.who button').forEach(x => x.setAttribute('aria-pressed', 'false'));
+  b.setAttribute('aria-pressed', 'true');
+}));
+</script>
+</body>
+</html>
