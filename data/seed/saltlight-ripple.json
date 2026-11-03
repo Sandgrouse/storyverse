@@ -1,0 +1,37 @@
+{
+  "change": "Mara cut the lamp herself.",
+  "summary": "3 scenes break across 3 channels",
+  "fixes": [
+    {
+      "id": "alibi",
+      "beatId": "causeway-alibi",
+      "problem": "The alibi no longer holds. Canon now puts Mara in the lamp room, but she says she was on the causeway.",
+      "proposal": "Keep her line, and show wet boots by the tower door so viewers can catch the lie.",
+      "regeneratesImage": false,
+      "status": "pending"
+    },
+    {
+      "id": "wire",
+      "beatId": "cut-wire",
+      "problem": "The clue points at the wrong person. The cut wire sits by Teo's salvage knife.",
+      "proposal": "Replace the knife with Mara's brass lantern, and regenerate the scene.",
+      "regeneratesImage": true,
+      "status": "pending"
+    },
+    {
+      "id": "ledger",
+      "beatId": "vigil-ledger",
+      "problem": "The paper calls her a hero. This still works, because the paper doesn't know yet. It now reads as irony.",
+      "proposal": "Add a line where Ines notes that nobody else saw the vigil.",
+      "regeneratesImage": false,
+      "status": "pending"
+    }
+  ],
+  "secretUpdates": [
+    {
+      "secretId": "wire-cut",
+      "text": "Mara cut the lamp wire",
+      "note": "Series viewers can catch her lie. Game players only suspect."
+    }
+  ]
+}
