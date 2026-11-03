@@ -3,18 +3,20 @@ import {
   RippleFixKindSchema,
   RippleFixSchema,
   WorldSchema,
+  type RippleDecision,
   type RippleFix,
+  type RippleSecretUpdate,
   type World,
 } from "@/lib/world/schemas";
 
 export const RIPPLE_INSTRUCTIONS =
-  "You are a continuity editor for a story told across several channels. Given the canon and a proposed change, walk through every part and every channel, and report each place the change touches, in three kinds: a contradiction (the scene is now false), a shift in meaning (the scene still holds but now reads differently), or a missing setup (a channel needs a planted clue so the change feels earned when fans compare channels). Only report what the change really touches. A harmless change touches nothing, so return no fixes for it. Respect what each channel may reveal: a secret that belongs to one channel must not leak into another, and a clue may hint without revealing. Never rename anyone or change established details. Propose the smallest fix per scene, in plain language.";
+  "You are a continuity editor for a story told across several channels. Given the canon and a proposed change, walk through every part and every channel, and report each place the change touches, in three kinds: a contradiction (the scene is now false), a shift in meaning (the scene still holds but now reads differently), or a missing setup (a channel needs a planted clue so the change feels earned when fans compare channels). Only report what the change really touches. A harmless change touches nothing, so return no fixes for it. Respect what each channel may reveal: a secret that belongs to one channel must not leak into another, and a clue may hint without revealing. If the change settles one of the canon's secrets, update that secret here as well, keeping which channels may know it. Never rename anyone or change established details. Propose the smallest fix per scene, in plain language.";
 
 export const APPLY_INSTRUCTIONS =
   "Rewrite this scene as little as possible so it carries out the proposal. Keep every name and established detail, reveal nothing that belongs only to another channel, and return only the scene.";
 
 export const CHECK_INSTRUCTIONS =
-  "You are a continuity editor for a story told across several channels. Given the canon and the proposed change, decide whether the canon is now consistent with the change. Scenes the creator approved are already rewritten in the canon; scenes kept as is were deliberately left alone. Return consistent true only if every channel now agrees with the change, with a short note saying so in plain language. Otherwise return consistent false with a short note saying what still breaks, in plain language.";
+  "You are a continuity editor for a story told across several channels. The canon lists established changes, which are true. Given those changes, decide whether any scene in any channel still contradicts the canon, and whether any scene leaks a secret into a channel that may not know it. A channel staying silent on a change is not a contradiction. Scenes the creator approved are already rewritten in the canon; scenes kept as is were deliberately left alone and still count: report them honestly if they leave a contradiction or a leak. Return consistent true only if nothing contradicts and nothing leaks, with a short note saying so in plain language. Otherwise return consistent false with a short note saying what still breaks or leaks, in plain language.";
 
 /** Readable canon text for model input. */
 export function serializeCanon(world: World): string {
@@ -23,6 +25,14 @@ export function serializeCanon(world: World): string {
   const lines: string[] = [];
   lines.push(`Canon: ${world.title}`);
   lines.push(`Premise: ${world.premise}`);
+  lines.push("Established changes to the canon:");
+  if (world.canonChanges.length === 0) {
+    lines.push("- None yet.");
+  } else {
+    for (const established of world.canonChanges) {
+      lines.push(`- ${established}`);
+    }
+  }
   lines.push("");
   lines.push("Characters:");
   for (const character of world.characters) {
@@ -73,6 +83,20 @@ export function buildRippleModelFixSchema(world: World) {
   });
 }
 
+/** Secret update shape the model returns. secretId is an enum of this world's secret ids. */
+export function buildRippleSecretUpdateSchema(world: World) {
+  const ids = world.secrets.map((s) => s.id);
+  const secretIds = (ids.length > 0 ? ids : ["no-secrets"]) as [
+    string,
+    ...string[],
+  ];
+  return z.object({
+    secretId: z.enum(secretIds),
+    text: z.string().min(1),
+    note: z.string().min(1),
+  });
+}
+
 export function rippleModelInput(change: string, world: World): string {
   return `Proposed change: ${change}\n\n${serializeCanon(world)}`;
 }
@@ -80,6 +104,7 @@ export function rippleModelInput(change: string, world: World): string {
 /** JSON Schema twin of the model fix schema, sent as the response format. */
 export function rippleModelJsonSchema(world: World): Record<string, unknown> {
   const beatIds = world.beats.map((b) => b.id);
+  const secretIds = world.secrets.map((s) => s.id);
   return {
     type: "object",
     properties: {
@@ -109,8 +134,21 @@ export function rippleModelJsonSchema(world: World): Record<string, unknown> {
           additionalProperties: false,
         },
       },
+      secretUpdates: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            secretId: { type: "string", enum: secretIds },
+            text: { type: "string" },
+            note: { type: "string" },
+          },
+          required: ["secretId", "text", "note"],
+          additionalProperties: false,
+        },
+      },
     },
-    required: ["summary", "fixes"],
+    required: ["summary", "fixes", "secretUpdates"],
     additionalProperties: false,
   };
 }
@@ -118,6 +156,7 @@ export function rippleModelJsonSchema(world: World): Record<string, unknown> {
 export const RippleModelOutputSchema = z.object({
   summary: z.string(),
   fixes: z.array(z.unknown()),
+  secretUpdates: z.array(z.unknown()).default([]),
 });
 
 export type RippleModelFix = z.infer<ReturnType<typeof buildRippleModelFixSchema>>;
@@ -160,6 +199,91 @@ export function toRippleFixes(
     );
   });
   return fixes;
+}
+
+/**
+ * Validate each model secret update on its own against the secret-id enum.
+ * Drops any update whose secretId does not resolve, instead of failing the
+ * whole ripple. The first update wins when a secret is updated twice.
+ */
+export function toSecretUpdates(
+  modelUpdates: unknown[],
+  world: World,
+): RippleSecretUpdate[] {
+  const updateSchema = buildRippleSecretUpdateSchema(world);
+  const secrets = new Map(world.secrets.map((s) => [s.id, s]));
+  const seen = new Set<string>();
+  const updates: RippleSecretUpdate[] = [];
+  modelUpdates.forEach((raw) => {
+    const parsed = updateSchema.safeParse(raw);
+    if (!parsed.success) return;
+    if (!secrets.has(parsed.data.secretId)) return;
+    if (seen.has(parsed.data.secretId)) return;
+    seen.add(parsed.data.secretId);
+    updates.push(parsed.data);
+  });
+  return updates;
+}
+
+/**
+ * Record the decided change in the canon and apply the model's secret
+ * updates. Secret updates carry only text and note, so which channels may
+ * know each secret is left untouched.
+ */
+export function settleRippleWorld(
+  world: World,
+  change: string,
+  secretUpdates: RippleSecretUpdate[],
+): World {
+  const updates = new Map(secretUpdates.map((u) => [u.secretId, u]));
+  return {
+    ...world,
+    canonChanges: world.canonChanges.includes(change)
+      ? world.canonChanges
+      : [...world.canonChanges, change],
+    secrets: world.secrets.map((secret) => {
+      const update = updates.get(secret.id);
+      if (!update) return secret;
+      return { ...secret, text: update.text, note: update.note };
+    }),
+  };
+}
+
+export type RippleProgress = {
+  decide(id: string, decision: RippleDecision): Record<string, RippleDecision>;
+  decided(id: string): boolean;
+  isSettled(): boolean;
+  remaining(): number;
+  snapshot(): Record<string, RippleDecision>;
+};
+
+/**
+ * Per-ripple decision tracker. The component holds one in a ref and mutates
+ * it from every card handler, so decisions made while another card is still
+ * applying are never lost to a stale state snapshot.
+ */
+export function createRippleProgress(total: number): RippleProgress {
+  let decisions: Record<string, RippleDecision> = {};
+  return {
+    decide(id, decision) {
+      if (!decisions[id]) {
+        decisions = { ...decisions, [id]: decision };
+      }
+      return { ...decisions };
+    },
+    decided(id) {
+      return decisions[id] !== undefined;
+    },
+    isSettled() {
+      return total > 0 && Object.keys(decisions).length >= total;
+    },
+    remaining() {
+      return Math.max(0, total - Object.keys(decisions).length);
+    },
+    snapshot() {
+      return { ...decisions };
+    },
+  };
 }
 
 export const RippleRequestSchema = z.object({
@@ -221,5 +345,5 @@ export const CheckModelOutputSchema = z.object({
 });
 
 export function checkModelInput(change: string, world: World): string {
-  return `Proposed change: ${change}\n\nThe canon already reflects every fix the creator approved:\n\n${serializeCanon(world)}`;
+  return `Proposed change: ${change}\n\nThe canon already reflects every fix the creator approved, and lists the established changes as true. Scenes kept as is were deliberately left alone and still count:\n\n${serializeCanon(world)}`;
 }

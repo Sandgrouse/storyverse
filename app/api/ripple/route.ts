@@ -9,6 +9,7 @@ import {
   rippleModelInput,
   rippleModelJsonSchema,
   toRippleFixes,
+  toSecretUpdates,
 } from "@/lib/ripple";
 import { RippleResultSchema } from "@/lib/world/schemas";
 
@@ -46,8 +47,14 @@ export async function POST(req: Request) {
       RippleModelOutputSchema,
     );
     const fixes = toRippleFixes(model.fixes, world);
+    const secretUpdates = toSecretUpdates(model.secretUpdates ?? [], world);
     return NextResponse.json(
-      RippleResultSchema.parse({ change, summary: model.summary, fixes }),
+      RippleResultSchema.parse({
+        change,
+        summary: model.summary,
+        fixes,
+        secretUpdates,
+      }),
     );
   } catch (error) {
     if (error instanceof MetaApiError) {

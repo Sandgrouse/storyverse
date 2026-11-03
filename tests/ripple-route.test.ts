@@ -48,6 +48,12 @@ function mockModel(text: string) {
 
 const CHANGE = "Enyinyi told them how to kill him.";
 
+const validSecretUpdate = {
+  secretId: "fire-plan",
+  text: "Enyinyi came up with the plan that finally worked",
+  note: "Still unrevealed.",
+};
+
 const validModelFix = {
   beatId: "beat-series-5",
   kind: "meaning",
@@ -115,6 +121,24 @@ describe("POST /api/ripple", () => {
     expect(
       schema.safeParse({ ...validModelFix, beatId: "beat-made-up" }).success,
     ).toBe(false);
+  });
+
+  it("returns validated secret updates and drops unknown secret ids", async () => {
+    const world = await loadWorld();
+    mockModel(
+      JSON.stringify({
+        summary: "one scene",
+        fixes: [validModelFix],
+        secretUpdates: [
+          validSecretUpdate,
+          { ...validSecretUpdate, secretId: "secret-made-up" },
+        ],
+      }),
+    );
+    const res = await ripplePOST(post({ change: CHANGE, world }));
+    expect(res.status).toBe(200);
+    const ripple = RippleResultSchema.parse(await res.json());
+    expect(ripple.secretUpdates).toEqual([validSecretUpdate]);
   });
 
   it("drops fixes whose beatId does not resolve", async () => {

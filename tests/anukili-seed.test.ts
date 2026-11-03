@@ -67,6 +67,14 @@ describe("anukili seed world", () => {
       expect(beat?.partId, `fix ${fix.id} beat part`).toBe(fix.partId);
       expect(beat?.content, `fix ${fix.id} quote in beat`).toContain(fix.quote);
     }
+    const secretsById = new Map(world.secrets.map((s) => [s.id, s]));
+    expect(ripple.secretUpdates.length).toBeGreaterThan(0);
+    for (const update of ripple.secretUpdates) {
+      expect(
+        secretsById.has(update.secretId),
+        `secret update ${update.secretId} resolves`,
+      ).toBe(true);
+    }
   });
 
   it("does not state that Enyinyi gave them the plan", async () => {

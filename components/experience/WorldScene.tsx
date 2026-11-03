@@ -1,9 +1,21 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import type { RippleFix, RippleFixKind, World } from "@/lib/world/schemas";
+import type {
+  RippleDecision,
+  RippleFix,
+  RippleFixKind,
+  RippleSecretUpdate,
+  World,
+} from "@/lib/world/schemas";
 import { RippleResultSchema } from "@/lib/world/schemas";
-import { ApplyResponseSchema, CheckResponseSchema } from "@/lib/ripple";
+import {
+  ApplyResponseSchema,
+  CheckResponseSchema,
+  createRippleProgress,
+  settleRippleWorld,
+  type RippleProgress,
+} from "@/lib/ripple";
 import CastDrawer from "./CastDrawer";
 import PackDrawer from "./PackDrawer";
 
@@ -18,6 +30,27 @@ const KIND_LABEL: Record<RippleFixKind, string> = {
   meaning: "Reads differently",
   setup: "Needs a clue",
 };
+
+const STAMP_LABEL: Record<RippleFixKind, string> = {
+  contradiction: "Breaks",
+  meaning: "Changes",
+  setup: "Needs a clue",
+};
+
+const KIND_RANK: Record<RippleFixKind, number> = {
+  contradiction: 0,
+  meaning: 1,
+  setup: 2,
+};
+
+/** Strongest kind on a part: a contradiction beats a shift beats a setup. */
+function strongestKind(fixes: RippleFix[]): RippleFixKind {
+  let best: RippleFixKind = "setup";
+  for (const fix of fixes) {
+    if (KIND_RANK[fix.kind] < KIND_RANK[best]) best = fix.kind;
+  }
+  return best;
+}
 
 const WAITING_STEPS = [
   "Reading every channel",
@@ -41,8 +74,6 @@ function channelColor(kind: string) {
   return KIND_COLORS[kind] ?? "#6f675a";
 }
 
-type Decision = "applied" | "kept";
-
 type Props = {
   active: boolean;
   world: World;
@@ -65,19 +96,33 @@ export default function WorldScene({ active, world, onWorld }: Props) {
   const [ripple, setRipple] = useState(false);
   const [changeText, setChangeText] = useState("");
   const [fixes, setFixes] = useState<RippleFix[]>([]);
+  const [secretUpdates, setSecretUpdates] = useState<RippleSecretUpdate[]>([]);
   const [visible, setVisible] = useState<string[]>([]);
-  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [decisions, setDecisions] = useState<Record<string, RippleDecision>>({});
   const [cracks, setCracks] = useState<string[]>([]);
   const [verdict, setVerdict] = useState("");
   const [failure, setFailure] = useState("");
   const [sample, setSample] = useState(false);
   const [applyState, setApplyState] = useState<Record<string, "working" | "error">>({});
+  const [oldContent, setOldContent] = useState<Record<string, string>>({});
+  const [showOld, setShowOld] = useState<Record<string, boolean>>({});
   const [checking, setChecking] = useState(false);
   const [checkFailed, setCheckFailed] = useState(false);
 
   const shelfRef = useRef<HTMLDivElement>(null);
   const timers = useRef<number[]>([]);
   const requestId = useRef(0);
+  // Synchronous mirrors of the state the card handlers race on. Every
+  // decision goes through progressRef, so a decision made while another
+  // card is still applying is never lost to a stale snapshot.
+  const worldRef = useRef<World>(world);
+  const progressRef = useRef<RippleProgress | null>(null);
+
+  const setWorld = (next: World) => {
+    worldRef.current = next;
+    setLiveWorld(next);
+    onWorld(next);
+  };
 
   useEffect(
     () => () => {
@@ -159,8 +204,12 @@ export default function WorldScene({ active, world, onWorld }: Props) {
     setPhase("waiting");
     setFailure("");
     setFixes([]);
+    setSecretUpdates([]);
     setVisible([]);
     setDecisions({});
+    setOldContent({});
+    setShowOld({});
+    progressRef.current = null;
     setCracks([]);
     setSample(false);
     setApplyState({});
@@ -189,6 +238,8 @@ export default function WorldScene({ active, world, onWorld }: Props) {
       if (requestId.current !== id) return;
       setSample(!!result.sample);
       setFixes(result.fixes);
+      setSecretUpdates(result.secretUpdates);
+      progressRef.current = createRippleProgress(result.fixes.length);
       setPhase("done");
       if (result.fixes.length === 0) {
         setVerdict("Nothing breaks. This fits your story.");
@@ -225,57 +276,68 @@ export default function WorldScene({ active, world, onWorld }: Props) {
     }
   };
 
+  const settleIfDone = (
+    progress: RippleProgress,
+    fixId: string,
+    decision: RippleDecision,
+    worldForCheck: World,
+  ) => {
+    setDecisions(progress.decide(fixId, decision));
+    if (progress.isSettled()) {
+      const settled = settleRippleWorld(worldForCheck, change, secretUpdates);
+      setWorld(settled);
+      void runCheck(change, settled);
+    } else {
+      setVerdict(
+        `${progress.remaining()} left to decide. Nothing changes until you say so.`,
+      );
+    }
+  };
+
   const applyFix = async (fix: RippleFix) => {
+    const progress = progressRef.current;
+    if (!progress || progress.decided(fix.id)) return;
+    const rippleId = requestId.current;
+    const before =
+      worldRef.current.beats.find((b) => b.id === fix.beatId)?.content ?? "";
     setApplyState((prev) => ({ ...prev, [fix.id]: "working" }));
     try {
       const res = await fetch("/api/ripple/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ change, fix, world: liveWorld }),
+        body: JSON.stringify({ change, fix, world: worldRef.current }),
       });
+      if (requestId.current !== rippleId) return;
       if (!res.ok) throw new Error(`apply failed: ${res.status}`);
       const json = ApplyResponseSchema.parse(await res.json());
       if (json.sample) setSample(true);
+      const base = worldRef.current;
       const nextWorld: World = {
-        ...liveWorld,
-        beats: liveWorld.beats.map((b) =>
+        ...base,
+        beats: base.beats.map((b) =>
           b.id === fix.beatId ? { ...b, content: json.content } : b,
         ),
       };
-      setLiveWorld(nextWorld);
-      onWorld(nextWorld);
+      setOldContent((prev) =>
+        prev[fix.id] === undefined ? { ...prev, [fix.id]: before } : prev,
+      );
+      setWorld(nextWorld);
       setApplyState((prev) => {
         const next = { ...prev };
         delete next[fix.id];
         return next;
       });
-      const next = { ...decisions, [fix.id]: "applied" as Decision };
-      setDecisions(next);
-      if (Object.keys(next).length === fixes.length) {
-        void runCheck(change, nextWorld);
-      } else {
-        const remaining = fixes.length - Object.keys(next).length;
-        setVerdict(
-          `${remaining} left to decide. Nothing changes until you say so.`,
-        );
-      }
+      settleIfDone(progress, fix.id, "applied", nextWorld);
     } catch {
+      if (requestId.current !== rippleId) return;
       setApplyState((prev) => ({ ...prev, [fix.id]: "error" }));
     }
   };
 
   const keepFix = (fix: RippleFix) => {
-    if (decisions[fix.id]) return;
-    const next = { ...decisions, [fix.id]: "kept" as Decision };
-    setDecisions(next);
-    if (Object.keys(next).length === fixes.length) {
-      void runCheck(change, liveWorld);
-    } else {
-      const remaining = fixes.length - Object.keys(next).length;
-      setVerdict(
-        `${remaining} left to decide. Nothing changes until you say so.`,
-      );
-    }
+    const progress = progressRef.current;
+    if (!progress || progress.decided(fix.id)) return;
+    settleIfDone(progress, fix.id, "kept", worldRef.current);
   };
 
   const backToStory = () => {
@@ -284,8 +346,12 @@ export default function WorldScene({ active, world, onWorld }: Props) {
     setRipple(false);
     setPhase("idle");
     setFixes([]);
+    setSecretUpdates([]);
     setVisible([]);
     setDecisions({});
+    setOldContent({});
+    setShowOld({});
+    progressRef.current = null;
     setCracks([]);
     setVerdict("");
     setFailure("");
@@ -433,7 +499,13 @@ export default function WorldScene({ active, world, onWorld }: Props) {
                 <b>{p.title}</b>
                 <small>Part {p.order}</small>
               </div>
-              <span className="stamp">{allApplied ? "Fixed" : "Breaks"}</span>
+              <span className="stamp">
+                {allApplied
+                  ? "Fixed"
+                  : STAMP_LABEL[
+                      strongestKind(fixes.filter((f) => f.partId === p.id))
+                    ]}
+              </span>
             </button>
           );
         })}
@@ -563,8 +635,31 @@ export default function WorldScene({ active, world, onWorld }: Props) {
                       </button>
                     </div>
                   )}
-                  {decision === "applied" && (
-                    <div className="state">{appliedLine(fix)}</div>
+                  {decision === "applied" && beat && (
+                    <div className="newscene">
+                      <p>
+                        {showOld[fix.id] && oldContent[fix.id] !== undefined
+                          ? oldContent[fix.id]
+                          : beat.content}
+                      </p>
+                      {oldContent[fix.id] !== undefined && (
+                        <button
+                          type="button"
+                          className="toggle"
+                          onClick={() =>
+                            setShowOld((prev) => ({
+                              ...prev,
+                              [fix.id]: !prev[fix.id],
+                            }))
+                          }
+                        >
+                          {showOld[fix.id]
+                            ? "Show the new version"
+                            : "Show the old version"}
+                        </button>
+                      )}
+                      <div className="state">{appliedLine(fix)}</div>
+                    </div>
                   )}
                 </article>
               );

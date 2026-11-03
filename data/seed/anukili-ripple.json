@@ -41,5 +41,12 @@
       "regeneratesImage": false,
       "status": "pending"
     }
+  ],
+  "secretUpdates": [
+    {
+      "secretId": "fire-plan",
+      "text": "Enyinyi came up with the plan that finally worked",
+      "note": "The women of Eziagulu carried it out, but the plan was his."
+    }
   ]
 }
