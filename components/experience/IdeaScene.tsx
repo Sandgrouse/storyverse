@@ -1,12 +1,17 @@
 "use client";
 
+import { useState } from "react";
+
 type Props = {
   active: boolean;
+  initialIdea: string;
   onBack: () => void;
-  onBegin: () => void;
+  onBegin: (idea: string) => void;
 };
 
-export default function IdeaScene({ active, onBack, onBegin }: Props) {
+export default function IdeaScene({ active, initialIdea, onBack, onBegin }: Props) {
+  const [idea, setIdea] = useState(initialIdea);
+
   return (
     <section className={`scene${active ? " on" : ""}`} id="idea">
       <div className="logo">Storyverse</div>
@@ -29,10 +34,16 @@ export default function IdeaScene({ active, onBack, onBegin }: Props) {
           }}
           onSubmit={(e) => {
             e.preventDefault();
-            onBegin();
+            onBegin(idea);
           }}
         >
-          <input aria-label="Your idea" placeholder="A sentence is enough" autoComplete="off" />
+          <input
+            aria-label="Your idea"
+            placeholder="A sentence is enough"
+            autoComplete="off"
+            value={idea}
+            onChange={(e) => setIdea(e.target.value)}
+          />
           <button type="submit">Begin</button>
         </form>
         <div style={{ marginTop: 14 }}>

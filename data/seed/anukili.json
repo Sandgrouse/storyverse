@@ -61,6 +61,7 @@
       "kind": "series",
       "title": "Five episodes",
       "tagline": "His whole life.",
+      "pitch": "His whole life, from omen to fire, across five episodes.",
       "secret": "why the baby lived",
       "imagePath": "/anukili/storm.webp"
     },
@@ -70,6 +71,7 @@
       "kind": "game",
       "title": "The hunt at the stream",
       "tagline": "Face the hippopotamus.",
+      "pitch": "Face the hippopotamus at the stream and learn what the water hides.",
       "secret": "what the stream hides",
       "imagePath": "/anukili/hippo.webp"
     },
@@ -79,6 +81,7 @@
       "kind": "shorts",
       "title": "The women of Eziagulu",
       "tagline": "Each tells her own story.",
+      "pitch": "The women of Eziagulu tell what they saw, each in her own words.",
       "secret": "who first spoke the vow",
       "imagePath": "/anukili/pots.webp"
     }

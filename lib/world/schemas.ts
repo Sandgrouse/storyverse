@@ -27,9 +27,10 @@ export const ChannelSchema = z.object({
   name: z.string(),
   kind: ChannelKindSchema,
   title: z.string(),
-  tagline: z.string(),
-  secret: z.string(),
-  imagePath: z.string(),
+  tagline: z.string().default(""),
+  pitch: z.string().default(""),
+  secret: z.string().default(""),
+  imagePath: z.string().default(""),
 });
 
 export const PartSchema = z.object({
@@ -38,8 +39,8 @@ export const PartSchema = z.object({
   title: z.string(),
   summary: z.string(),
   excerpt: z.string(),
-  imagePath: z.string(),
-  tint: z.string(),
+  imagePath: z.string().default(""),
+  tint: z.string().default("#e9e0ce"),
   characterIds: z.array(z.string()),
 });
 

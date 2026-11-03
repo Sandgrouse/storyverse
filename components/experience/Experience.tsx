@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { World } from "@/lib/world/schemas";
+import {
+  clearPersistedWorld,
+  loadPersistedWorld,
+  persistWorld,
+} from "@/lib/story";
 import ArrivalScene from "./ArrivalScene";
 import IdeaScene from "./IdeaScene";
 import BringScene from "./BringScene";
@@ -18,6 +23,18 @@ export type SceneId =
   | "understood"
   | "channels"
   | "world";
+
+export type ClientFile = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  displayUrl?: string;
+  sendText?: string;
+  sendDataUrl?: string;
+  label?: string;
+  kind?: string;
+};
 
 const ORDER: SceneId[] = [
   "arrival",
@@ -36,7 +53,12 @@ function sceneFromHash(): SceneId {
 }
 
 export default function Experience({ seed }: { seed: World }) {
-  const [world, setWorld] = useState<World>(seed);
+  const [world, setWorld] = useState<World>(() => loadPersistedWorld()?.world ?? seed);
+  const [sample, setSample] = useState<boolean>(
+    () => loadPersistedWorld()?.sample ?? false,
+  );
+  const [files, setFiles] = useState<ClientFile[]>([]);
+  const [idea, setIdea] = useState("");
   const [scene, setScene] = useState<SceneId>("arrival");
 
   useEffect(() => {
@@ -46,6 +68,10 @@ export default function Experience({ seed }: { seed: World }) {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
+  useEffect(() => {
+    persistWorld(world, sample);
+  }, [world, sample]);
+
   const go = useCallback((id: SceneId) => {
     window.location.hash = id;
   }, []);
@@ -54,7 +80,7 @@ export default function Experience({ seed }: { seed: World }) {
     const seen = new Set<string>();
     const paths: string[] = [];
     for (const part of world.parts) {
-      if (!seen.has(part.imagePath)) {
+      if (part.imagePath && !seen.has(part.imagePath)) {
         seen.add(part.imagePath);
         paths.push(part.imagePath);
       }
@@ -72,6 +98,25 @@ export default function Experience({ seed }: { seed: World }) {
     setWorld(next);
   }, []);
 
+  const handleSample = useCallback(() => {
+    setWorld(seed);
+    setSample(true);
+  }, [seed]);
+
+  const handleReadDone = useCallback((next: World, nextSample: boolean) => {
+    setWorld(next);
+    setSample(nextSample);
+  }, []);
+
+  const handleStartOver = useCallback(() => {
+    clearPersistedWorld();
+    setWorld(seed);
+    setSample(false);
+    setFiles([]);
+    setIdea("");
+    window.location.hash = "arrival";
+  }, [seed]);
+
   return (
     <main>
       <ArrivalScene
@@ -82,23 +127,39 @@ export default function Experience({ seed }: { seed: World }) {
       />
       <IdeaScene
         active={scene === "idea"}
+        initialIdea={idea}
         onBack={() => go("arrival")}
-        onBegin={() => go("bring")}
+        onBegin={(value) => {
+          setIdea(value);
+          go("bring");
+        }}
       />
       <BringScene
         active={scene === "bring"}
-        world={world}
+        files={files}
+        onFiles={setFiles}
+        seed={seed}
+        sample={sample}
+        onSample={handleSample}
         onBack={() => go("arrival")}
         onRead={() => go("reading")}
       />
       <ReadingScene
         active={scene === "reading"}
-        world={world}
-        onDone={() => go("understood")}
+        files={files}
+        idea={idea}
+        seed={seed}
+        sample={sample}
+        onFiles={setFiles}
+        onDone={(next, nextSample) => {
+          handleReadDone(next, nextSample);
+          go("understood");
+        }}
       />
       <UnderstoodScene
         active={scene === "understood"}
         world={world}
+        onWorld={handleWorld}
         onBack={() => go("bring")}
         onOpen={() => go("channels")}
       />
@@ -111,6 +172,7 @@ export default function Experience({ seed }: { seed: World }) {
         active={scene === "world"}
         world={world}
         onWorld={handleWorld}
+        onStartOver={handleStartOver}
       />
       <div className="smallscreen" role="note">
         <div>

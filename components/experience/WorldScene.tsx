@@ -16,14 +16,9 @@ import {
   settleRippleWorld,
   type RippleProgress,
 } from "@/lib/ripple";
+import { channelColorByIndex } from "@/lib/story";
 import CastDrawer from "./CastDrawer";
 import PackDrawer from "./PackDrawer";
-
-const KIND_COLORS: Record<string, string> = {
-  series: "var(--series)",
-  game: "var(--game)",
-  shorts: "var(--shorts)",
-};
 
 const KIND_LABEL: Record<RippleFixKind, string> = {
   contradiction: "Now false",
@@ -70,21 +65,35 @@ function facePosition(imagePath: string): string | undefined {
   return undefined;
 }
 
-function channelColor(kind: string) {
-  return KIND_COLORS[kind] ?? "#6f675a";
+function channelColor(index: number) {
+  return channelColorByIndex(index);
 }
 
 type Props = {
   active: boolean;
   world: World;
   onWorld: (world: World) => void;
+  onStartOver: () => void;
 };
 
-export default function WorldScene({ active, world, onWorld }: Props) {
+export default function WorldScene({ active, world, onWorld, onStartOver }: Props) {
   const [liveWorld, setLiveWorld] = useState<World>(world);
   const parts = [...liveWorld.parts].sort((a, b) => a.order - b.order);
   const [partId, setPartId] = useState(parts[2]?.id ?? parts[0]?.id);
   const part = parts.find((p) => p.id === partId) ?? parts[0];
+
+  useEffect(() => {
+    setLiveWorld(world);
+    const ids = new Set(world.parts.map((p) => p.id));
+    if (world.parts.length > 0) {
+      setPartId((prev) => {
+        if (prev && ids.has(prev)) return prev;
+        const ordered = [...world.parts].sort((a, b) => a.order - b.order);
+        return ordered[2]?.id ?? ordered[0]?.id ?? "";
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world]);
   const [bookOpen, setBookOpen] = useState(false);
   const [drawer, setDrawer] = useState<"cast" | "pack" | null>(null);
 
@@ -130,6 +139,10 @@ export default function WorldScene({ active, world, onWorld }: Props) {
     },
     [],
   );
+
+  useEffect(() => {
+    worldRef.current = world;
+  }, [world]);
 
   const beatsHere = (channelId: string, pid: string) =>
     liveWorld.beats.some((b) => b.channelId === channelId && b.partId === pid);
@@ -389,6 +402,17 @@ export default function WorldScene({ active, world, onWorld }: Props) {
     return `Fixed in ${channel?.name ?? "story"} · ${KIND_LABEL[fix.kind]}`;
   };
 
+  if (!part) {
+    return (
+      <section className={`scene${active ? " on" : ""}`} id="world">
+        <div className="logo">{liveWorld.title}</div>
+        <nav className="nav" aria-label="Sections">
+          <button onClick={onStartOver}>Start over</button>
+        </nav>
+      </section>
+    );
+  }
+
   return (
     <section
       className={`scene${active ? " on" : ""}${ripple ? " ripple" : ""}`}
@@ -397,10 +421,14 @@ export default function WorldScene({ active, world, onWorld }: Props) {
     >
       <div
         className="artwash"
-        style={{
-          backgroundImage: `url(${part.imagePath})`,
-          backgroundPosition: facePosition(part.imagePath),
-        }}
+        style={
+          part.imagePath
+            ? {
+                backgroundImage: `url(${part.imagePath})`,
+                backgroundPosition: facePosition(part.imagePath),
+              }
+            : { backgroundImage: "none", backgroundColor: part.tint }
+        }
       />
       <div className="logo">{liveWorld.title}</div>
       <nav className="nav" aria-label="Sections">
@@ -422,6 +450,7 @@ export default function WorldScene({ active, world, onWorld }: Props) {
         >
           Agent package
         </button>
+        <button onClick={onStartOver}>Start over</button>
       </nav>
       <div className="headline">
         <div className="kicker">The change</div>
@@ -461,10 +490,14 @@ export default function WorldScene({ active, world, onWorld }: Props) {
         </div>
         <div
           className="cover"
-          style={{
-            backgroundImage: `url(${part.imagePath})`,
-            backgroundPosition: facePosition(part.imagePath),
-          }}
+          style={
+            part.imagePath
+              ? {
+                  backgroundImage: `url(${part.imagePath})`,
+                  backgroundPosition: facePosition(part.imagePath),
+                }
+              : { backgroundImage: "none", backgroundColor: part.tint }
+          }
         >
           <span>{part.title}</span>
           <small>{liveWorld.title}</small>
@@ -490,10 +523,14 @@ export default function WorldScene({ active, world, onWorld }: Props) {
             >
               <div
                 className="thumb"
-                style={{
-                  backgroundImage: `url(${p.imagePath})`,
-                  backgroundPosition: facePosition(p.imagePath),
-                }}
+                style={
+                  p.imagePath
+                    ? {
+                        backgroundImage: `url(${p.imagePath})`,
+                        backgroundPosition: facePosition(p.imagePath),
+                      }
+                    : { backgroundImage: "none", backgroundColor: p.tint }
+                }
               />
               <div className="label">
                 <b>{p.title}</b>
@@ -509,11 +546,11 @@ export default function WorldScene({ active, world, onWorld }: Props) {
             </button>
           );
         })}
-        {liveWorld.channels.map((channel) => (
+        {liveWorld.channels.map((channel, channelIndex) => (
           <Fragment key={`lane-${channel.id}`}>
             <div
               className="lane"
-              style={{ color: channelColor(channel.kind) }}
+              style={{ color: channelColor(channelIndex) }}
             >
               {channel.name}
             </div>
@@ -531,7 +568,7 @@ export default function WorldScene({ active, world, onWorld }: Props) {
                 <div
                   key={`seg-${channel.id}-${p.id}`}
                   className="seg"
-                  style={{ "--c": channelColor(channel.kind) } as React.CSSProperties}
+                  style={{ "--c": channelColor(channelIndex) } as React.CSSProperties}
                 >
                   {beatsHere(channel.id, p.id) && (
                     <div
@@ -599,7 +636,7 @@ export default function WorldScene({ active, world, onWorld }: Props) {
                   key={fix.id}
                   className={`fix in${decision === "applied" ? " done" : ""}${decision === "kept" ? " kept" : ""}`}
                 >
-                  <small style={{ color: channel ? channelColor(channel.kind) : undefined }}>
+                  <small style={{ color: channel ? channelColor(liveWorld.channels.findIndex((c) => c.id === channel.id)) : undefined }}>
                     {channel?.name ?? ""}
                     {beat ? ` · ${beat.unitLabel}` : ""}
                   </small>

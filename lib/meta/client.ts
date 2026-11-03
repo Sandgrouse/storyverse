@@ -23,9 +23,14 @@ export class MetaApiError extends Error {
   }
 }
 
+export type ModelMessage = {
+  role: string;
+  content: unknown;
+};
+
 export type StructuredOutputRequest = {
   instructions: string;
-  input: string;
+  input: string | ModelMessage[];
   schemaName: string;
   jsonSchema: Record<string, unknown>;
 };
