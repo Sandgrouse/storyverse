@@ -1,26 +1,54 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Instrument_Serif } from "next/font/google";
-import Rail from "@/components/Rail";
-import { createLocalStorage } from "@/lib/storage/local";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const serif = Instrument_Serif({
-  weight: ["400"],
-  style: ["normal", "italic"],
-  subsets: ["latin"],
+const serif = localFont({
+  src: [
+    {
+      path: "./fonts/newsreader-normal-latin.woff2",
+      weight: "300",
+      style: "normal",
+    },
+    {
+      path: "./fonts/newsreader-normal-latin.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/newsreader-italic-latin.woff2",
+      weight: "300",
+      style: "italic",
+    },
+    {
+      path: "./fonts/newsreader-italic-latin.woff2",
+      weight: "400",
+      style: "italic",
+    },
+  ],
   variable: "--font-serif",
+  display: "swap",
 });
 
-const sans = IBM_Plex_Sans({
-  weight: ["400", "500", "600"],
-  subsets: ["latin"],
+const sans = localFont({
+  src: [
+    {
+      path: "./fonts/instrumentsans-latin.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/instrumentsans-latin.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "./fonts/instrumentsans-latin.woff2",
+      weight: "600",
+      style: "normal",
+    },
+  ],
   variable: "--font-sans",
-});
-
-const mono = IBM_Plex_Mono({
-  weight: ["400", "500"],
-  subsets: ["latin"],
-  variable: "--font-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -28,20 +56,14 @@ export const metadata: Metadata = {
   description: "Change the story once, and every channel follows.",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const world = await createLocalStorage().getWorld();
   return (
     <html lang="en">
-      <body className={`${serif.variable} ${sans.variable} ${mono.variable}`}>
-        <div className="app">
-          <Rail worldTitle={world.title} />
-          <main className="main">{children}</main>
-        </div>
-      </body>
+      <body className={`${serif.variable} ${sans.variable}`}>{children}</body>
     </html>
   );
 }

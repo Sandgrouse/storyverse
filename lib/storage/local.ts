@@ -4,7 +4,7 @@ import { join, dirname } from "node:path";
 import { WorldSchema, type World } from "@/lib/world/schemas";
 import type { WorldStorage } from "@/lib/storage/index";
 
-const SEED_PATH = join(process.cwd(), "data", "seed", "saltlight.json");
+const SEED_PATH = join(process.cwd(), "data", "seed", "anukili.json");
 
 async function readSeedWorld(): Promise<World> {
   const raw = await readFile(SEED_PATH, "utf-8");

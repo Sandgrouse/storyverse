@@ -1,7 +1,7 @@
-import StoryMap from "@/components/StoryMap";
+import Experience from "@/components/experience/Experience";
 import { createLocalStorage } from "@/lib/storage/local";
 
-export default async function StoryMapPage() {
+export default async function HomePage() {
   const world = await createLocalStorage().getWorld();
-  return <StoryMap world={world} />;
+  return <Experience seed={world} />;
 }

@@ -1,0 +1,258 @@
+{
+  "id": "anukili",
+  "title": "Anukili",
+  "premise": "Fiction based on the Igbo myth of Anukili Ugama, set in a mythic past. One story told across an animated series, a game, and shorts.",
+  "logline": "A boy is born in Aguleri legs first, with teeth, clutching roots and herbs. He grows into the hero who kills the hippopotamus at the stream, turns on his own people in Eziagulu, and dies with burning fire on his head.",
+  "characters": [
+    {
+      "id": "anukili-ugama",
+      "name": "Anukili Ugama",
+      "canon": "Huge and tall, with tough, coarse skin, a stomach like a big water pot, a scarred face, bloodshot eyes, lips as thick as tree bark and teeth like elephant tusks. He carries a tree stump, a bow and arrows, and a big stick with thorns at the head.",
+      "artPath": "/anukili/anukili.webp",
+      "sheet": []
+    },
+    {
+      "id": "enyinyi",
+      "name": "Enyinyi",
+      "canon": "Anukili's confidant and medicine man.",
+      "artPath": "/anukili/enyinyi.webp",
+      "sheet": []
+    },
+    {
+      "id": "anukilis-father",
+      "name": "Anukili's father",
+      "canon": "Rejects him at birth. He calls the birth an abomination, and in his rage decides to kill the baby on the fourth day.",
+      "sheet": []
+    },
+    {
+      "id": "people-of-eziagulu",
+      "name": "The people of Eziagulu",
+      "canon": "His own people, in Aguleri. The women carry water home in pots. They vow to kill him.",
+      "artPath": "/anukili/pots.webp",
+      "sheet": []
+    }
+  ],
+  "locations": [
+    {
+      "id": "aguleri",
+      "name": "Aguleri",
+      "description": "A village in the time before anyone wrote anything down."
+    },
+    {
+      "id": "eziagulu",
+      "name": "Eziagulu",
+      "description": "His own people live here, in Aguleri. The women carry water home in pots."
+    },
+    {
+      "id": "stream",
+      "name": "The stream",
+      "description": "Water comes from the local stream. A hippopotamus starts attacking people here."
+    },
+    {
+      "id": "omabala",
+      "name": "The Omabala River",
+      "description": "Runs across the village. One night they run across the Omabala to escape him."
+    }
+  ],
+  "channels": [
+    {
+      "id": "series",
+      "name": "Series",
+      "kind": "series",
+      "title": "Five episodes",
+      "tagline": "His whole life.",
+      "secret": "why the baby lived",
+      "imagePath": "/anukili/storm.webp"
+    },
+    {
+      "id": "game",
+      "name": "Game",
+      "kind": "game",
+      "title": "The hunt at the stream",
+      "tagline": "Face the hippopotamus.",
+      "secret": "what the stream hides",
+      "imagePath": "/anukili/hippo.webp"
+    },
+    {
+      "id": "shorts",
+      "name": "Shorts",
+      "kind": "shorts",
+      "title": "The women of Eziagulu",
+      "tagline": "Each tells her own story.",
+      "secret": "who first spoke the vow",
+      "imagePath": "/anukili/pots.webp"
+    }
+  ],
+  "parts": [
+    {
+      "id": "part-1",
+      "order": 1,
+      "title": "The Omen",
+      "summary": "A boy is born in Aguleri legs first, with upper and lower teeth, clutching roots and herbs in both hands. His father calls it an abomination.",
+      "excerpt": "He cannot cry until he is seven years old, and then only three times a day: at midnight, in the morning and in the evening. When he cries, animals take to their heels.",
+      "imagePath": "/anukili/roots.webp",
+      "tint": "#e9e0ce",
+      "characterIds": ["anukili-ugama", "anukilis-father"]
+    },
+    {
+      "id": "part-2",
+      "order": 2,
+      "title": "The Weight",
+      "summary": "Anukili becomes a leader with no training at all. He eats the food meant for thirty men, and anything he touches comes crashing to the ground.",
+      "excerpt": "Enyinyi, his confidant and medicine man, stays at his side.",
+      "imagePath": "/anukili/anukili.webp",
+      "tint": "#e5dccf",
+      "characterIds": ["anukili-ugama", "enyinyi"]
+    },
+    {
+      "id": "part-3",
+      "order": 3,
+      "title": "The Stream",
+      "summary": "A hippopotamus starts attacking people at the stream. Anukili asks if they're sure it's a hippopotamus, and calls it tiny.",
+      "excerpt": "He tells them to show him where it waits, then he kills it.",
+      "imagePath": "/anukili/hippo.webp",
+      "tint": "#dbe4e0",
+      "characterIds": ["anukili-ugama", "people-of-eziagulu"]
+    },
+    {
+      "id": "part-4",
+      "order": 4,
+      "title": "The Pots",
+      "summary": "At thirty, Anukili turns on his own people in Eziagulu. No quantity of water satisfies him, so he snatches the women's water pots and breaks them with one finger.",
+      "excerpt": "One night they run across the Omabala to escape him. He finds them, and they run back across the river to endure him again.",
+      "imagePath": "/anukili/pots.webp",
+      "tint": "#ecd9c9",
+      "characterIds": ["anukili-ugama", "people-of-eziagulu"]
+    },
+    {
+      "id": "part-5",
+      "order": 5,
+      "title": "The Fire",
+      "summary": "Owl's droppings blind Anukili, and Enyinyi's herbs restore his sight. But the people of Eziagulu have vowed to kill him. Their first plan fails. Their next puts burning fire on his head.",
+      "excerpt": "The people are in ecstasy. They can't believe their eyes. So Anukili could die after all?",
+      "imagePath": "/anukili/fire.webp",
+      "tint": "#e8d6c6",
+      "characterIds": ["anukili-ugama", "enyinyi", "people-of-eziagulu"]
+    }
+  ],
+  "beats": [
+    {
+      "id": "beat-series-1",
+      "order": 1,
+      "timeLabel": "Part 1",
+      "title": "The Omen",
+      "channelId": "series",
+      "partId": "part-1",
+      "unitLabel": "Episode 1",
+      "content": "A boy is born in Aguleri legs first, with upper and lower teeth, clutching roots and herbs in both hands. His father calls it an abomination.",
+      "characterIds": ["anukili-ugama", "anukilis-father"]
+    },
+    {
+      "id": "beat-series-2",
+      "order": 2,
+      "timeLabel": "Part 2",
+      "title": "The Weight",
+      "channelId": "series",
+      "partId": "part-2",
+      "unitLabel": "Episode 2",
+      "content": "Anukili becomes a leader with no training at all. He eats the food meant for thirty men, and anything he touches comes crashing to the ground.",
+      "characterIds": ["anukili-ugama", "enyinyi"]
+    },
+    {
+      "id": "beat-series-3",
+      "order": 3,
+      "timeLabel": "Part 3",
+      "title": "The Stream",
+      "channelId": "series",
+      "partId": "part-3",
+      "unitLabel": "Episode 3",
+      "content": "A hippopotamus starts attacking people at the stream. Anukili asks if they're sure it's a hippopotamus, and calls it tiny.",
+      "characterIds": ["anukili-ugama", "people-of-eziagulu"]
+    },
+    {
+      "id": "beat-game-3",
+      "order": 4,
+      "timeLabel": "Part 3",
+      "title": "The Stream",
+      "channelId": "game",
+      "partId": "part-3",
+      "unitLabel": "The hunt",
+      "content": "The hunt for the hippopotamus at the stream. He tells them to show him where it waits, then he kills it.",
+      "characterIds": ["anukili-ugama", "people-of-eziagulu"]
+    },
+    {
+      "id": "beat-series-4",
+      "order": 5,
+      "timeLabel": "Part 4",
+      "title": "The Pots",
+      "channelId": "series",
+      "partId": "part-4",
+      "unitLabel": "Episode 4",
+      "content": "At thirty, Anukili turns on his own people in Eziagulu. No quantity of water satisfies him, so he snatches the women's water pots and breaks them with one finger.",
+      "characterIds": ["anukili-ugama", "people-of-eziagulu"]
+    },
+    {
+      "id": "beat-shorts-4",
+      "order": 6,
+      "timeLabel": "Part 4",
+      "title": "The Pots",
+      "channelId": "shorts",
+      "partId": "part-4",
+      "unitLabel": "Short 1",
+      "content": "The women of Eziagulu, each telling her own story. One night they run across the Omabala to escape him.",
+      "characterIds": ["anukili-ugama", "people-of-eziagulu"]
+    },
+    {
+      "id": "beat-series-5",
+      "order": 7,
+      "timeLabel": "Part 5",
+      "title": "The Fire",
+      "channelId": "series",
+      "partId": "part-5",
+      "unitLabel": "Episode 5",
+      "content": "Owl's droppings blind Anukili, and Enyinyi's herbs restore his sight. Their first plan fails. Their next puts burning fire on his head.",
+      "characterIds": ["anukili-ugama", "enyinyi", "people-of-eziagulu"]
+    },
+    {
+      "id": "beat-shorts-5",
+      "order": 8,
+      "timeLabel": "Part 5",
+      "title": "The Fire",
+      "channelId": "shorts",
+      "partId": "part-5",
+      "unitLabel": "Short 2",
+      "content": "The women of Eziagulu, each telling her own story. The people are in ecstasy. They can't believe their eyes.",
+      "characterIds": ["anukili-ugama", "enyinyi", "people-of-eziagulu"]
+    }
+  ],
+  "secrets": [
+    {
+      "id": "why-lived",
+      "text": "Why the baby lived past the fourth day",
+      "knownThrough": ["series"],
+      "note": "Only the series reveals this."
+    },
+    {
+      "id": "stream-hides",
+      "text": "Something the stream hides",
+      "knownThrough": ["game"],
+      "note": "Only the game reveals this."
+    },
+    {
+      "id": "vow-speaker",
+      "text": "Who first spoke the vow to kill him",
+      "knownThrough": ["shorts"],
+      "note": "Only the shorts reveal this."
+    },
+    {
+      "id": "fire-plan",
+      "text": "Who came up with the plan that finally worked",
+      "knownThrough": [],
+      "note": "Nobody knows yet."
+    }
+  ],
+  "gaps": [
+    { "id": "gap-lived", "question": "Why did the baby live past the fourth day?" },
+    { "id": "gap-plan", "question": "Who came up with the plan that finally worked?" }
+  ]
+}
