@@ -10,3 +10,4 @@ coverage/
 data/local/
 .claude/
 .pnpm-store/
+tsconfig.tsbuildinfo
