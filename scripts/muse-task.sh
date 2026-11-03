@@ -63,7 +63,7 @@ fi
 
 git push -u origin "$branch"
 
-if gh pr view "$branch" >/dev/null 2>&1; then
+if [ -n "$(gh pr list --head "$branch" --json number --jq '.[].number')" ]; then
   echo "Updated existing pull request."
 else
   body="$(mktemp)"

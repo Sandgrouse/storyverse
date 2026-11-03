@@ -49,9 +49,13 @@ The API is OpenAI-compatible at `https://api.meta.ai/v1`, using the Responses AP
 
 The deployed app holds a real API key. Generation endpoints must enforce a server-side budget (a count of model calls per day) and fall back to read-only browsing of the seeded world when it runs out.
 
-## Demo world
+## Demo story
 
-A new world created for this hackathon, with no war or political content. Working title: **Saltlight**, a mystery on a tidal island about a lighthouse keeper's disappearance. Channels: a small game, a web series, and the island's newspaper. The ripple: "Mara cut the lamp herself."
+The user's own project: Anukili, a five-part animated epic based on the Igbo myth of Anukili Ugama, set in a mythic past. The source for the demo is `docs/story/anukili-treatment.md`. Always use the myth's real names and details. Anything added for the demo is labelled as an addition. Demo content skips the war and slave-raid episodes. Channels: the animated series, a game about the hippopotamus at the stream, and shorts told by the women of Eziagulu. The ripple: "Enyinyi told them how to kill him."
+
+## User experience
+
+An application with a cinematic first-run, not a dashboard. The flow and look are being redesigned and need the owner's approval before any build task.
 
 ## Out of scope
 
