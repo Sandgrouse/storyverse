@@ -73,6 +73,17 @@ export const GapSchema = z.object({
   question: z.string(),
 });
 
+/** Production material for one channel's take on one part. */
+export const PackSchema = z.object({
+  partId: z.string(),
+  channelId: z.string(),
+  script: z.string(),
+  shots: z.array(z.string()),
+  posts: z.array(z.string()),
+  reveals: z.array(z.string()),
+  additions: z.array(z.string()),
+});
+
 export const WorldSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -87,6 +98,7 @@ export const WorldSchema = z.object({
   beats: z.array(BeatSchema),
   secrets: z.array(SecretSchema),
   gaps: z.array(GapSchema),
+  packs: z.array(PackSchema).default([]),
   canonChanges: z.array(z.string()).default([]),
 });
 
@@ -137,6 +149,7 @@ export type Part = z.infer<typeof PartSchema>;
 export type Beat = z.infer<typeof BeatSchema>;
 export type Secret = z.infer<typeof SecretSchema>;
 export type Gap = z.infer<typeof GapSchema>;
+export type StoryPack = z.infer<typeof PackSchema>;
 export type World = z.infer<typeof WorldSchema>;
 export type FixStatus = z.infer<typeof FixStatusSchema>;
 export type RippleDecision = z.infer<typeof RippleDecisionSchema>;
