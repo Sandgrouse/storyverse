@@ -7,7 +7,9 @@ import { POST as checkPOST } from "@/app/api/ripple/check/route";
 import {
   RIPPLE_INSTRUCTIONS,
   buildRippleModelFixSchema,
+  rippleModelJsonSchema,
   toRippleFixes,
+  toSecretUpdates,
 } from "@/lib/ripple";
 import {
   RippleResultSchema,
@@ -218,6 +220,97 @@ describe("POST /api/ripple", () => {
   it("rejects a missing change and world", async () => {
     const res = await ripplePOST(post({}));
     expect(res.status).toBe(400);
+  });
+
+  it("omits the enum when the world has no secrets or beats", async () => {
+    const world = await loadWorld();
+    const empty = { ...world, secrets: [], beats: [] };
+    const schema = rippleModelJsonSchema(empty) as {
+      properties: {
+        fixes: { items: { properties: { beatId: object } } };
+        secretUpdates: { items: { properties: { secretId: object } } };
+      };
+    };
+    expect(schema.properties.secretUpdates.items.properties.secretId).toEqual({
+      type: "string",
+    });
+    expect(schema.properties.fixes.items.properties.beatId).toEqual({
+      type: "string",
+    });
+    const full = rippleModelJsonSchema(world) as {
+      properties: {
+        fixes: { items: { properties: { beatId: { enum: string[] } } } };
+        secretUpdates: { items: { properties: { secretId: { enum: string[] } } } };
+      };
+    };
+    expect(
+      full.properties.secretUpdates.items.properties.secretId.enum,
+    ).toEqual(world.secrets.map((s) => s.id));
+    expect(full.properties.fixes.items.properties.beatId.enum).toEqual(
+      world.beats.map((b) => b.id),
+    );
+  });
+
+  it("sends no empty enum to the API for a secretless world", async () => {
+    const world = await loadWorld();
+    const secretless = { ...world, secrets: [] };
+    const fetchMock = mockModel(JSON.stringify({ summary: "ok", fixes: [] }));
+    const res = await ripplePOST(post({ change: CHANGE, world: secretless }));
+    expect(res.status).toBe(200);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    const secretId =
+      body.text.format.schema.properties.secretUpdates.items.properties
+        .secretId;
+    expect(secretId).toEqual({ type: "string" });
+    expect(JSON.stringify(body)).not.toContain('"enum":[]');
+  });
+
+  it("drops secret updates when the world has no secrets", async () => {
+    const world = await loadWorld();
+    const secretless = { ...world, secrets: [] };
+    mockModel(
+      JSON.stringify({
+        summary: "ok",
+        fixes: [],
+        secretUpdates: [{ secretId: "s-made-up", text: "T", note: "N" }],
+      }),
+    );
+    const res = await ripplePOST(post({ change: CHANGE, world: secretless }));
+    expect(res.status).toBe(200);
+    const ripple = RippleResultSchema.parse(await res.json());
+    expect(ripple.secretUpdates).toEqual([]);
+    expect(toSecretUpdates([{ secretId: "x", text: "T", note: "N" }], secretless)).toEqual([]);
+  });
+
+  it("logs the API error message on the server without the key", async () => {
+    const world = await loadWorld();
+    const errors: unknown[][] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                error: { code: "invalid_model", message: "that model is gone" },
+              }),
+              { status: 400 },
+            ),
+        ),
+      );
+      const res = await ripplePOST(post({ change: CHANGE, world }));
+      expect(res.status).toBe(400);
+    } finally {
+      console.error = original;
+    }
+    const logged = errors.map((args) => args.join(" ")).join("\n");
+    expect(logged).toContain("that model is gone");
+    expect(logged).not.toContain("test-key");
   });
 });
 

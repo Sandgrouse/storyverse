@@ -1,7 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { World } from "@/lib/world/schemas";
+import {
+  downscaleImageDataUrl,
+  isAcceptedFile,
+  largestFileName,
+  overLimit,
+  readFileAsDataUrl,
+  readFileAsText,
+  type SendableFile,
+} from "@/lib/files";
+import { gapNoteForKinds } from "@/lib/story";
+import type { ClientFile } from "./Experience";
 
 type Card = {
   id: string;
@@ -14,118 +25,168 @@ type Card = {
 
 const TAG_COLORS = ["#2f5fd0", "#3d7a58", "#a8476a", "#a9771f", "#2c7f93"];
 
-function tagForFile(file: File): { tag: string; color: string } {
-  if (file.type.startsWith("image/")) return { tag: "Image", color: "#2c7f93" };
-  if (file.type.startsWith("video/")) return { tag: "Video", color: "#a8476a" };
-  if (file.type.startsWith("audio/")) return { tag: "Audio", color: "#a9771f" };
-  if (
-    file.type.startsWith("text/") ||
-    file.type.includes("pdf") ||
-    file.type.includes("document") ||
-    file.type.includes("word")
-  )
-    return { tag: "Document", color: "#2f5fd0" };
-  return { tag: "File", color: "#6f675a" };
-}
-
-function sampleCards(world: World): Card[] {
-  const cards: Card[] = [
-    {
-      id: "sample-treatment",
-      title: world.title,
-      tag: "Story treatment",
-      color: TAG_COLORS[0],
-      body: world.premise,
-    },
-  ];
-  world.characters
-    .filter((c) => c.artPath)
-    .forEach((c, i) => {
-      cards.push({
-        id: `sample-${c.id}`,
-        title: c.name,
-        tag: c.name,
-        color: TAG_COLORS[(i + 1) % TAG_COLORS.length],
-        image: c.artPath,
-      });
-    });
-  const firstChannel = world.channels[0]?.id;
-  const scenic = world.parts.filter((p) =>
-    world.beats.some((b) => b.partId === p.id && b.channelId !== firstChannel),
-  );
-  scenic.forEach((p, i) => {
-    cards.push({
-      id: `sample-${p.id}`,
-      title: p.title,
-      tag: p.title,
-      color: TAG_COLORS[(i + 2) % TAG_COLORS.length],
-      image: p.imagePath,
-    });
-  });
-  return cards;
+function inferredKind(file: ClientFile): string {
+  if (file.kind) return file.kind;
+  if (file.type.startsWith("image/") || file.displayUrl) return "scene_art";
+  return "story";
 }
 
 type Props = {
   active: boolean;
-  world: World;
+  files: ClientFile[];
+  onFiles: (files: ClientFile[]) => void;
+  seed: World;
+  sample: boolean;
+  onSample: () => void;
   onBack: () => void;
   onRead: () => void;
 };
 
-export default function BringScene({ active, world, onBack, onRead }: Props) {
-  const [cards, setCards] = useState<Card[]>([]);
-  const [shown, setShown] = useState(0);
+export default function BringScene({
+  active,
+  files,
+  onFiles,
+  seed,
+  sample,
+  onSample,
+  onBack,
+  onRead,
+}: Props) {
   const [dragging, setDragging] = useState(false);
-  const urls = useRef<string[]>([]);
+  const [error, setError] = useState("");
+  const [working, setWorking] = useState(false);
 
-  useEffect(() => {
-    if (!active || cards.length === 0) return;
-    setShown(0);
-    const id = window.setInterval(() => {
-      setShown((prev) => {
-        if (prev >= cards.length) {
-          window.clearInterval(id);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 170);
-    return () => window.clearInterval(id);
-  }, [active, cards]);
+  const cards: Card[] = files.map((file, i) => ({
+    id: file.id,
+    title: file.name,
+    tag: file.label ?? file.name,
+    color: TAG_COLORS[i % TAG_COLORS.length] ?? "#6f675a",
+    image: file.displayUrl,
+    body: file.displayUrl ? undefined : file.sendText?.slice(0, 140) ?? file.name,
+  }));
 
-  useEffect(() => {
-    const keep = urls.current;
-    return () => {
-      keep.forEach((u) => URL.revokeObjectURL(u));
-    };
-  }, []);
+  const sampleCards: Card[] = sample
+    ? [
+        {
+          id: "sample-treatment",
+          title: seed.title,
+          tag: "Story treatment",
+          color: TAG_COLORS[0] ?? "#2f5fd0",
+          body: seed.premise,
+        },
+        ...seed.characters
+          .filter((c) => c.artPath)
+          .slice(0, 2)
+          .map((c, i) => ({
+            id: `sample-${c.id}`,
+            title: c.name,
+            tag: c.name,
+            color: TAG_COLORS[(i + 1) % TAG_COLORS.length] ?? "#3d7a58",
+            image: c.artPath,
+          })),
+      ]
+    : [];
 
-  const addFiles = (files: FileList | File[]) => {
-    setCards((prev) => {
-      const next: Card[] = [...prev];
-      for (const file of Array.from(files)) {
-        const { tag, color } = tagForFile(file);
-        const card: Card = {
-          id: `${file.name}-${file.size}-${next.length}`,
-          title: file.name,
-          tag,
-          color,
-        };
-        if (file.type.startsWith("image/")) {
-          const url = URL.createObjectURL(file);
-          urls.current.push(url);
-          card.image = url;
-        } else {
-          card.body = file.name;
-        }
-        next.push(card);
+  // Every dropped file appears in the fan at once: staggering the reveal
+  // left later cards invisible when the count changed mid-animation.
+  const visible = sample && files.length === 0 ? sampleCards : cards;
+
+  const kinds = new Set(
+    files.map((file) => inferredKind(file)).filter((kind) => kind.length > 0),
+  );
+  if (sample && files.length === 0) {
+    kinds.add("story");
+    kinds.add("scene_art");
+  }
+  const gapnote =
+    files.length > 0 || sample ? gapNoteForKinds(kinds) : "";
+
+  const toSendable = (list: ClientFile[]): SendableFile[] =>
+    list.map((file) => ({
+      name: file.name,
+      type: file.type,
+      dataUrl: file.sendDataUrl ?? (file.displayUrl?.startsWith("data:") ? file.displayUrl : undefined),
+      text: file.sendText,
+    }));
+
+  const addFiles = async (incoming: FileList | File[]) => {
+    setError("");
+    const rejected: string[] = [];
+    const accepted: File[] = [];
+    for (const file of Array.from(incoming)) {
+      if (!isAcceptedFile(file.name, file.type)) {
+        rejected.push(file.name);
+      } else {
+        accepted.push(file);
       }
-      return next;
-    });
+    }
+    if (rejected.length > 0) {
+      setError(
+        `I can read PDF, .md, .txt and images. Skipped: ${rejected.join(", ")}.`,
+      );
+    }
+    if (accepted.length === 0) return;
+    setWorking(true);
+    try {
+      const next: ClientFile[] = [];
+      for (const file of accepted) {
+        const id = `${file.name}-${file.size}-${Date.now()}-${next.length}`;
+        if (file.type.startsWith("image/")) {
+          const original = await readFileAsDataUrl(file);
+          const small = await downscaleImageDataUrl(original);
+          next.push({
+            id,
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            displayUrl: original,
+            sendDataUrl: small,
+          });
+        } else if (
+          file.name.toLowerCase().endsWith(".md") ||
+          file.name.toLowerCase().endsWith(".markdown") ||
+          file.name.toLowerCase().endsWith(".txt") ||
+          file.type.startsWith("text/")
+        ) {
+          const text = await readFileAsText(file);
+          next.push({
+            id,
+            name: file.name,
+            type: file.type || "text/plain",
+            size: file.size,
+            sendText: text,
+          });
+        } else {
+          const dataUrl = await readFileAsDataUrl(file);
+          next.push({
+            id,
+            name: file.name,
+            type: file.type || "application/pdf",
+            size: file.size,
+            sendDataUrl: dataUrl,
+          });
+        }
+      }
+      const combined = [...files, ...next];
+      if (overLimit(toSendable(combined))) {
+        const big = largestFileName(toSendable(combined)) ?? next[0]?.name ?? "A file";
+        setError(
+          `${big} is too large. Keep the total under 4MB so it fits in one request.`,
+        );
+        return;
+      }
+      onFiles(combined);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "I could not read those files. Try again.",
+      );
+    } finally {
+      setWorking(false);
+    }
   };
 
-  const ready = cards.length > 0;
-  const spacing = cards.length > 5 ? 140 : 190;
+  const ready = files.length > 0 || sample;
+  const spacing = visible.length > 5 ? 140 : 190;
 
   return (
     <section className={`scene${active ? " on" : ""}`} id="bring">
@@ -146,7 +207,7 @@ export default function BringScene({ active, world, onBack, onRead }: Props) {
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
-          if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
+          if (e.dataTransfer.files.length > 0) void addFiles(e.dataTransfer.files);
         }}
         style={dragging ? { outline: "2px solid var(--clay)", borderRadius: 14 } : undefined}
       >
@@ -158,31 +219,28 @@ export default function BringScene({ active, world, onBack, onRead }: Props) {
               <input
                 type="file"
                 multiple
+                accept="application/pdf,.md,.markdown,.txt,image/*"
                 aria-label="Choose files to bring in"
                 onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) addFiles(e.target.files);
+                  if (e.target.files && e.target.files.length > 0) {
+                    void addFiles(e.target.files);
+                    e.target.value = "";
+                  }
                 }}
               />
             </div>
-            <button
-              type="button"
-              className="pill light"
-              onClick={() => setCards(sampleCards(world))}
-            >
+            <button type="button" className="pill light" onClick={onSample}>
               Use the sample project
             </button>
           </div>
         )}
-        {cards.map((card, i) => {
-          const o = i - (cards.length - 1) / 2;
-          const placed =
-            i < shown
-              ? `translate(${o * spacing}px, ${Math.abs(o) * 12}px) rotate(${o * 4}deg)`
-              : `translate(${o * 40}px, 50px) rotate(${o * 2}deg)`;
+        {visible.map((card, i) => {
+          const o = i - (visible.length - 1) / 2;
+          const placed = `translate(${o * spacing}px, ${Math.abs(o) * 12}px) rotate(${o * 4}deg)`;
           return (
             <div
               key={card.id}
-              className={`file${card.body && !card.image ? " doc" : ""}${i < shown ? " in" : ""}`}
+              className={`file${card.body && !card.image ? " doc" : ""} in`}
               style={{
                 ...(card.image ? { backgroundImage: `url(${card.image})` } : undefined),
                 transform: placed,
@@ -202,16 +260,12 @@ export default function BringScene({ active, world, onBack, onRead }: Props) {
           );
         })}
       </div>
-      <p className="gapnote">
-        {ready
-          ? "You have a story and some art. You don't have character sheets or a channel plan yet. I can make both."
-          : ""}
-      </p>
+      <p className="gapnote">{error ? error : working ? "Reading those files…" : gapnote}</p>
       <div className="foot">
         <button className="quiet" onClick={onBack}>
           Back
         </button>
-        <button className="pill" disabled={!ready} onClick={onRead}>
+        <button className="pill" disabled={!ready || working} onClick={onRead}>
           Read my story
         </button>
       </div>

@@ -101,10 +101,21 @@ export function rippleModelInput(change: string, world: World): string {
   return `Proposed change: ${change}\n\n${serializeCanon(world)}`;
 }
 
-/** JSON Schema twin of the model fix schema, sent as the response format. */
+/**
+ * JSON Schema twin of the model fix schema, sent as the response format.
+ * An empty enum is rejected by the API, so when the world has no beats or
+ * no secrets the id stays a plain string and per-item validation drops
+ * anything that does not resolve.
+ */
 export function rippleModelJsonSchema(world: World): Record<string, unknown> {
   const beatIds = world.beats.map((b) => b.id);
   const secretIds = world.secrets.map((s) => s.id);
+  const beatIdSchema =
+    beatIds.length > 0 ? { type: "string", enum: beatIds } : { type: "string" };
+  const secretIdSchema =
+    secretIds.length > 0
+      ? { type: "string", enum: secretIds }
+      : { type: "string" };
   return {
     type: "object",
     properties: {
@@ -114,7 +125,7 @@ export function rippleModelJsonSchema(world: World): Record<string, unknown> {
         items: {
           type: "object",
           properties: {
-            beatId: { type: "string", enum: beatIds },
+            beatId: beatIdSchema,
             kind: { type: "string", enum: ["contradiction", "meaning", "setup"] },
             title: { type: "string" },
             problem: { type: "string" },
@@ -139,7 +150,7 @@ export function rippleModelJsonSchema(world: World): Record<string, unknown> {
         items: {
           type: "object",
           properties: {
-            secretId: { type: "string", enum: secretIds },
+            secretId: secretIdSchema,
             text: { type: "string" },
             note: { type: "string" },
           },

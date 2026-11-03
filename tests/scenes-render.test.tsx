@@ -41,12 +41,12 @@ describe("experience scenes", () => {
     const noop = () => {};
     const scenes: Array<[string, React.ReactElement]> = [
       ["arrival", <ArrivalScene active images={[]} onBring={noop} onIdea={noop} />],
-      ["idea", <IdeaScene active onBack={noop} onBegin={noop} />],
-      ["bring", <BringScene active world={world} onBack={noop} onRead={noop} />],
-      ["reading", <ReadingScene active world={world} onDone={noop} />],
-      ["understood", <UnderstoodScene active world={world} onBack={noop} onOpen={noop} />],
+      ["idea", <IdeaScene active initialIdea="" onBack={noop} onBegin={noop} />],
+      ["bring", <BringScene active files={[]} onFiles={noop} seed={world} sample={false} onSample={noop} onBack={noop} onRead={noop} />],
+      ["reading", <ReadingScene active files={[]} idea="" seed={world} sample onFiles={noop} onDone={noop} />],
+      ["understood", <UnderstoodScene active world={world} onWorld={noop} onBack={noop} onOpen={noop} />],
       ["channels", <ChannelsScene active world={world} onOpen={noop} />],
-      ["world", <WorldScene active world={world} onWorld={noop} />],
+      ["world", <WorldScene active world={world} onWorld={noop} onStartOver={noop} />],
       ["experience", <Experience seed={world} />],
     ];
     for (const [name, node] of scenes) {
@@ -60,19 +60,19 @@ describe("experience scenes", () => {
     const world = await loadWorld();
     const noop = () => {};
     const { html: reading } = renderQuiet(
-      <ReadingScene active world={world} onDone={noop} />,
+      <ReadingScene active files={[]} idea="" seed={world} sample onFiles={noop} onDone={noop} />,
     );
     const readingText = reading
       .replace(/<[^>]+>/g, "")
       .replace(/&#x27;/g, "'");
     expect(readingText).toContain(world.parts[0].summary.slice(0, 40));
     const { html: understood } = renderQuiet(
-      <UnderstoodScene active world={world} onBack={noop} onOpen={noop} />,
+      <UnderstoodScene active world={world} onWorld={noop} onBack={noop} onOpen={noop} />,
     );
     expect(understood).toContain(world.logline.slice(0, 40));
     expect(understood).toContain(world.gaps[0].question);
     const { html: shelf } = renderQuiet(
-      <WorldScene active world={world} onWorld={noop} />,
+      <WorldScene active world={world} onWorld={noop} onStartOver={noop} />,
     );
     for (const part of world.parts) {
       expect(shelf).toContain(part.title);

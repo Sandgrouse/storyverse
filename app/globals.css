@@ -287,10 +287,13 @@ p {
   left: 0;
   right: 0;
   bottom: 96px;
+  max-width: min(880px, 92vw);
+  margin: 0 auto;
   text-align: center;
   font: 300 19px var(--serif);
   min-height: 28px;
   padding: 0 20px;
+  overflow-wrap: anywhere;
 }
 .samplebtn {
   margin-top: 12px;
@@ -345,6 +348,22 @@ p {
   opacity: 1;
   transform: rotate(var(--r));
 }
+.stack .bust.bare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f3ecdd;
+  background-image: none;
+  padding: 18px;
+}
+.stack .bust.bare span {
+  position: static;
+  background: none;
+  padding: 0;
+  font: 300 30px/1.1 var(--serif);
+  text-align: center;
+  color: var(--ink);
+}
 .stack .bust span {
   position: absolute;
   left: 10px;
@@ -398,6 +417,17 @@ p {
   border-radius: 6px;
   background-size: cover;
   background-position: center;
+}
+.pg .plate.bare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.pg .plate.bare span {
+  font: 300 30px/1.15 var(--serif);
+  text-align: center;
+  color: var(--ink);
 }
 .rings {
   position: absolute;
@@ -805,6 +835,10 @@ p {
   font-weight: 600;
   align-self: center;
   line-height: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .seg {
   position: relative;
