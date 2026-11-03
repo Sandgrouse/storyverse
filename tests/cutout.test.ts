@@ -129,19 +129,74 @@ describe("normalizedCutoutEvents", () => {
       content_index: 0,
       delta: "half",
     };
+    const partDone = {
+      type: "response.content_part.done",
+      item_id: "msg-1",
+      output_index: 0,
+      content_index: 0,
+      part: { type: "output_text", text: "full text" },
+    };
     const events = await collect([
       delta,
-      {
-        type: "response.content_part.done",
-        item_id: "msg-1",
-        output_index: 0,
-        content_index: 0,
-        part: { type: "output_text", text: "full text" },
-      },
+      partDone,
       { type: "response.completed" },
     ]);
 
     expect(events[0]).toEqual(delta);
+    expect(events[1]).toEqual(partDone);
+    expect(events[2]).toEqual({
+      type: "response.output_text.done",
+      item_id: "msg-1",
+      output_index: 0,
+      content_index: 0,
+      text: "full text",
+    });
+    expect(events).toHaveLength(4);
+  });
+
+  it("emits one done when both output_text.done and content_part.done arrive", async () => {
+    const realDone = {
+      type: "response.output_text.done",
+      item_id: "msg-1",
+      output_index: 0,
+      content_index: 0,
+      text: "full text",
+    };
+    const partDone = {
+      type: "response.content_part.done",
+      item_id: "msg-1",
+      output_index: 0,
+      content_index: 0,
+      part: { type: "output_text", text: "full text" },
+    };
+    const events = await collect([realDone, partDone]);
+
+    expect(events[0]).toEqual(realDone);
+    expect(events[1]).toEqual(partDone);
+    expect(events).toHaveLength(2);
+    expect(
+      events.filter((e) => e.type === "response.output_text.done"),
+    ).toHaveLength(1);
+  });
+
+  it("drops a real done that repeats a synthesized lane", async () => {
+    const partDone = {
+      type: "response.content_part.done",
+      item_id: "msg-1",
+      output_index: 0,
+      content_index: 0,
+      part: { type: "output_text", text: "full text" },
+    };
+    const realDone = {
+      type: "response.output_text.done",
+      item_id: "msg-1",
+      output_index: 0,
+      content_index: 0,
+      text: "full text",
+    };
+    const events = await collect([partDone, realDone]);
+
+    expect(events[0]).toEqual(partDone);
     expect(events[1]).toEqual({
       type: "response.output_text.done",
       item_id: "msg-1",
@@ -149,10 +204,28 @@ describe("normalizedCutoutEvents", () => {
       content_index: 0,
       text: "full text",
     });
-    expect(events).toHaveLength(3);
-    expect(events.some((e) => e.type === "response.content_part.done")).toBe(
-      false,
-    );
+    expect(events).toHaveLength(2);
+  });
+
+  it("synthesizes a done when only content_part.done arrives", async () => {
+    const partDone = {
+      type: "response.content_part.done",
+      item_id: "msg-1",
+      output_index: 0,
+      content_index: 0,
+      part: { type: "output_text", text: "only part" },
+    };
+    const events = await collect([partDone]);
+
+    expect(events[0]).toEqual(partDone);
+    expect(events[1]).toEqual({
+      type: "response.output_text.done",
+      item_id: "msg-1",
+      output_index: 0,
+      content_index: 0,
+      text: "only part",
+    });
+    expect(events).toHaveLength(2);
   });
 
   it("leaves non-text content parts alone", async () => {

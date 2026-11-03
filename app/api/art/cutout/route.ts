@@ -111,11 +111,18 @@ export async function POST(req: Request) {
       }),
     );
   } catch (error) {
+    // Server log only: status, code and message. Never the key or image.
     if (error instanceof MetaApiError) {
+      console.error(
+        `[cutout] failed: ${error.status} ${error.code} ${error.message}`,
+      );
       const status =
         error.status >= 400 && error.status < 600 ? error.status : 502;
       return errorResponse(status, error.code, "The cutout failed.");
     }
+    console.error(
+      `[cutout] failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return errorResponse(500, "CUTOUT_FAILED", "The cutout failed.");
   }
 }

@@ -100,24 +100,38 @@ export async function* ssePayloads(
 }
 
 /**
- * Normalize a raw Responses event stream for the SAM parser. The API
- * streams `response.content_part.done` but not `response.output_text.done`,
- * which the parser needs, so each output-text content part is replaced by
- * a synthesized output-text done event for its lane.
+ * Normalize a raw Responses event stream for the SAM parser. The API may
+ * send both `response.output_text.done` and `response.content_part.done`
+ * for the same lane, while the parser finalizes a lane only once, so a
+ * second done for one lane fails. Follows Meta's cookbook logic: track
+ * finished lanes and synthesize at most one done per lane.
  */
 export type CutoutEvent = { readonly type: string } & Record<
   string,
   unknown
 >;
 
+function cutoutLaneKey(event: Record<string, unknown>): string {
+  return `${String(event.item_id ?? "")}:${String(event.output_index ?? "")}:${String(event.content_index ?? "")}`;
+}
+
 export async function* normalizedCutoutEvents(
   source: AsyncIterable<unknown> | Iterable<unknown>,
 ): AsyncGenerator<CutoutEvent, void, void> {
+  const finished = new Set<string>();
   for await (const raw of source) {
     if (raw === null || typeof raw !== "object") continue;
     const event = raw as Record<string, unknown>;
     if (typeof event.type !== "string") continue;
+    if (event.type === "response.output_text.done") {
+      const key = cutoutLaneKey(event);
+      if (finished.has(key)) continue;
+      finished.add(key);
+      yield event as CutoutEvent;
+      continue;
+    }
     if (event.type === "response.content_part.done") {
+      yield event as CutoutEvent;
       const part = (event as { part?: unknown }).part;
       if (part !== null && typeof part === "object") {
         const record = part as Record<string, unknown>;
@@ -125,6 +139,9 @@ export async function* normalizedCutoutEvents(
           record.type === "output_text" &&
           typeof record.text === "string"
         ) {
+          const key = cutoutLaneKey(event);
+          if (finished.has(key)) continue;
+          finished.add(key);
           yield {
             type: "response.output_text.done",
             item_id: event.item_id,
@@ -132,9 +149,9 @@ export async function* normalizedCutoutEvents(
             content_index: event.content_index,
             text: record.text,
           };
-          continue;
         }
       }
+      continue;
     }
     yield event as CutoutEvent;
   }

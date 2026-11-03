@@ -68,11 +68,18 @@ export async function POST(req: Request) {
     );
     return NextResponse.json({ ...model, partId, channelId });
   } catch (error) {
+    // Server log only: status, code and message. Never the key or images.
     if (error instanceof MetaApiError) {
+      console.error(
+        `[pack] failed: ${error.status} ${error.code} ${error.message}`,
+      );
       const status =
         error.status >= 400 && error.status < 600 ? error.status : 502;
       return errorResponse(status, error.code, "The story pack failed.");
     }
+    console.error(
+      `[pack] failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return errorResponse(500, "PACK_FAILED", "The story pack failed.");
   }
 }
