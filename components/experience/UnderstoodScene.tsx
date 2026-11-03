@@ -57,6 +57,7 @@ export default function UnderstoodScene({ active, world, onWorld, onBack, onOpen
               text: gap.question,
               knownThrough: [],
               note: "Not revealed yet",
+              suggested: false,
             },
           ],
     });

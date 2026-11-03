@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { World } from "@/lib/world/schemas";
 import {
   clearPersistedWorld,
+  hydrateWorld,
   loadPersistedWorld,
   persistWorld,
 } from "@/lib/story";
+import { dropStoredRefs } from "@/lib/images";
 import ArrivalScene from "./ArrivalScene";
 import IdeaScene from "./IdeaScene";
 import BringScene from "./BringScene";
@@ -53,7 +55,12 @@ function sceneFromHash(): SceneId {
 }
 
 export default function Experience({ seed }: { seed: World }) {
-  const [world, setWorld] = useState<World>(() => loadPersistedWorld()?.world ?? seed);
+  const [world, setWorld] = useState<World>(() => {
+    const persisted = loadPersistedWorld();
+    // Stored refs resolve just after first paint; drop them until then so
+    // no broken image flashes.
+    return persisted ? dropStoredRefs(persisted.world) : seed;
+  });
   const [sample, setSample] = useState<boolean>(
     () => loadPersistedWorld()?.sample ?? false,
   );
@@ -71,6 +78,18 @@ export default function Experience({ seed }: { seed: World }) {
   useEffect(() => {
     persistWorld(world, sample);
   }, [world, sample]);
+
+  // Stored images load back after the first paint.
+  useEffect(() => {
+    let live = true;
+    void hydrateWorld(world).then((hydrated) => {
+      if (live && hydrated !== world) setWorld(hydrated);
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const go = useCallback((id: SceneId) => {
     window.location.hash = id;
@@ -109,13 +128,13 @@ export default function Experience({ seed }: { seed: World }) {
   }, []);
 
   const handleStartOver = useCallback(() => {
-    clearPersistedWorld();
+    clearPersistedWorld(world.id);
     setWorld(seed);
     setSample(false);
     setFiles([]);
     setIdea("");
     window.location.hash = "arrival";
-  }, [seed]);
+  }, [seed, world.id]);
 
   return (
     <main>
@@ -166,6 +185,7 @@ export default function Experience({ seed }: { seed: World }) {
       <ChannelsScene
         active={scene === "channels"}
         world={world}
+        onWorld={handleWorld}
         onOpen={() => go("world")}
       />
       <WorldScene

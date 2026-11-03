@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import type {
+  Part,
   RippleDecision,
   RippleFix,
   RippleFixKind,
@@ -17,8 +18,26 @@ import {
   type RippleProgress,
 } from "@/lib/ripple";
 import { channelColorByIndex, stripImageData } from "@/lib/story";
+import {
+  postArtRoute,
+  sceneReferences,
+  styleImageFor,
+  type ArtPostResult,
+} from "@/lib/images";
+import rippleSeed from "@/data/seed/anukili-ripple.json";
 import CastDrawer from "./CastDrawer";
 import PackDrawer from "./PackDrawer";
+
+/** The sample project's suggestion lives in the seed ripple, not the world. */
+const SAMPLE_SUGGESTION =
+  typeof (rippleSeed as { change?: unknown }).change === "string"
+    ? (rippleSeed as { change: string }).change
+    : "";
+
+function suggestionFor(world: World): string {
+  if (world.sampleChange) return world.sampleChange;
+  return world.id === "anukili" ? SAMPLE_SUGGESTION : "";
+}
 
 const KIND_LABEL: Record<RippleFixKind, string> = {
   contradiction: "Now false",
@@ -62,6 +81,18 @@ function channelColor(index: number) {
   return channelColorByIndex(index);
 }
 
+type SceneArtState =
+  | { kind: "idle" }
+  | { kind: "working" }
+  | { kind: "error"; message: string }
+  | { kind: "blocked"; message: string; description: string };
+
+type RegenState =
+  | { kind: "working"; oldImage: string }
+  | { kind: "done"; oldImage: string; newImage: string }
+  | { kind: "error"; oldImage: string; message: string }
+  | { kind: "blocked"; oldImage: string; message: string; description: string };
+
 type Props = {
   active: boolean;
   world: World;
@@ -91,8 +122,8 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
   const [drawer, setDrawer] = useState<"cast" | "pack" | null>(null);
 
   // The ask bar suggests the sample project's change, from the seed
-  // data. Any other world starts empty.
-  const [ask, setAsk] = useState(world.sampleChange ?? "");
+  // ripple data. Any other world starts empty.
+  const [ask, setAsk] = useState(() => suggestionFor(world));
   const [change, setChange] = useState("");
   const [phase, setPhase] = useState<"idle" | "waiting" | "done" | "error">(
     "idle",
@@ -112,6 +143,10 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
   const [showOld, setShowOld] = useState<Record<string, boolean>>({});
   const [checking, setChecking] = useState(false);
   const [checkFailed, setCheckFailed] = useState(false);
+  const [sceneArt, setSceneArt] = useState<Record<string, SceneArtState>>({});
+  const [sceneDrafts, setSceneDrafts] = useState<Record<string, string>>({});
+  const [regen, setRegen] = useState<Record<string, RegenState>>({});
+  const [regenDrafts, setRegenDrafts] = useState<Record<string, string>>({});
 
   const shelfRef = useRef<HTMLDivElement>(null);
   const timers = useRef<number[]>([]);
@@ -140,10 +175,16 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
   }, [world]);
 
   // A new project gets its own bar: the sample suggestion, or empty.
+  // Any new world resets it, so an upload never keeps the old sentence.
+  const worldIdentity = `${world.id}::${world.sampleChange ?? ""}`;
   useEffect(() => {
-    setAsk(world.sampleChange ?? "");
+    setSceneArt({});
+    setSceneDrafts({});
+    setRegen({});
+    setRegenDrafts({});
+    setAsk(suggestionFor(world));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [world.id]);
+  }, [worldIdentity]);
 
   const beatsHere = (channelId: string, pid: string) =>
     liveWorld.beats.some((b) => b.channelId === channelId && b.partId === pid);
@@ -231,6 +272,10 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
     setSample(false);
     setApplyState({});
     setCheckFailed(false);
+    setSceneArt({});
+    setSceneDrafts({});
+    setRegen({});
+    setRegenDrafts({});
     setChange(nextChange);
     setChangeText(`\u201C${nextChange}\u201D`);
     setVerdict(WAITING_STEPS[0]);
@@ -351,6 +396,11 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
         delete next[fix.id];
         return next;
       });
+      if (fix.regeneratesImage) {
+        const oldImage =
+          nextWorld.parts.find((p) => p.id === fix.partId)?.imagePath ?? "";
+        void regenSceneArt(fix, oldImage);
+      }
       settleIfDone(progress, fix.id, "applied", nextWorld);
     } catch {
       if (requestId.current !== rippleId) return;
@@ -362,6 +412,117 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
     const progress = progressRef.current;
     if (!progress || progress.decided(fix.id)) return;
     settleIfDone(progress, fix.id, "kept", worldRef.current);
+  };
+
+  /** POST one scene image for a part, with an optional proposal or edit. */
+  const postScene = async (
+    target: Part,
+    base: World,
+    options?: { change?: string; description?: string },
+  ): Promise<ArtPostResult> => {
+    const references = await sceneReferences(base, target.characterIds);
+    let styleImage: string | undefined;
+    if (references.length === 0) {
+      styleImage = await styleImageFor(base);
+    }
+    const characters = target.characterIds.flatMap((id) => {
+      const character = base.characters.find((c) => c.id === id);
+      return character ? [{ id: character.id, name: character.name }] : [];
+    });
+    const payload: Record<string, unknown> = {
+      part: { id: target.id, title: target.title, summary: target.summary },
+      characters,
+      references,
+    };
+    if (styleImage) payload.styleImage = styleImage;
+    if (options?.change) payload.change = options.change;
+    if (options?.description) payload.description = options.description;
+    return postArtRoute("/api/art/scene", payload);
+  };
+
+  const setPartImage = (base: World, partId: string, imagePath: string): World => ({
+    ...base,
+    parts: base.parts.map((p) => (p.id === partId ? { ...p, imagePath } : p)),
+  });
+
+  /** The desk's "Make the art" button: the part's first image. */
+  const makeSceneArt = async (target: Part, description?: string) => {
+    setSceneArt((prev) => ({ ...prev, [target.id]: { kind: "working" } }));
+    const result = await postScene(target, worldRef.current, { description });
+    if (result.ok) {
+      setWorld(
+        setPartImage(
+          worldRef.current,
+          target.id,
+          `data:image/webp;base64,${result.imageBase64}`,
+        ),
+      );
+      setSceneArt((prev) => ({ ...prev, [target.id]: { kind: "idle" } }));
+    } else if (result.kind === "blocked") {
+      setSceneArt((prev) => ({
+        ...prev,
+        [target.id]: {
+          kind: "blocked",
+          message: result.message,
+          description: result.description,
+        },
+      }));
+      setSceneDrafts((prev) =>
+        prev[target.id] === undefined
+          ? { ...prev, [target.id]: result.description }
+          : prev,
+      );
+    } else {
+      setSceneArt((prev) => ({
+        ...prev,
+        [target.id]: { kind: "error", message: result.message },
+      }));
+    }
+  };
+
+  /**
+   * Redraw a part's art with the applied proposal added. The text fix
+   * stands whatever happens here; a failure only offers a retry.
+   */
+  const regenSceneArt = async (fix: RippleFix, oldImage: string) => {
+    setRegen((prev) => ({ ...prev, [fix.id]: { kind: "working", oldImage } }));
+    const target = worldRef.current.parts.find((p) => p.id === fix.partId);
+    if (!target) {
+      setRegen((prev) => ({
+        ...prev,
+        [fix.id]: { kind: "error", oldImage, message: "That part is gone." },
+      }));
+      return;
+    }
+    const draft = regenDrafts[fix.id]?.trim();
+    const result = await postScene(target, worldRef.current, {
+      change: fix.proposal,
+      description: draft || undefined,
+    });
+    if (result.ok) {
+      const newImage = `data:image/webp;base64,${result.imageBase64}`;
+      setWorld(setPartImage(worldRef.current, target.id, newImage));
+      setRegen((prev) => ({
+        ...prev,
+        [fix.id]: { kind: "done", oldImage, newImage },
+      }));
+    } else if (result.kind === "blocked") {
+      setRegen((prev) => ({
+        ...prev,
+        [fix.id]: {
+          kind: "blocked",
+          oldImage,
+          message: result.message,
+          description: result.description,
+        },
+      }));
+      setRegenDrafts((prev) => ({ ...prev, [fix.id]: result.description }));
+    } else {
+      setRegen((prev) => ({
+        ...prev,
+        [fix.id]: { kind: "error", oldImage, message: result.message },
+      }));
+    }
   };
 
   const backToStory = () => {
@@ -381,6 +542,10 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
     setFailure("");
     setChecking(false);
     setCheckFailed(false);
+    setSceneArt({});
+    setSceneDrafts({});
+    setRegen({});
+    setRegenDrafts({});
   };
 
   const settled = fixes.length > 0 && Object.keys(decisions).length === fixes.length;
@@ -407,9 +572,10 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
   const beatOf = (fix: RippleFix) =>
     liveWorld.beats.find((b) => b.id === fix.beatId);
 
+  const sceneState: SceneArtState = sceneArt[part.id] ?? { kind: "idle" };
+
   const appliedLine = (fix: RippleFix) => {
     const channel = channelOf(fix);
-    if (fix.regeneratesImage) return "Image update next";
     return `Fixed in ${channel?.name ?? "story"} · ${KIND_LABEL[fix.kind]}`;
   };
 
@@ -483,10 +649,61 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
               <b>{whosHere}</b>Who&rsquo;s here
             </div>
           </div>
+          {!part.imagePath && sceneState.kind !== "idle" && (
+            <div className="artstate" role="status">
+              {sceneState.kind === "working" && <p>Making the art…</p>}
+              {sceneState.kind === "error" && (
+                <>
+                  <p>{sceneState.message}</p>
+                  <button
+                    type="button"
+                    className="quiet"
+                    onClick={() => void makeSceneArt(part)}
+                  >
+                    Retry
+                  </button>
+                </>
+              )}
+              {sceneState.kind === "blocked" && (
+                <>
+                  <p>{sceneState.message}</p>
+                  <textarea
+                    aria-label="Describe the scene art"
+                    value={sceneDrafts[part.id] ?? sceneState.description}
+                    onChange={(e) =>
+                      setSceneDrafts((prev) => ({
+                        ...prev,
+                        [part.id]: e.target.value,
+                      }))
+                    }
+                    rows={3}
+                  />
+                  <button
+                    type="button"
+                    className="quiet"
+                    onClick={() =>
+                      void makeSceneArt(
+                        part,
+                        sceneDrafts[part.id]?.trim() || undefined,
+                      )
+                    }
+                  >
+                    Retry
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
         <div className="side">
           <button onClick={() => setDrawer("pack")}>Story Pack</button>
-          <button>Send to video</button>
+          {part.imagePath ? (
+            <button>Send to video</button>
+          ) : sceneState.kind === "working" ? (
+            <button disabled>Making the art…</button>
+          ) : (
+            <button onClick={() => void makeSceneArt(part)}>Make the art</button>
+          )}
           <button onClick={() => setBookOpen((v) => !v)}>Open</button>
         </div>
       </div>
@@ -710,6 +927,93 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
                         </button>
                       )}
                       <div className="state">{appliedLine(fix)}</div>
+                      {fix.regeneratesImage &&
+                        (() => {
+                          const art: RegenState = regen[fix.id] ?? {
+                            kind: "working",
+                            oldImage: "",
+                          };
+                          if (art.kind === "done") {
+                            return (
+                              <div className="compare">
+                                {art.oldImage && (
+                                  <figure>
+                                    <div
+                                      className="cmpimg"
+                                      style={{
+                                        backgroundImage: `url(${art.oldImage})`,
+                                      }}
+                                      role="img"
+                                      aria-label="The scene before the fix"
+                                    />
+                                    <figcaption>Before</figcaption>
+                                  </figure>
+                                )}
+                                <figure>
+                                  <div
+                                    className="cmpimg"
+                                    style={{
+                                      backgroundImage: `url(${art.newImage})`,
+                                    }}
+                                    role="img"
+                                    aria-label="The scene after the fix"
+                                  />
+                                  <figcaption>After</figcaption>
+                                </figure>
+                              </div>
+                            );
+                          }
+                          if (art.kind === "error") {
+                            return (
+                              <div className="regenfail" role="status">
+                                <p>{art.message}</p>
+                                <button
+                                  type="button"
+                                  className="quiet"
+                                  onClick={() =>
+                                    void regenSceneArt(fix, art.oldImage)
+                                  }
+                                >
+                                  Retry the image
+                                </button>
+                              </div>
+                            );
+                          }
+                          if (art.kind === "blocked") {
+                            return (
+                              <div className="regenfail" role="status">
+                                <p>{art.message}</p>
+                                <textarea
+                                  aria-label="Describe the new scene art"
+                                  value={
+                                    regenDrafts[fix.id] ?? art.description
+                                  }
+                                  onChange={(e) =>
+                                    setRegenDrafts((prev) => ({
+                                      ...prev,
+                                      [fix.id]: e.target.value,
+                                    }))
+                                  }
+                                  rows={3}
+                                />
+                                <button
+                                  type="button"
+                                  className="quiet"
+                                  onClick={() =>
+                                    void regenSceneArt(fix, art.oldImage)
+                                  }
+                                >
+                                  Retry the image
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <p className="regenwait" role="status">
+                              Making the new image…
+                            </p>
+                          );
+                        })()}
                     </div>
                   )}
                 </article>
@@ -737,7 +1041,7 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
         </div>
       </aside>
 
-      <CastDrawer world={liveWorld} open={drawer === "cast"} onClose={() => setDrawer(null)} />
+      <CastDrawer world={liveWorld} open={drawer === "cast"} onClose={() => setDrawer(null)} onWorld={setWorld} />
       <PackDrawer world={liveWorld} open={drawer === "pack"} onClose={() => setDrawer(null)} />
     </section>
   );
