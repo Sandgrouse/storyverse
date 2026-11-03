@@ -1,0 +1,162 @@
+{
+  "id": "saltlight",
+  "title": "Saltlight",
+  "premise": "A lighthouse keeper vanishes from a tidal island on the night a supply ship is wrecked. Everyone on the island has a different version of what happened.",
+  "characters": [
+    {
+      "id": "mara-quill",
+      "name": "Mara Quill",
+      "canon": "Keeper's apprentice. Silver-streaked hair, scar through the left eyebrow, mustard oilskin, brass lantern.",
+      "secret": "She cut the lamp herself.",
+      "sheet": []
+    },
+    {
+      "id": "teo-bram",
+      "name": "Teo Bram",
+      "canon": "Reef salvager with a gentle reputation. Broad-shouldered, rope-burned hands, canvas coat, notched salvage knife.",
+      "sheet": []
+    },
+    {
+      "id": "ines-okoro",
+      "name": "Ines Okoro",
+      "canon": "Editor of The Harbor Ledger. Sharp-eyed, grey braided hair, ink-stained sleeves, never without her notebook.",
+      "sheet": []
+    },
+    {
+      "id": "elias-vane",
+      "name": "Elias Vane",
+      "canon": "Keeper of the Saltlight lamp for twenty years. Lean, weather-lined face, white beard, brass key ring.",
+      "secret": "Elias is alive.",
+      "sheet": []
+    }
+  ],
+  "locations": [
+    {
+      "id": "lamp-room",
+      "name": "Saltlight lamp room",
+      "description": "The lamp room at the top of the lighthouse, home to the great lens and its feed wire."
+    },
+    {
+      "id": "causeway",
+      "name": "The causeway",
+      "description": "A tidal stone path linking the lighthouse rock to Greywick village, passable only at low water."
+    },
+    {
+      "id": "harbor",
+      "name": "Greywick harbor",
+      "description": "The island's small harbor, where the Ledger is printed and the lifeboat is kept."
+    },
+    {
+      "id": "reef",
+      "name": "The reef",
+      "description": "A black reef east of the island where the supply ship Wren ran aground."
+    }
+  ],
+  "channels": [
+    { "id": "game", "name": "Game", "kind": "game", "title": "Saltlight: Tides" },
+    { "id": "series", "name": "Web series", "kind": "series", "title": "The Dark Hour" },
+    { "id": "press", "name": "Newspaper", "kind": "press", "title": "The Harbor Ledger" }
+  ],
+  "beats": [
+    {
+      "id": "lamp-dark",
+      "order": 1,
+      "timeLabel": "Night of",
+      "title": "The lamp goes dark",
+      "channelId": "series",
+      "unitLabel": "Episode 1",
+      "content": "A squall rolls over Greywick Isle just after midnight, and the Saltlight lamp gutters out in the middle of the shipping forecast. Mara Quill climbs the tower stairs with her brass lantern and finds the lamp room empty, the keeper's coat still hanging by the door. The supply ship Wren is already feeling its way toward the reef in the dark.",
+      "characterIds": ["mara-quill", "elias-vane"]
+    },
+    {
+      "id": "wren-aground",
+      "order": 2,
+      "timeLabel": "Night of",
+      "title": "The Wren runs aground",
+      "channelId": "game",
+      "unitLabel": "Level 1",
+      "content": "Playing the night watch, the player steers the Wren through black water with only bell buoys to mark the safe channel. A strange light flickers on the headland, drawing the ship toward the reef until the hull grinds onto the rocks. The level ends with the crew launching boats while, far above, a lantern is doused on the cliff path.",
+      "characterIds": ["teo-bram", "mara-quill"]
+    },
+    {
+      "id": "torn-logbook",
+      "order": 3,
+      "timeLabel": "Day 1",
+      "title": "The torn logbook",
+      "channelId": "game",
+      "unitLabel": "Level 2",
+      "content": "The player searches the lamp room for the keeper's logbook and finds a page torn out, with only the stub remaining. The stub records a payment to Elias Vane, signed with a wreck-mark and dated the day before the storm. Mara begs the player not to show it to Ines until she understands what it means.",
+      "characterIds": ["mara-quill", "elias-vane"]
+    },
+    {
+      "id": "vigil-ledger",
+      "order": 4,
+      "timeLabel": "Day 1",
+      "title": "\"Apprentice kept vigil\"",
+      "channelId": "press",
+      "unitLabel": "Front page",
+      "content": "The Harbor Ledger's front page praises Mara Quill, who kept a lantern burning on the causeway all night to guide the rescue boats. Ines Okoro quotes two boatmen who saw the girl's light through the spray. The whole island reads her as a hero before anyone asks where the keeper was.",
+      "characterIds": ["mara-quill", "ines-okoro"]
+    },
+    {
+      "id": "causeway-alibi",
+      "order": 5,
+      "timeLabel": "Day 2",
+      "title": "Mara's causeway alibi",
+      "channelId": "series",
+      "unitLabel": "Episode 2",
+      "content": "Questioned by the harbormaster, Mara says she never left the causeway on the night of the wreck. The camera holds on her face as she describes the cold, then drifts to the empty causeway in the grey morning light. Viewers are left to decide whether she is protecting someone or herself.",
+      "characterIds": ["mara-quill"]
+    },
+    {
+      "id": "cut-wire",
+      "order": 6,
+      "timeLabel": "Day 3",
+      "title": "A cut wire in the lamp room",
+      "channelId": "game",
+      "unitLabel": "Level 3",
+      "content": "The player finds the lamp's feed wire sliced clean through behind the service panel. Teo Bram's notched salvage knife lies on the floor beside the panel, and Mara goes pale when she sees it. She insists Teo would never do such a thing, yet she will not say where she was when the lamp went dark.",
+      "characterIds": ["mara-quill", "teo-bram"]
+    },
+    {
+      "id": "salvagers-editorial",
+      "order": 7,
+      "timeLabel": "Day 4",
+      "title": "Ines names the salvagers",
+      "channelId": "press",
+      "unitLabel": "Editorial",
+      "content": "Ines Okoro writes that the Wren was lured onto the rocks, and names the reef salvagers who reached the wreck before the lifeboat did. She stops short of accusing Teo Bram, noting that his knife proves nothing and that someone on the island is lying. The editorial closes by asking who profits when ships miss the harbor.",
+      "characterIds": ["ines-okoro", "teo-bram"]
+    },
+    {
+      "id": "elias-mainland",
+      "order": 8,
+      "timeLabel": "Day 6",
+      "title": "Elias seen on the mainland",
+      "channelId": "series",
+      "unitLabel": "Episode 3",
+      "content": "The episode ends on a rain-streaked ferry dock, where a figure in a keeper's oilskin buys passage with a wreck-mark coin. The camera never shows his face, but the brass key ring on his belt is Elias Vane's. Only series viewers learn that the keeper may be alive.",
+      "characterIds": ["elias-vane", "ines-okoro"]
+    }
+  ],
+  "secrets": [
+    {
+      "id": "wreck-lured",
+      "text": "The Wren was lured onto the rocks",
+      "knownThrough": ["game"],
+      "note": "Only game players know"
+    },
+    {
+      "id": "wire-cut",
+      "text": "Someone cut the lamp wire",
+      "knownThrough": ["game"],
+      "note": "Game players find it, but not who did it"
+    },
+    {
+      "id": "elias-alive",
+      "text": "Elias is alive",
+      "knownThrough": ["series"],
+      "note": "Only series viewers know"
+    }
+  ]
+}
