@@ -26,5 +26,12 @@
       "regeneratesImage": false,
       "status": "pending"
     }
+  ],
+  "secretUpdates": [
+    {
+      "secretId": "wire-cut",
+      "text": "Mara cut the lamp wire",
+      "note": "Series viewers can catch her lie. Game players only suspect."
+    }
   ]
 }

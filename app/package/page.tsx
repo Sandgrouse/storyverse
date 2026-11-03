@@ -1,9 +1,14 @@
 import { createLocalStorage } from "@/lib/storage/local";
-import { RippleResultSchema } from "@/lib/world/schemas";
-import rippleFixture from "@/data/seed/saltlight-ripple.json";
 
 function lowerFirst(s: string): string {
   return s.charAt(0).toLowerCase() + s.slice(1);
+}
+
+// Lower-case a secret for mid-sentence use, but never change a name.
+function briefCase(s: string, names: Set<string>): string {
+  const first = (s.split(/\s+/)[0] ?? "").replace(/[^A-Za-z]/g, "");
+  if (names.has(first.toLowerCase())) return s;
+  return lowerFirst(s);
 }
 
 export default async function PackagePage() {
@@ -47,19 +52,17 @@ export default async function PackagePage() {
   const hidden = world.secrets.filter(
     (s) => !(gameChannelId && s.knownThrough.includes(gameChannelId)),
   );
+  const names = new Set(
+    world.characters.flatMap((c) => c.name.split(" ").map((w) => w.toLowerCase())),
+  );
   const knownSentence =
     known.length > 0
-      ? `Players can learn that ${known.map((s) => lowerFirst(s.text)).join(", and that ")}.`
+      ? `Players can learn that ${known.map((s) => briefCase(s.text, names)).join(", and that ")}.`
       : "Players start knowing nothing.";
   const hiddenSentences = hidden.map(
     (s) =>
-      `They must not learn that ${lowerFirst(s.text)}, because that belongs to the ${channelName(s.knownThrough[0] ?? "")}.`,
+      `They must not learn that ${briefCase(s.text, names)}, because that belongs to the ${channelName(s.knownThrough[0] ?? "")}.`,
   );
-
-  // Temporary until ripple results persist server-side: the brief quotes the
-  // seeded fixture's game fix, matching the prototype's callout.
-  const ripple = RippleResultSchema.parse(rippleFixture);
-  const gameFix = ripple.fixes.find((f) => f.regeneratesImage);
 
   return (
     <div className="view">
@@ -77,11 +80,6 @@ export default async function PackagePage() {
             <p>
               {knownSentence} {hiddenSentences.join(" ")}
             </p>
-            {gameFix && (
-              <div className="changed">
-                Changed by the last ripple: {gameFix.proposal}
-              </div>
-            )}
             <div className="acts" style={{ marginTop: "14px" }}>
               <button
                 className="ok"

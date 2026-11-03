@@ -37,7 +37,7 @@ export function appliedMessage(
 }
 
 export default function StoryMap({ world }: { world: World }) {
-  const [change, setChange] = useState("Mara cut the lamp herself.");
+  const [change, setChange] = useState("");
   const [ripple, setRipple] = useState<RippleResult | null>(null);
   const [statuses, setStatuses] = useState<Record<string, FixStatus>>({});
   const [revealed, setRevealed] = useState<string[]>([]);
@@ -219,19 +219,15 @@ export default function StoryMap({ world }: { world: World }) {
               Secrets<small>Only here</small>
             </div>
             {world.secrets.map((secret, i) => {
-              // The wire secret is rewritten once the ripple lands, mirroring
-              // the prototype: the canon change gives it a known author.
-              const moved = secret.id === "wire-cut";
-              const text =
-                ripple && moved ? "Mara cut the lamp wire" : secret.text;
-              const note =
-                ripple && moved
-                  ? "Series viewers can catch her lie. Game players only suspect."
-                  : secret.note;
+              const update = ripple?.secretUpdates.find(
+                (u) => u.secretId === secret.id,
+              );
+              const text = update?.text ?? secret.text;
+              const note = update?.note ?? secret.note;
               return (
                 <div
                   key={secret.id}
-                  className={`secret ${moved ? "moved" : ""}`}
+                  className={`secret ${update ? "moved" : ""}`}
                   style={{ gridColumn: `span ${secretSpans[i]}` }}
                 >
                   <b>{text}</b>
@@ -248,6 +244,7 @@ export default function StoryMap({ world }: { world: World }) {
             value={change}
             onChange={(e) => setChange(e.target.value)}
             autoComplete="off"
+            placeholder="Describe one canon change…"
           />
           <button className="btn" type="submit" disabled={loading}>
             {loading ? "Following…" : "Follow the change"}
@@ -290,8 +287,7 @@ export default function StoryMap({ world }: { world: World }) {
                   </p>
                   {fix.regeneratesImage && beat && (
                     <div className="art">
-                      <div className={thumbClass(beat.order)} />→
-                      <div className={thumbClass(beat.order + 1)} />
+                      <div className={thumbClass(beat.order)} />
                       <span>Same character sheet</span>
                     </div>
                   )}

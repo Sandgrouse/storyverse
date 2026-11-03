@@ -16,10 +16,12 @@ export default function CharactersView({ world }: { world: World }) {
   const [selectedId, setSelectedId] = useState(world.characters[0]?.id ?? "");
   const character =
     world.characters.find((c) => c.id === selectedId) ?? world.characters[0];
+  const channelName = (channelId: string): string =>
+    world.channels.find((c) => c.id === channelId)?.name ?? channelId;
   const usedIn = world.beats
     .filter((b) => b.characterIds.includes(character.id))
     .sort((a, b) => a.order - b.order)
-    .map((b) => b.unitLabel);
+    .map((b) => `${channelName(b.channelId)}: ${b.unitLabel}`);
 
   return (
     <div className="view">

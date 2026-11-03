@@ -69,10 +69,17 @@ export const RippleFixSchema = z.object({
   status: FixStatusSchema,
 });
 
+export const SecretUpdateSchema = z.object({
+  secretId: z.string(),
+  text: z.string(),
+  note: z.string(),
+});
+
 export const RippleResultSchema = z.object({
   change: z.string(),
   summary: z.string(),
   fixes: z.array(RippleFixSchema),
+  secretUpdates: z.array(SecretUpdateSchema),
 });
 
 export type SheetView = z.infer<typeof SheetViewSchema>;
@@ -85,4 +92,5 @@ export type Secret = z.infer<typeof SecretSchema>;
 export type World = z.infer<typeof WorldSchema>;
 export type FixStatus = z.infer<typeof FixStatusSchema>;
 export type RippleFix = z.infer<typeof RippleFixSchema>;
+export type SecretUpdate = z.infer<typeof SecretUpdateSchema>;
 export type RippleResult = z.infer<typeof RippleResultSchema>;

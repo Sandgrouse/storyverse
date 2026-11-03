@@ -57,4 +57,30 @@ describe("ripple fixture", () => {
       expect(fix.status).toBe("pending");
     }
   });
+
+  it("resolves every secret update to a known secret", async () => {
+    const world = WorldSchema.parse(await readSeed("saltlight.json"));
+    const ripple = RippleResultSchema.parse(await readSeed("saltlight-ripple.json"));
+    const secretIds = new Set(world.secrets.map((s) => s.id));
+    expect(ripple.secretUpdates.length).toBeGreaterThan(0);
+    for (const update of ripple.secretUpdates) {
+      expect(secretIds.has(update.secretId), `secret update ${update.secretId}`).toBe(true);
+      expect(update.text.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("seed twist guard", () => {
+  it("keeps Mara's secret free of the ripple twist", async () => {
+    const world = WorldSchema.parse(await readSeed("saltlight.json"));
+    const mara = world.characters.find((c) => c.id === "mara-quill");
+    expect(mara?.secret).toBe(
+      "She is hiding where she was when the lamp went dark.",
+    );
+  });
+
+  it("contains no seed text stating the twist", async () => {
+    const raw = await readFile(join(process.cwd(), "data", "seed", "saltlight.json"), "utf-8");
+    expect(raw.toLowerCase()).not.toContain("cut the lamp");
+  });
 });

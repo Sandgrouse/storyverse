@@ -32,7 +32,6 @@ export default function Rail({ worldTitle }: { worldTitle: string }) {
           </Link>
         ))}
       </nav>
-      <div className="foot">Prototype. Sample content, no model calls.</div>
     </aside>
   );
 }

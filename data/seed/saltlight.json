@@ -6,8 +6,8 @@
     {
       "id": "mara-quill",
       "name": "Mara Quill",
-      "canon": "Keeper's apprentice. Silver-streaked hair, scar through the left eyebrow, mustard oilskin, brass lantern.",
-      "secret": "She cut the lamp herself.",
+      "canon": "Keeper's apprentice in her forties. Silver-streaked hair, scar through the left eyebrow, mustard oilskin, brass lantern.",
+      "secret": "She is hiding where she was when the lamp went dark.",
       "sheet": []
     },
     {
@@ -95,7 +95,7 @@
       "title": "\"Apprentice kept vigil\"",
       "channelId": "press",
       "unitLabel": "Front page",
-      "content": "The Harbor Ledger's front page praises Mara Quill, who kept a lantern burning on the causeway all night to guide the rescue boats. Ines Okoro quotes two boatmen who saw the girl's light through the spray. The whole island reads her as a hero before anyone asks where the keeper was.",
+      "content": "The Harbor Ledger's front page praises Mara Quill, who kept a lantern burning on the causeway all night to guide the rescue boats. Ines Okoro quotes two boatmen who saw her light through the spray. The whole island reads her as a hero before anyone asks where the keeper was.",
       "characterIds": ["mara-quill", "ines-okoro"]
     },
     {
@@ -148,7 +148,7 @@
     },
     {
       "id": "wire-cut",
-      "text": "Someone cut the lamp wire",
+      "text": "Someone severed the lamp wire",
       "knownThrough": ["game"],
       "note": "Game players find it, but not who did it"
     },

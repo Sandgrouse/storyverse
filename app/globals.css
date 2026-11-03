@@ -186,7 +186,8 @@ h1 {
   position: sticky;
   left: 0;
   background: var(--ink);
-  z-index: 2;
+  z-index: 3;
+  box-shadow: 8px 0 0 var(--ink);
 }
 .lane small {
   display: block;
