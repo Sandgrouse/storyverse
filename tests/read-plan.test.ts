@@ -13,9 +13,11 @@ import {
 } from "@/lib/read";
 import {
   PLAN_INSTRUCTIONS,
+  planModelJsonSchema,
   toPlanBeats,
   toPlanChannels,
   toPlanSecrets,
+  uncoveredChannels,
 } from "@/lib/plan";
 import {
   MAX_SEND_BYTES,
@@ -130,13 +132,13 @@ describe("read content order", () => {
 
   it("uses the exact read instructions", () => {
     expect(READ_INSTRUCTIONS).toBe(
-      "You read a creator's raw story material and build its canon. Use only what the material says. Never rename anyone, and keep all names and details exactly. Split the story into its natural parts. An excerpt is a short retelling in your own words, never copied text. A gap is an important question the material leaves open. For each image, say who or what it shows. Set artFile on a character, or on a part, only if an image clearly shows them, otherwise leave it empty.",
+      "You read a creator's raw story material and build its canon. Use only what the material says. Never rename anyone, and keep all names and details exactly. The logline tells the story itself in one gripping sentence. It never describes the document. Split the story into its natural parts. An excerpt is a short retelling in your own words, never copied text. A gap is an important question the material leaves open. For each image, say who or what it shows. Set artFile on a character, or on a part, only if an image clearly shows them, otherwise leave it empty.",
     );
   });
 
   it("uses the exact plan instructions", () => {
     expect(PLAN_INSTRUCTIONS).toBe(
-      "You plan how one story spreads across channels. Propose three channels unless the material names others. Give each channel its own piece of the story, so that each holds at least one secret the others don't, and fans must follow several to get the whole truth. Every part must appear in at least one channel. Beat content is two to four sentences. Invented secrets are additions: keep them consistent with the canon, and never change a name or an established detail.",
+      "You plan how one story spreads across channels. Propose three channels unless the material names others. Give each channel its own piece of the story, so that each holds at least one secret the others don't, and fans must follow several to get the whole truth. Every channel must hold at least one secret. A secret's knownThrough lists the ids of the channels in this same response. name is one plain word for the format, such as Series, Game or Shorts. title is the name of the work. Every part must appear in at least one channel. Beat content is two to four sentences. Invented secrets are additions: keep them consistent with the canon, and never change a name or an established detail.",
     );
   });
 });
@@ -338,6 +340,129 @@ describe("POST /api/plan", () => {
     const json = await res.json();
     expect(json.sample).toBe(true);
     expect(json.channels).toHaveLength(seed.channels.length);
+  });
+
+  it("omits the id enums when the canon has no parts or characters", async () => {
+    const schema = planModelJsonSchema({
+      ...CANON,
+      parts: [],
+      characters: [],
+    }) as {
+      properties: {
+        beats: {
+          items: {
+            properties: { partId: object; characterIds: never };
+          };
+        };
+      };
+    };
+    const beatProps = schema.properties.beats.items.properties;
+    expect(beatProps.partId).toEqual({ type: "string" });
+    const full = planModelJsonSchema(CANON) as {
+      properties: {
+        beats: {
+          items: {
+            properties: {
+              partId: { enum: string[] };
+              characterIds: { items: { enum: string[] } };
+            };
+          };
+        };
+      };
+    };
+    const fullProps = full.properties.beats.items.properties;
+    expect(fullProps.partId.enum).toEqual(CANON.parts.map((p) => p.id));
+    expect(fullProps.characterIds.items.enum).toEqual(
+      CANON.characters.map((c) => c.id),
+    );
+  });
+
+  it("requires every secret to name a returned channel", async () => {
+    expect(
+      toPlanSecrets(
+        [
+          { id: "s1", text: "Known.", knownThrough: ["ch1"], note: "N" },
+          { id: "s2", text: "Unclaimed.", knownThrough: [], note: "N" },
+          { id: "s3", text: "Lost.", knownThrough: ["nowhere"], note: "N" },
+        ],
+        ["ch1"],
+      ).map((s) => s.id),
+    ).toEqual(["s1"]);
+  });
+
+  it("reports channels left with no secret", async () => {
+    const channels = toPlanChannels([
+      { id: "ch1", name: "Series", kind: "series", title: "T", pitch: "P" },
+      { id: "ch2", name: "Game", kind: "game", title: "T", pitch: "P" },
+    ]);
+    const secrets = toPlanSecrets(
+      [{ id: "s1", text: "Known.", knownThrough: ["ch1"], note: "N" }],
+      ["ch1", "ch2"],
+    );
+    expect(uncoveredChannels(channels, secrets).map((c) => c.id)).toEqual([
+      "ch2",
+    ]);
+    expect(
+      uncoveredChannels(channels, [
+        ...secrets,
+        { id: "s2", text: "Also.", knownThrough: ["ch2"], note: "N" },
+      ]).map((c) => c.id),
+    ).toEqual([]);
+  });
+
+  it("retries once when a channel has no secret", async () => {
+    const thin = {
+      channels: [
+        { id: "ch1", name: "Series", kind: "series", title: "T", pitch: "P" },
+        { id: "ch2", name: "Game", kind: "game", title: "T", pitch: "P" },
+      ],
+      beats: [],
+      secrets: [{ id: "s1", text: "One.", knownThrough: ["ch1"], note: "N" }],
+    };
+    const fullPlan = {
+      ...thin,
+      secrets: [
+        { id: "s1", text: "One.", knownThrough: ["ch1"], note: "N" },
+        { id: "s2", text: "Two.", knownThrough: ["ch2"], note: "N" },
+      ],
+    };
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify(
+          modelPayload(
+            JSON.stringify(fetchMock.mock.calls.length === 0 ? thin : fullPlan),
+          ),
+        ),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await planPOST(post({ canon: CANON }));
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const json = await res.json();
+    expect(json.secrets.map((s: { id: string }) => s.id).toEqual([
+      "s1",
+      "s2",
+    ]);
+  });
+
+  it("continues with what exists when the retry still leaves a gap", async () => {
+    const thin = {
+      channels: [
+        { id: "ch1", name: "Series", kind: "series", title: "T", pitch: "P" },
+        { id: "ch2", name: "Game", kind: "game", title: "T", pitch: "P" },
+      ],
+      beats: [],
+      secrets: [{ id: "s1", text: "One.", knownThrough: ["ch1"], note: "N" }],
+    };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(modelPayload(JSON.stringify(thin))), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await planPOST(post({ canon: CANON }));
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const json = await res.json();
+    expect(json.secrets.map((s: { id: string }) => s.id)).toEqual(["s1"]);
   });
 });
 

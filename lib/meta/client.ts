@@ -49,6 +49,28 @@ function apiErrorCode(payload: unknown): string {
   return "meta_error";
 }
 
+/**
+ * The API's own error message, for the server log. The payload never holds
+ * the key, but this stays a short string anyway: status, code and message.
+ */
+function apiErrorMessage(payload: unknown): string {
+  if (payload !== null && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    const error = record.error;
+    if (error !== null && typeof error === "object") {
+      const message = (error as Record<string, unknown>).message;
+      if (typeof message === "string" && message.length > 0) {
+        return message.slice(0, 300);
+      }
+    }
+    const message = record.message;
+    if (typeof message === "string" && message.length > 0) {
+      return message.slice(0, 300);
+    }
+  }
+  return "";
+}
+
 function firstOutputText(payload: unknown): string | null {
   if (payload === null || typeof payload !== "object") return null;
   const output = (payload as Record<string, unknown>).output;
@@ -111,7 +133,14 @@ export async function completeJson<T>(
 
   const payload: unknown = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new MetaApiError(res.status, apiErrorCode(payload));
+    const code = apiErrorCode(payload);
+    const message = apiErrorMessage(payload);
+    // Server log only. The key is in the request headers, never in the
+    // payload, so logging status, code and message cannot leak it.
+    console.error(
+      `[meta] ${request.schemaName} failed: ${res.status} ${code}${message ? ` ${message}` : ""}`,
+    );
+    throw new MetaApiError(res.status, code);
   }
 
   logUsage(payload);

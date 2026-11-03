@@ -40,6 +40,8 @@ export const PartSchema = z.object({
   summary: z.string(),
   excerpt: z.string(),
   imagePath: z.string().default(""),
+  /** CSS background-position for this part's art, from the seed data. */
+  imagePosition: z.string().default(""),
   tint: z.string().default("#e9e0ce"),
   characterIds: z.array(z.string()),
 });
@@ -74,6 +76,8 @@ export const WorldSchema = z.object({
   title: z.string(),
   premise: z.string(),
   logline: z.string(),
+  /** Suggested change for the ask bar. Only the sample project sets this. */
+  sampleChange: z.string().default(""),
   characters: z.array(CharacterSchema),
   locations: z.array(LocationSchema),
   channels: z.array(ChannelSchema),

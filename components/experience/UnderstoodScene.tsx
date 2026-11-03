@@ -15,7 +15,15 @@ export default function UnderstoodScene({ active, world, onWorld, onBack, onOpen
   const [handled, setHandled] = useState<string[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const plate = world.channels[0]?.imagePath;
+  // The left page shows the first available art from any file. With no
+  // art at all it is a tinted plate with the story's title.
+  const art = [
+    ...world.channels.map((c) => c.imagePath),
+    ...world.parts.map((p) => p.imagePath),
+    ...world.characters.map((c) => c.artPath ?? ""),
+    ...world.beats.map((b) => b.imagePath ?? ""),
+  ].find((path) => typeof path === "string" && path.length > 0);
+  const tint = world.parts[0]?.tint ?? "#e9e0ce";
 
   const markHandled = (id: string) =>
     setHandled((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -61,10 +69,19 @@ export default function UnderstoodScene({ active, world, onWorld, onBack, onOpen
     <section className={`scene${active ? " on" : ""}`} id="understood">
       <div className="spread">
         <div className="pg">
-          <div
-            className="plate"
-            style={plate ? { backgroundImage: `url(${plate})` } : undefined}
-          />
+          {art ? (
+            <div
+              className="plate"
+              style={{ backgroundImage: `url(${art})` }}
+            />
+          ) : (
+            <div
+              className="plate bare"
+              style={{ backgroundImage: "none", backgroundColor: tint }}
+            >
+              <span>{world.title}</span>
+            </div>
+          )}
           <p className="logline">{world.logline}</p>
         </div>
         <div className="pg">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { World } from "@/lib/world/schemas";
 import {
   downscaleImageDataUrl,
@@ -52,7 +52,6 @@ export default function BringScene({
   onBack,
   onRead,
 }: Props) {
-  const [shown, setShown] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
@@ -88,25 +87,9 @@ export default function BringScene({
       ]
     : [];
 
+  // Every dropped file appears in the fan at once: staggering the reveal
+  // left later cards invisible when the count changed mid-animation.
   const visible = sample && files.length === 0 ? sampleCards : cards;
-
-  useEffect(() => {
-    if (!active) return;
-    setShown(0);
-    const total = sample && files.length === 0 ? sampleCards.length : cards.length;
-    if (total === 0) return;
-    const id = window.setInterval(() => {
-      setShown((prev) => {
-        if (prev >= total) {
-          window.clearInterval(id);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 170);
-    return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, files.length, sample]);
 
   const kinds = new Set(
     files.map((file) => inferredKind(file)).filter((kind) => kind.length > 0),
@@ -253,14 +236,11 @@ export default function BringScene({
         )}
         {visible.map((card, i) => {
           const o = i - (visible.length - 1) / 2;
-          const placed =
-            i < shown
-              ? `translate(${o * spacing}px, ${Math.abs(o) * 12}px) rotate(${o * 4}deg)`
-              : `translate(${o * 40}px, 50px) rotate(${o * 2}deg)`;
+          const placed = `translate(${o * spacing}px, ${Math.abs(o) * 12}px) rotate(${o * 4}deg)`;
           return (
             <div
               key={card.id}
-              className={`file${card.body && !card.image ? " doc" : ""}${i < shown ? " in" : ""}`}
+              className={`file${card.body && !card.image ? " doc" : ""} in`}
               style={{
                 ...(card.image ? { backgroundImage: `url(${card.image})` } : undefined),
                 transform: placed,

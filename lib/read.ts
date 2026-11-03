@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const READ_INSTRUCTIONS =
-  "You read a creator's raw story material and build its canon. Use only what the material says. Never rename anyone, and keep all names and details exactly. Split the story into its natural parts. An excerpt is a short retelling in your own words, never copied text. A gap is an important question the material leaves open. For each image, say who or what it shows. Set artFile on a character, or on a part, only if an image clearly shows them, otherwise leave it empty.";
+  "You read a creator's raw story material and build its canon. Use only what the material says. Never rename anyone, and keep all names and details exactly. The logline tells the story itself in one gripping sentence. It never describes the document. Split the story into its natural parts. An excerpt is a short retelling in your own words, never copied text. A gap is an important question the material leaves open. For each image, say who or what it shows. Set artFile on a character, or on a part, only if an image clearly shows them, otherwise leave it empty.";
 
 export const IDEA_ADDITION =
   "This is only an idea. Build a first draft of the canon from it, and treat what you add as a draft for the creator to confirm.";

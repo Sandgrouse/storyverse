@@ -11,6 +11,10 @@ import {
   toPlanBeats,
   toPlanChannels,
   toPlanSecrets,
+  uncoveredChannels,
+  type PlanBeat,
+  type PlanChannel,
+  type PlanSecret,
 } from "@/lib/plan";
 import { WorldSchema } from "@/lib/world/schemas";
 
@@ -38,36 +42,54 @@ export async function POST(req: Request) {
   }
 
   try {
-    const model = await completeJson(
-      {
-        instructions: PLAN_INSTRUCTIONS,
-        input: planModelInput({
-          ...canon,
-          files: [],
-          characters: canon.characters.map((c) => ({
-            ...c,
-            artFile: "",
-          })),
-          parts: canon.parts.map((p) => ({ ...p, artFile: "" })),
-        }),
-        schemaName: "channel_plan",
-        jsonSchema: planModelJsonSchema({
-          ...canon,
-          files: [],
-          characters: canon.characters.map((c) => ({
-            ...c,
-            artFile: "",
-          })),
-          parts: canon.parts.map((p) => ({ ...p, artFile: "" })),
-        }),
-      },
-      PlanModelOutputSchema,
-    );
-    const channels = toPlanChannels(model.channels ?? []);
-    const channelIds = channels.map((channel) => channel.id);
-    const beats = toPlanBeats(model.beats ?? [], canon, channelIds);
-    const secrets = toPlanSecrets(model.secrets ?? [], channelIds);
-    return NextResponse.json({ channels, beats, secrets });
+    const withoutArt = {
+      ...canon,
+      files: [],
+      characters: canon.characters.map((c) => ({
+        ...c,
+        artFile: "",
+      })),
+      parts: canon.parts.map((p) => ({ ...p, artFile: "" })),
+    };
+    const request = {
+      instructions: PLAN_INSTRUCTIONS,
+      input: planModelInput(withoutArt),
+      schemaName: "channel_plan",
+      jsonSchema: planModelJsonSchema(withoutArt),
+    };
+    const validate = (model: {
+      channels?: unknown;
+      beats?: unknown;
+      secrets?: unknown;
+    }): {
+      channels: PlanChannel[];
+      beats: PlanBeat[];
+      secrets: PlanSecret[];
+    } => {
+      const channels = toPlanChannels(
+        Array.isArray(model.channels) ? model.channels : [],
+      );
+      const channelIds = channels.map((channel) => channel.id);
+      return {
+        channels,
+        beats: toPlanBeats(
+          Array.isArray(model.beats) ? model.beats : [],
+          canon,
+          channelIds,
+        ),
+        secrets: toPlanSecrets(
+          Array.isArray(model.secrets) ? model.secrets : [],
+          channelIds,
+        ),
+      };
+    };
+    let plan = validate(await completeJson(request, PlanModelOutputSchema));
+    // A channel with no secret breaks the map. Retry once, then continue
+    // with what exists.
+    if (uncoveredChannels(plan.channels, plan.secrets).length > 0) {
+      plan = validate(await completeJson(request, PlanModelOutputSchema));
+    }
+    return NextResponse.json(plan);
   } catch (error) {
     if (error instanceof MetaApiError) {
       const status =

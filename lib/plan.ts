@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ReadModelOutput } from "@/lib/read";
 
 export const PLAN_INSTRUCTIONS =
-  "You plan how one story spreads across channels. Propose three channels unless the material names others. Give each channel its own piece of the story, so that each holds at least one secret the others don't, and fans must follow several to get the whole truth. Every part must appear in at least one channel. Beat content is two to four sentences. Invented secrets are additions: keep them consistent with the canon, and never change a name or an established detail.";
+  "You plan how one story spreads across channels. Propose three channels unless the material names others. Give each channel its own piece of the story, so that each holds at least one secret the others don't, and fans must follow several to get the whole truth. Every channel must hold at least one secret. A secret's knownThrough lists the ids of the channels in this same response. name is one plain word for the format, such as Series, Game or Shorts. title is the name of the work. Every part must appear in at least one channel. Beat content is two to four sentences. Invented secrets are additions: keep them consistent with the canon, and never change a name or an established detail.";
 
 export const PlanChannelKindSchema = z.enum(["series", "game", "press"]);
 
@@ -36,6 +36,20 @@ export const PlanSecretSchema = z.object({
 });
 
 export type PlanSecret = z.infer<typeof PlanSecretSchema>;
+
+/**
+ * Channels left with no secret after validation. The plan is only complete
+ * when every channel holds at least one secret the others don't.
+ */
+export function uncoveredChannels(
+  channels: PlanChannel[],
+  secrets: PlanSecret[],
+): PlanChannel[] {
+  return channels.filter(
+    (channel) =>
+      !secrets.some((secret) => secret.knownThrough.includes(channel.id)),
+  );
+}
 
 export const PlanModelOutputSchema = z.object({
   channels: z.array(z.unknown()).default([]),
@@ -108,7 +122,7 @@ function buildSecretItemSchema(channelIds: string[]) {
   return z.object({
     id: z.string().min(1),
     text: z.string().min(1),
-    knownThrough: z.array(z.enum(nonEmptyIds(channelIds))).default([]),
+    knownThrough: z.array(z.enum(nonEmptyIds(channelIds))).min(1),
     note: z.string().default(""),
   });
 }
@@ -167,8 +181,10 @@ export function toPlanBeats(
 }
 
 /**
- * Validate each secret against the channel enum. Unknown channel ids are
- * dropped from knownThrough; the secret stays, possibly unrevealed.
+ * Validate each secret against the channels returned in the same response.
+ * knownThrough must name at least one of those channel ids: unknown ids
+ * are dropped, and a secret left with nowhere to be known is dropped too,
+ * so every surviving secret belongs to at least one channel.
  */
 export function toPlanSecrets(
   modelSecrets: unknown[],
@@ -189,15 +205,8 @@ export function toPlanSecrets(
           )
         : [],
     };
-    // If the model named channels but none resolve, drop the secret when it
-    // claimed to be known somewhere; an explicitly empty knownThrough stays.
-    if (
-      Array.isArray(record.knownThrough) &&
-      record.knownThrough.length > 0 &&
-      (candidate.knownThrough as string[]).length === 0
-    ) {
-      continue;
-    }
+    // The schema requires at least one known channel id, so a secret
+    // whose channels do not resolve is dropped here.
     const parsed = itemSchema.safeParse(candidate);
     if (!parsed.success) continue;
     if (seen.has(parsed.data.id)) continue;
@@ -238,14 +247,23 @@ export function planModelInput(canon: ReadModelOutput): string {
   return lines.join("\n");
 }
 
-/** JSON Schema twin of the plan model output, sent as the response format. */
+/**
+ * JSON Schema twin of the plan model output, sent as the response format.
+ * An empty enum is rejected by the API, so when the canon has no parts or
+ * no characters the id stays a plain string and per-item validation drops
+ * anything that does not resolve. knownThrough lists channel ids created
+ * in this same response, so it is never an enum: it is validated against
+ * the returned channels instead.
+ */
 export function planModelJsonSchema(canon: ReadModelOutput): Record<string, unknown> {
-  const partIds =
-    canon.parts.length > 0 ? canon.parts.map((part) => part.id) : ["no-parts"];
-  const characterIds =
-    canon.characters.length > 0
-      ? canon.characters.map((character) => character.id)
-      : ["no-characters"];
+  const partIds = canon.parts.map((part) => part.id);
+  const characterIds = canon.characters.map((character) => character.id);
+  const partIdSchema =
+    partIds.length > 0 ? { type: "string", enum: partIds } : { type: "string" };
+  const characterIdSchema =
+    characterIds.length > 0
+      ? { type: "string", enum: characterIds }
+      : { type: "string" };
   return {
     type: "object",
     properties: {
@@ -270,14 +288,14 @@ export function planModelJsonSchema(canon: ReadModelOutput): Record<string, unkn
           type: "object",
           properties: {
             id: { type: "string" },
-            partId: { type: "string", enum: partIds },
+            partId: partIdSchema,
             channelId: { type: "string" },
             unitLabel: { type: "string" },
             title: { type: "string" },
             content: { type: "string" },
             characterIds: {
               type: "array",
-              items: { type: "string", enum: characterIds },
+              items: characterIdSchema,
             },
           },
           required: [
@@ -299,7 +317,11 @@ export function planModelJsonSchema(canon: ReadModelOutput): Record<string, unkn
           properties: {
             id: { type: "string" },
             text: { type: "string" },
-            knownThrough: { type: "array", items: { type: "string" } },
+            knownThrough: {
+              type: "array",
+              items: { type: "string" },
+              minItems: 1,
+            },
             note: { type: "string" },
           },
           required: ["id", "text", "knownThrough", "note"],

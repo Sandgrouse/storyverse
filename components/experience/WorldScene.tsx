@@ -16,7 +16,7 @@ import {
   settleRippleWorld,
   type RippleProgress,
 } from "@/lib/ripple";
-import { channelColorByIndex } from "@/lib/story";
+import { channelColorByIndex, stripImageData } from "@/lib/story";
 import CastDrawer from "./CastDrawer";
 import PackDrawer from "./PackDrawer";
 
@@ -53,16 +53,9 @@ const WAITING_STEPS = [
   "Looking for what breaks",
 ];
 
-const DEFAULT_CHANGE = "Enyinyi told them how to kill him.";
-
-// Where Anukili's face sits in the current art, so cropped surfaces
-// (the wash, the covers, the shelf) keep framing him. His portrait is a
-// tall frame with his face top-center; the stream scene is wide with him
-// standing left-of-center. Other art keeps its CSS default.
-function facePosition(imagePath: string): string | undefined {
-  if (imagePath.endsWith("/anukili.webp")) return "50% 0%";
-  if (imagePath.endsWith("/hippo.webp")) return "32% 32%";
-  return undefined;
+/** Crop position for a part's art. Empty keeps the CSS default. */
+function artPosition(imagePosition: string): string | undefined {
+  return imagePosition.length > 0 ? imagePosition : undefined;
 }
 
 function channelColor(index: number) {
@@ -97,7 +90,9 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
   const [bookOpen, setBookOpen] = useState(false);
   const [drawer, setDrawer] = useState<"cast" | "pack" | null>(null);
 
-  const [ask, setAsk] = useState(DEFAULT_CHANGE);
+  // The ask bar suggests the sample project's change, from the seed
+  // data. Any other world starts empty.
+  const [ask, setAsk] = useState(world.sampleChange ?? "");
   const [change, setChange] = useState("");
   const [phase, setPhase] = useState<"idle" | "waiting" | "done" | "error">(
     "idle",
@@ -143,6 +138,12 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
   useEffect(() => {
     worldRef.current = world;
   }, [world]);
+
+  // A new project gets its own bar: the sample suggestion, or empty.
+  useEffect(() => {
+    setAsk(world.sampleChange ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world.id]);
 
   const beatsHere = (channelId: string, pid: string) =>
     liveWorld.beats.some((b) => b.channelId === channelId && b.partId === pid);
@@ -191,7 +192,10 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
       const res = await fetch("/api/ripple/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ change: decidedChange, world: nextWorld }),
+        body: JSON.stringify({
+          change: decidedChange,
+          world: stripImageData(nextWorld),
+        }),
       });
       if (!res.ok) throw new Error(`check failed: ${res.status}`);
       const json = CheckResponseSchema.parse(await res.json());
@@ -242,7 +246,10 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
       const res = await fetch("/api/ripple", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ change: nextChange, world: liveWorld }),
+        body: JSON.stringify({
+          change: nextChange,
+          world: stripImageData(liveWorld),
+        }),
       });
       if (requestId.current !== id) return;
       if (!res.ok) throw new Error(`ripple failed: ${res.status}`);
@@ -318,7 +325,11 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
       const res = await fetch("/api/ripple/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ change, fix, world: worldRef.current }),
+        body: JSON.stringify({
+          change,
+          fix,
+          world: stripImageData(worldRef.current),
+        }),
       });
       if (requestId.current !== rippleId) return;
       if (!res.ok) throw new Error(`apply failed: ${res.status}`);
@@ -425,7 +436,7 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
           part.imagePath
             ? {
                 backgroundImage: `url(${part.imagePath})`,
-                backgroundPosition: facePosition(part.imagePath),
+                backgroundPosition: artPosition(part.imagePosition),
               }
             : { backgroundImage: "none", backgroundColor: part.tint }
         }
@@ -494,7 +505,7 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
             part.imagePath
               ? {
                   backgroundImage: `url(${part.imagePath})`,
-                  backgroundPosition: facePosition(part.imagePath),
+                  backgroundPosition: artPosition(part.imagePosition),
                 }
               : { backgroundImage: "none", backgroundColor: part.tint }
           }
@@ -527,7 +538,7 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
                   p.imagePath
                     ? {
                         backgroundImage: `url(${p.imagePath})`,
-                        backgroundPosition: facePosition(p.imagePath),
+                        backgroundPosition: artPosition(p.imagePosition),
                       }
                     : { backgroundImage: "none", backgroundColor: p.tint }
                 }
@@ -598,7 +609,10 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
           onChange={(e) => setAsk(e.target.value)}
           autoComplete="off"
         />
-        <button type="submit" disabled={phase === "waiting"}>
+        <button
+          type="submit"
+          disabled={phase === "waiting" || ask.trim().length === 0}
+        >
           Follow the change
         </button>
       </form>

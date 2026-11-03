@@ -297,7 +297,7 @@ export default function ReadingScene({
           busts.map((bust, i) => (
             <div
               key={bust.id}
-              className="bust on"
+              className={`bust on${bust.art ? "" : " bare"}`}
               style={
                 {
                   "--r": i % 2 === 0 ? "-4deg" : "3deg",
