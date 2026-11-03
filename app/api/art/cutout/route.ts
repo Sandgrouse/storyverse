@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { budgetMessage, checkBudget } from "@/lib/budget";
 import {
   decodeMaskToRaster,
   parseImageStream,
@@ -76,6 +77,11 @@ export async function POST(req: Request) {
 
   if (!process.env.MODEL_API_KEY) {
     return errorResponse(503, "NO_API_KEY", CUTOUT_NO_KEY_MESSAGE);
+  }
+
+  const charge = await checkBudget("cutout", req);
+  if (!charge.allowed) {
+    return errorResponse(429, "BUDGET", budgetMessage(charge.scope));
   }
 
   const apiKey = process.env.MODEL_API_KEY;

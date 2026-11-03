@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MAX_BODY_BYTES, budgetMessage, checkBudget } from "@/lib/budget";
 import { MetaApiError, completeJson } from "@/lib/meta/client";
 import {
   PACK_INSTRUCTIONS,
@@ -24,7 +25,27 @@ function errorResponse(status: number, code: string, message: string) {
  * anything invented. The client strips images before sending.
  */
 export async function POST(req: Request) {
-  const body: unknown = await req.json().catch(() => null);
+  const raw = await req.text().catch(() => null);
+  if (raw === null) {
+    return errorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "Expected { world, partId, channelId }.",
+    );
+  }
+  if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) {
+    return errorResponse(413, "REQUEST_TOO_LARGE", "That request is too large.");
+  }
+  let body: unknown = null;
+  try {
+    body = JSON.parse(raw) as unknown;
+  } catch {
+    return errorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "Expected { world, partId, channelId }.",
+    );
+  }
   const parsed = PackRequestSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse(
@@ -54,6 +75,11 @@ export async function POST(req: Request) {
 
   if (!process.env.MODEL_API_KEY) {
     return errorResponse(503, "NO_API_KEY", PACK_NO_KEY_MESSAGE);
+  }
+
+  const charge = await checkBudget("pack", req);
+  if (!charge.allowed) {
+    return errorResponse(429, "BUDGET", budgetMessage(charge.scope));
   }
 
   try {

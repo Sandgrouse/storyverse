@@ -265,6 +265,11 @@ export default function BringScene({
         <button className="quiet" onClick={onBack}>
           Back
         </button>
+        {!sample && (
+          <button type="button" className="pill light" onClick={onSample}>
+            Use the sample project
+          </button>
+        )}
         <button className="pill" disabled={!ready || working} onClick={onRead}>
           Read my story
         </button>

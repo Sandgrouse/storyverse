@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MAX_BODY_BYTES, budgetMessage, checkBudget } from "@/lib/budget";
 import { MetaApiError, completeJson } from "@/lib/meta/client";
 import {
   APPLY_INSTRUCTIONS,
@@ -15,7 +16,27 @@ function errorResponse(status: number, code: string, message: string) {
 }
 
 export async function POST(req: Request) {
-  const body: unknown = await req.json().catch(() => null);
+  const raw = await req.text().catch(() => null);
+  if (raw === null) {
+    return errorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "Expected { change, fix, world }.",
+    );
+  }
+  if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) {
+    return errorResponse(413, "REQUEST_TOO_LARGE", "That request is too large.");
+  }
+  let body: unknown = null;
+  try {
+    body = JSON.parse(raw) as unknown;
+  } catch {
+    return errorResponse(
+      400,
+      "VALIDATION_ERROR",
+      "Expected { change, fix, world }.",
+    );
+  }
   const parsed = ApplyRequestSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse(
@@ -37,6 +58,11 @@ export async function POST(req: Request) {
         sample: true,
       }),
     );
+  }
+
+  const charge = await checkBudget("apply", req);
+  if (!charge.allowed) {
+    return errorResponse(429, "BUDGET", budgetMessage(charge.scope));
   }
 
   try {

@@ -23,6 +23,22 @@ type Props = {
 
 type Phase = "idle" | "reading" | "planning" | "showing" | "error";
 
+/** The server's message when it has one, so a budget stop reads as one. */
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const json: unknown = await res.clone().json().catch(() => null);
+  const record =
+    json !== null && typeof json === "object"
+      ? (json as Record<string, unknown>)
+      : null;
+  const error =
+    record?.error !== null && typeof record?.error === "object"
+      ? (record.error as Record<string, unknown>)
+      : null;
+  return typeof error?.message === "string" && error.message.length > 0
+    ? error.message
+    : fallback;
+}
+
 export default function ReadingScene({
   active,
   files,
@@ -142,12 +158,18 @@ export default function ReadingScene({
             ...(idea.trim() ? { idea: idea.trim() } : {}),
           }),
         });
-        if (!res.ok) throw new Error(`read failed: ${res.status}`);
+        if (!res.ok) {
+          throw new Error(
+            await errorMessage(res, "I could not read those files. Try again."),
+          );
+        }
         readJson = await res.json();
-      } catch {
+      } catch (e) {
         if (cancelled || runId.current !== id) return;
         setPhase("error");
-        setFailure("I could not read those files. Try again.");
+        setFailure(
+          e instanceof Error ? e.message : "I could not read those files. Try again.",
+        );
         doneRef.current = false;
         return;
       }
@@ -199,12 +221,18 @@ export default function ReadingScene({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ canon: canonValue }),
         });
-        if (!res.ok) throw new Error(`plan failed: ${res.status}`);
+        if (!res.ok) {
+          throw new Error(
+            await errorMessage(res, "I could not plan the channels. Try again."),
+          );
+        }
         planJson = await res.json();
-      } catch {
+      } catch (e) {
         if (cancelled || runId.current !== id) return;
         setPhase("error");
-        setFailure("I could not plan the channels. Try again.");
+        setFailure(
+          e instanceof Error ? e.message : "I could not plan the channels. Try again.",
+        );
         doneRef.current = false;
         return;
       }

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",
+    "@vercel/blob": "^2.8.2",
     "jszip": "^3.10.2",
     "next": "15.5.4",
     "react": "19.1.1",

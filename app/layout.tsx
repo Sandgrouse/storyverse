@@ -34,6 +34,11 @@ const sans = localFont({
 export const metadata: Metadata = {
   title: "Storyverse",
   description: "Change the story once, and every channel follows.",
+  openGraph: {
+    title: "Storyverse",
+    description: "Change the story once, and every channel follows.",
+    images: ["/anukili/storm.webp"],
+  },
 };
 
 export default function RootLayout({
