@@ -94,14 +94,17 @@ type RegenState =
   | { kind: "error"; oldImage: string; message: string }
   | { kind: "blocked"; oldImage: string; message: string; description: string };
 
+export type WorldDrawer = "cast" | "pack" | "story" | null;
+
 type Props = {
-  active: boolean;
+  active?: boolean;
   world: World;
   onWorld: (world: World) => void;
-  onStartOver: () => void;
+  drawer?: WorldDrawer;
+  onDrawer?: (drawer: WorldDrawer) => void;
 };
 
-export default function WorldScene({ active, world, onWorld, onStartOver }: Props) {
+export default function WorldScene({ active = true, world, onWorld, drawer: controlled, onDrawer }: Props) {
   const [liveWorld, setLiveWorld] = useState<World>(world);
   const parts = [...liveWorld.parts].sort((a, b) => a.order - b.order);
   const [partId, setPartId] = useState(parts[2]?.id ?? parts[0]?.id);
@@ -120,9 +123,12 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world]);
   const [bookOpen, setBookOpen] = useState(false);
-  const [drawer, setDrawer] = useState<"cast" | "pack" | "story" | null>(
-    null,
-  );
+  const [localDrawer, setLocalDrawer] = useState<WorldDrawer>(null);
+  const drawer = controlled !== undefined ? controlled : localDrawer;
+  const setDrawer = (next: WorldDrawer) => {
+    if (controlled === undefined) setLocalDrawer(next);
+    onDrawer?.(next);
+  };
 
   // The ask bar suggests the sample project's change, from the seed
   // ripple data. Any other world starts empty.
@@ -625,10 +631,9 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
   if (!part) {
     return (
       <section className={`scene${active ? " on" : ""}`} id="world">
-        <div className="logo">{liveWorld.title}</div>
-        <nav className="nav" aria-label="Sections">
-          <button onClick={onStartOver}>Start over</button>
-        </nav>
+        <div className="about">
+          <h2>{liveWorld.title}</h2>
+        </div>
       </section>
     );
   }
@@ -650,28 +655,6 @@ export default function WorldScene({ active, world, onWorld, onStartOver }: Prop
             : { backgroundImage: "none", backgroundColor: part.tint }
         }
       />
-      <div className="logo">{liveWorld.title}</div>
-      <nav className="nav" aria-label="Sections">
-        <button
-          className={drawer === null ? "on" : ""}
-          onClick={() => setDrawer(null)}
-        >
-          Story
-        </button>
-        <button
-          className={drawer === "cast" ? "on" : ""}
-          onClick={() => setDrawer("cast")}
-        >
-          Characters
-        </button>
-        <button
-          className={drawer === "pack" ? "on" : ""}
-          onClick={() => setDrawer("pack")}
-        >
-          Agent package
-        </button>
-        <button onClick={onStartOver}>Start over</button>
-      </nav>
       <div className="headline">
         <div className="kicker">The change</div>
         <h2>{changeText}</h2>

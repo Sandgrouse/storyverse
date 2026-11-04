@@ -18,6 +18,7 @@ export type ReadFileInput = z.infer<typeof ReadFileSchema>;
 export const ReadRequestSchema = z.object({
   files: z.array(ReadFileSchema).default([]),
   idea: z.string().optional(),
+  instruction: z.string().optional(),
 });
 
 export const ReadFileKindSchema = z.enum([
@@ -95,9 +96,13 @@ function isTextFile(file: ReadFileInput): boolean {
 export function buildReadContent(
   files: ReadFileInput[],
   idea?: string,
+  instruction?: string,
 ): Array<Record<string, unknown>> {
   const names = files.map((file) => file.name);
   const content: Array<Record<string, unknown>> = [];
+  if (typeof instruction === "string" && instruction.trim().length > 0) {
+    content.push({ type: "input_text", text: instruction.trim() });
+  }
   if (names.length > 0) {
     content.push({
       type: "input_text",
@@ -143,8 +148,9 @@ export function buildReadContent(
 export function buildReadInput(
   files: ReadFileInput[],
   idea?: string,
+  instruction?: string,
 ): Array<{ role: string; content: Array<Record<string, unknown>> }> {
-  return [{ role: "user", content: buildReadContent(files, idea) }];
+  return [{ role: "user", content: buildReadContent(files, idea, instruction) }];
 }
 
 /** JSON Schema twin of the read model output, sent as the response format. */

@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return errorResponse(400, "VALIDATION_ERROR", "Expected { files, idea? }.");
   }
-  const { files, idea } = parsed.data;
+  const { files, idea, instruction } = parsed.data;
   const hasIdea = typeof idea === "string" && idea.trim().length > 0;
   if (files.length === 0 && !hasIdea) {
     return errorResponse(400, "VALIDATION_ERROR", "Send files or an idea.");
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     const model = await completeJson(
       {
         instructions: READ_INSTRUCTIONS,
-        input: buildReadInput(files, idea),
+        input: buildReadInput(files, idea, instruction),
         schemaName: "canon",
         jsonSchema: readModelJsonSchema(),
       },

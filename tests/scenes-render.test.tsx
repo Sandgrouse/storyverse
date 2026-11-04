@@ -1,10 +1,9 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import React from "react";
 import { renderToString } from "react-dom/server";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { WorldSchema, type World } from "@/lib/world/schemas";
-import Experience from "@/components/experience/Experience";
 import ArrivalScene from "@/components/experience/ArrivalScene";
 import IdeaScene from "@/components/experience/IdeaScene";
 import BringScene from "@/components/experience/BringScene";
@@ -12,6 +11,7 @@ import ReadingScene from "@/components/experience/ReadingScene";
 import UnderstoodScene from "@/components/experience/UnderstoodScene";
 import ChannelsScene from "@/components/experience/ChannelsScene";
 import WorldScene from "@/components/experience/WorldScene";
+import { MissingStory } from "@/components/projects/ProjectContext";
 
 async function loadWorld(): Promise<World> {
   const raw = await readFile(
@@ -41,13 +41,13 @@ describe("experience scenes", () => {
     const noop = () => {};
     const scenes: Array<[string, React.ReactElement]> = [
       ["arrival", <ArrivalScene active images={[]} onBring={noop} onIdea={noop} />],
-      ["idea", <IdeaScene active initialIdea="" onBack={noop} onBegin={noop} />],
-      ["bring", <BringScene active files={[]} onFiles={noop} seed={world} sample={false} onSample={noop} onBack={noop} onRead={noop} />],
-      ["reading", <ReadingScene active files={[]} idea="" seed={world} sample onFiles={noop} onDone={noop} />],
-      ["understood", <UnderstoodScene active world={world} onWorld={noop} onBack={noop} onOpen={noop} />],
+      ["idea", <IdeaScene active idea="" onIdea={noop} onBegin={noop} />],
+      ["bring", <BringScene active files={[]} onFiles={noop} seed={world} sample={false} onSample={noop} onRead={noop} />],
+      ["reading", <ReadingScene files={[]} seed={world} sample onDone={noop} />],
+      ["understood", <UnderstoodScene active world={world} onWorld={noop} onAddMaterial={noop} onOpen={noop} />],
       ["channels", <ChannelsScene active world={world} onWorld={noop} onOpen={noop} />],
-      ["world", <WorldScene active world={world} onWorld={noop} onStartOver={noop} />],
-      ["experience", <Experience seed={world} />],
+      ["world", <WorldScene active world={world} onWorld={noop} />],
+      ["missing", <MissingStory />],
     ];
     for (const [name, node] of scenes) {
       const { html, errors } = renderQuiet(node);
@@ -60,19 +60,19 @@ describe("experience scenes", () => {
     const world = await loadWorld();
     const noop = () => {};
     const { html: reading } = renderQuiet(
-      <ReadingScene active files={[]} idea="" seed={world} sample onFiles={noop} onDone={noop} />,
+      <ReadingScene files={[]} seed={world} sample onDone={noop} />,
     );
     const readingText = reading
       .replace(/<[^>]+>/g, "")
       .replace(/&#x27;/g, "'");
     expect(readingText).toContain(world.parts[0].summary.slice(0, 40));
     const { html: understood } = renderQuiet(
-      <UnderstoodScene active world={world} onWorld={noop} onBack={noop} onOpen={noop} />,
+      <UnderstoodScene active world={world} onWorld={noop} onAddMaterial={noop} onOpen={noop} />,
     );
     expect(understood).toContain(world.logline.slice(0, 40));
     expect(understood).toContain(world.gaps[0].question);
     const { html: shelf } = renderQuiet(
-      <WorldScene active world={world} onWorld={noop} onStartOver={noop} />,
+      <WorldScene active world={world} onWorld={noop} />,
     );
     for (const part of world.parts) {
       expect(shelf).toContain(part.title);
@@ -80,5 +80,7 @@ describe("experience scenes", () => {
     for (const channel of world.channels) {
       expect(shelf).toContain(channel.name);
     }
+    const { html: missing } = renderQuiet(<MissingStory />);
+    expect(missing).toContain("Your projects");
   });
 });

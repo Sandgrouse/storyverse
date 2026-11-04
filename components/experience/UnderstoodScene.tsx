@@ -4,14 +4,14 @@ import { useState } from "react";
 import type { World } from "@/lib/world/schemas";
 
 type Props = {
-  active: boolean;
+  active?: boolean;
   world: World;
   onWorld: (world: World) => void;
-  onBack: () => void;
+  onAddMaterial: () => void;
   onOpen: () => void;
 };
 
-export default function UnderstoodScene({ active, world, onWorld, onBack, onOpen }: Props) {
+export default function UnderstoodScene({ active = true, world, onWorld, onAddMaterial, onOpen }: Props) {
   const [handled, setHandled] = useState<string[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -168,7 +168,7 @@ export default function UnderstoodScene({ active, world, onWorld, onBack, onOpen
         </div>
       </div>
       <div className="foot">
-        <button className="quiet" onClick={onBack}>
+        <button className="quiet" onClick={onAddMaterial}>
           Add more material
         </button>
         <button className="pill" onClick={onOpen}>

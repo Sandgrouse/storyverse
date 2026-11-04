@@ -1,20 +1,15 @@
 "use client";
 
-import { useState } from "react";
-
 type Props = {
-  active: boolean;
-  initialIdea: string;
-  onBack: () => void;
+  active?: boolean;
+  idea: string;
+  onIdea: (idea: string) => void;
   onBegin: (idea: string) => void;
 };
 
-export default function IdeaScene({ active, initialIdea, onBack, onBegin }: Props) {
-  const [idea, setIdea] = useState(initialIdea);
-
+export default function IdeaScene({ active = true, idea, onIdea, onBegin }: Props) {
   return (
     <section className={`scene${active ? " on" : ""}`} id="idea">
-      <div className="logo">Storyverse</div>
       <div className="hello">
         <h1 className="big" style={{ fontSize: "clamp(34px, 4vw, 58px)" }}>
           What&rsquo;s the story you can&rsquo;t stop thinking about?
@@ -42,15 +37,10 @@ export default function IdeaScene({ active, initialIdea, onBack, onBegin }: Prop
             placeholder="A sentence is enough"
             autoComplete="off"
             value={idea}
-            onChange={(e) => setIdea(e.target.value)}
+            onChange={(e) => onIdea(e.target.value)}
           />
           <button type="submit">Begin</button>
         </form>
-        <div style={{ marginTop: 14 }}>
-          <button className="quiet" onClick={onBack}>
-            Back
-          </button>
-        </div>
       </div>
     </section>
   );

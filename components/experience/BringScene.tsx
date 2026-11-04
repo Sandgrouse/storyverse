@@ -12,7 +12,7 @@ import {
   type SendableFile,
 } from "@/lib/files";
 import { gapNoteForKinds } from "@/lib/story";
-import type { ClientFile } from "./Experience";
+import type { ClientFile } from "@/components/projects/DraftContext";
 
 type Card = {
   id: string;
@@ -32,25 +32,31 @@ function inferredKind(file: ClientFile): string {
 }
 
 type Props = {
-  active: boolean;
+  active?: boolean;
   files: ClientFile[];
   onFiles: (files: ClientFile[]) => void;
   seed: World;
   sample: boolean;
   onSample: () => void;
-  onBack: () => void;
   onRead: () => void;
+  readLabel?: string;
+  extraDisabled?: boolean;
+  note?: string;
+  hideSample?: boolean;
 };
 
 export default function BringScene({
-  active,
+  active = true,
   files,
   onFiles,
   seed,
   sample,
   onSample,
-  onBack,
   onRead,
+  readLabel = "Read my story",
+  extraDisabled = false,
+  note = "",
+  hideSample = false,
 }: Props) {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
@@ -190,7 +196,6 @@ export default function BringScene({
 
   return (
     <section className={`scene${active ? " on" : ""}`} id="bring">
-      <div className="logo">Storyverse</div>
       <div className="top">
         <h1 className="big" style={{ fontSize: "clamp(34px, 4.2vw, 60px)" }}>
           Bring me what you have.
@@ -260,18 +265,17 @@ export default function BringScene({
           );
         })}
       </div>
-      <p className="gapnote">{error ? error : working ? "Reading those files…" : gapnote}</p>
+      <p className="gapnote">{error ? error : working ? "Reading those files…" : note ? `${gapnote}${gapnote ? " " : ""}${note}` : gapnote}</p>
       <div className="foot">
-        <button className="quiet" onClick={onBack}>
-          Back
-        </button>
-        {!sample && (
-          <button type="button" className="pill light" onClick={onSample}>
-            Use the sample project
-          </button>
-        )}
-        <button className="pill" disabled={!ready || working} onClick={onRead}>
-          Read my story
+        <span>
+          {!sample && !hideSample && (
+            <button type="button" className="pill light" onClick={onSample}>
+              Use the sample project
+            </button>
+          )}
+        </span>
+        <button className="pill" disabled={!ready || working || extraDisabled} onClick={onRead}>
+          {readLabel}
         </button>
       </div>
     </section>

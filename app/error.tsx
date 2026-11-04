@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 
 /**
@@ -24,12 +25,15 @@ export default function Error({
         <div className="hello">
           <h1 className="big">Something broke.</h1>
           <p className="lede">
-            The story is safe. Start over and it will be waiting.
+            Your stories are safe. Try again, or head back home.
           </p>
-          <div style={{ marginTop: 24 }}>
+          <div className="doors" style={{ marginTop: 24 }}>
             <button type="button" className="pill" onClick={() => reset()}>
-              Start over
+              Try again
             </button>
+            <Link className="pill light" href="/projects">
+              Your projects
+            </Link>
           </div>
         </div>
       </section>
