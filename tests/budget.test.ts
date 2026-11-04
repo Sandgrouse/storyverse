@@ -77,6 +77,7 @@ describe("budget caps", () => {
     expect(ROUTE_COSTS).toEqual({
       read: 3,
       plan: 3,
+      facts: 1,
       ripple: 2,
       apply: 1,
       check: 1,

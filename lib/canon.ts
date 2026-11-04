@@ -123,6 +123,42 @@ export function chapterCountFor(
   return count;
 }
 
+export type PlaceArtPart = CanonPartText & {
+  id?: string;
+  order?: number | null;
+  imagePath?: string | null;
+};
+
+/**
+ * Art for a place: the art of the first part (in story order) whose
+ * text, summary or excerpt names the place, matching whole names only
+ * and case-insensitively. Falls back to the first part's art.
+ */
+export function placeArtFor(
+  location: { id?: string; name: string },
+  world: { parts: PlaceArtPart[] },
+): string {
+  const ordered = [...world.parts].sort(
+    (a, b) => (a.order ?? 0) - (b.order ?? 0),
+  );
+  const firstArt = ordered[0]?.imagePath ?? "";
+  const aliases = aliasesFor(location.name).filter((a) => a.length > 0);
+  if (aliases.length === 0) return firstArt;
+  let pattern: RegExp | null = null;
+  try {
+    pattern = new RegExp(`(?<!\\w)(${aliases.map(escapeRegExp).join("|")})(?!\\w)`, "i");
+  } catch {
+    return firstArt;
+  }
+  for (const part of ordered) {
+    pattern.lastIndex = 0;
+    const haystack = `${part.text ?? ""} ${part.summary} ${part.excerpt}`;
+    if (!pattern.test(haystack)) continue;
+    if (part.imagePath && part.imagePath.length > 0) return part.imagePath;
+  }
+  return firstArt;
+}
+
 /** Short chips for the book cover, drawn from the story basics. */
 export function coverChips(world: {
   characters: unknown[];
