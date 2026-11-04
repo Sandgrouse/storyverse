@@ -105,6 +105,271 @@
   color: inherit;
 }
 
+/* Channel tabs on top, with the Map/Files/Readiness switch beside them. */
+
+.packtop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.packtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.packtab {
+  border: 1px solid var(--rule);
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--soft);
+  background: transparent;
+}
+
+.packtab.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--sheet);
+}
+
+.packviews {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--rule);
+  border-radius: 99px;
+  padding: 2px;
+  background: var(--sheet);
+}
+
+.packview {
+  border-radius: 99px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--soft);
+}
+
+.packview.on {
+  background: var(--clay-soft);
+  color: var(--ink);
+}
+
+/* Accordions: every long list collapses behind a counted header. */
+
+.packacc {
+  margin-top: 12px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: var(--lift);
+}
+
+.packacc-head {
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "name count"
+    "bar bar";
+  gap: 2px 12px;
+  align-items: baseline;
+  padding: 12px 16px;
+  list-style: none;
+}
+
+.packacc-head::-webkit-details-marker {
+  display: none;
+}
+
+.packacc-head:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.packacc-name {
+  grid-area: name;
+  font: 400 17px var(--serif);
+}
+
+.packacc-count {
+  grid-area: count;
+  font-size: 12px;
+  color: var(--soft);
+  white-space: nowrap;
+}
+
+.packacc-bar {
+  grid-area: bar;
+  margin-top: 6px;
+}
+
+.packacc-body {
+  padding: 4px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Grouped rows: one per scene or character, with made/not-made chips. */
+
+.packrow {
+  border-top: 1px solid var(--rule);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.packrow-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.packrow-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.packrow-sub {
+  font-size: 12px;
+  color: var(--soft);
+  white-space: nowrap;
+}
+
+.packchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.packchip {
+  border: 1.5px solid var(--clay);
+  border-radius: 99px;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--clay-soft);
+}
+
+.packchip.missing {
+  border-style: dashed;
+  border-color: var(--soft);
+  background: transparent;
+  color: var(--soft);
+  font-weight: 400;
+}
+
+/* The channel map canvas: scrollable and zoomable, touch included. */
+
+.packmap {
+  margin-top: 12px;
+  height: 520px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--sheet);
+  box-shadow: var(--lift);
+  overflow: auto;
+  touch-action: pan-x pan-y;
+}
+
+.packmap .react-flow {
+  background: var(--sheet);
+}
+
+.packfit {
+  font-size: 13px;
+}
+
+.pkgnode {
+  width: 232px;
+  min-height: 118px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--clay);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: var(--lift);
+  font-size: 13px;
+}
+
+.pkgnode.unmade {
+  border-style: dashed;
+  border-top-style: dashed;
+  opacity: 0.75;
+}
+
+.pkgnode-kind {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--soft);
+}
+
+.pkgnode-title {
+  font: 400 15px var(--serif);
+  margin-top: 2px;
+}
+
+.pkgnode-sub {
+  font-size: 12px;
+  color: var(--soft);
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pkgnode-thumb {
+  width: 100%;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-top: 6px;
+}
+
+.pkgnode-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--clay);
+}
+
+.packmap-fallback {
+  margin-top: 12px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.packmap-row {
+  font-size: 13.5px;
+}
+
+.packmap-row-kind {
+  font-size: 12px;
+  color: var(--soft);
+}
+
+@media (max-width: 900px) {
+  .packmap {
+    height: 420px;
+  }
+}
+
 .packdone {
   font-size: 13px;
   color: var(--soft);
