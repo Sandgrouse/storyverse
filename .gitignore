@@ -12,3 +12,5 @@ data/local/
 .claude/
 .pnpm-store/
 tsconfig.tsbuildinfo
+.tmp-pnpm-store/
+.tmp-npm-cache/

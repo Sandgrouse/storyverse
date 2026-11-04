@@ -38,6 +38,8 @@ This project uses `@meta-sam/parser` under the SAM License. See the license term
 
 Character voices are spoken by the [Fish Audio](https://fish.audio/) text-to-speech API; the app sends it only the chosen voice and the line to speak. [ElevenLabs](https://elevenlabs.io/) is kept as an optional provider. Some things are built but untested: see [Known limitations](docs/KNOWN-LIMITATIONS.md).
 
+The Agent package map is drawn with [React Flow](https://reactflow.dev/) (`@xyflow/react`, exactly pinned) under the MIT License.
+
 ## Custom voices
 
 A project owner can make a custom voice for a character from their own recording, an uploaded sample, recordings from a voice artist reached by a link (`/voice/[token]`), or — Fish Audio only — by describing the voice and letting Muse imagine it.
