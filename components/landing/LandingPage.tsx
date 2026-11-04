@@ -7,7 +7,7 @@ import Lenis from "lenis";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import {
   BROWSER_SUB,
   BROWSER_TITLE,
@@ -18,7 +18,9 @@ import {
   CHANGE_LINE,
   CLOSE_HEADING,
   HERO_HEADING,
+  HERO_IMAGES,
   HERO_LEDE,
+  LANDING_COVER_TIMEOUT_MS,
   LANDING_IMAGES,
   LAYOUTS,
   PUBLISH_SECRETS,
@@ -26,22 +28,27 @@ import {
   SCRIPT_NOTE,
   TREE_LINES,
   TREE_SECRET,
-  VIDEO_CAPTION,
+  VIDEO_CAPTIONS,
+  VIDEO_SHOT_CARD_IDS,
   cardBasePx,
   cardTag,
   clamp01,
+  landingCoverDone,
   layoutRects,
   lerp,
   nearRest,
   segmentEase,
   smooth,
   stagger,
+  videoPlayingAt,
+  videoShotIndexAt,
   type CardRect,
 } from "@/lib/landing";
 import { ensureSample } from "@/lib/projects";
 import { WorldSchema } from "@/lib/world/schemas";
 import seedJson from "@/data/seed/anukili.json";
 import LandingCard from "./LandingCard";
+import LandingCover from "./LandingCover";
 import { useFinePointer } from "./effects";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
@@ -224,7 +231,16 @@ export default function LandingPage() {
   const hintEl = useRef<HTMLDivElement>(null);
   const capEl = useRef<HTMLDivElement>(null);
   const headEl = useRef<HTMLDivElement>(null);
+  const stageEl = useRef<HTMLDivElement>(null);
   const geo = useRef<Geo | null>(null);
+  // First-paint cover: hides once fonts, the hero images and the GSAP setup
+  // are ready, or the timeout cap fires. `gsapReady` also reveals the rail.
+  const [fontsReady, setFontsReady] = useState(false);
+  const [heroReady, setHeroReady] = useState(false);
+  const [gsapReady, setGsapReady] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+  const [coverHidden, setCoverHidden] = useState(false);
+  const [coverInstant, setCoverInstant] = useState(false);
   // Boundary caches so per-frame writes stay transform and opacity only:
   // visibility, z-index and classes change only when their state flips.
   const vis = useRef({
@@ -265,23 +281,64 @@ export default function LandingPage() {
   // Preload every card image before the first scroll.
   useEffect(() => {
     let live = true;
-    void Promise.all(
-      LANDING_IMAGES.map(
-        (src) =>
-          new Promise<void>((resolve) => {
-            const img = new window.Image();
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-            img.src = src;
-          }),
-      ),
-    ).then(() => {
+    setCoverInstant(
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    );
+    const load = (src: string) =>
+      new Promise<void>((resolve) => {
+        const img = new window.Image();
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+        img.src = src;
+      });
+    // Hero images gate the cover; the full set refreshes the triggers.
+    void Promise.all(HERO_IMAGES.map(load)).then(() => {
+      if (live) setHeroReady(true);
+    });
+    void Promise.all(LANDING_IMAGES.map(load)).then(() => {
       if (live) ScrollTrigger.refresh();
     });
     return () => {
       live = false;
     };
   }, []);
+
+  // Fonts gate the cover.
+  useEffect(() => {
+    let live = true;
+    if (document.fonts?.ready) {
+      void document.fonts.ready.then(() => {
+        if (live) setFontsReady(true);
+      });
+    } else {
+      setFontsReady(true);
+    }
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // The cover never sticks: the cap hides it however slow the assets are.
+  useEffect(() => {
+    const t = window.setTimeout(
+      () => setTimedOut(true),
+      LANDING_COVER_TIMEOUT_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (
+      landingCoverDone({
+        fontsReady,
+        heroImagesReady: heroReady,
+        gsapReady,
+        elapsedMs: timedOut ? LANDING_COVER_TIMEOUT_MS : 0,
+      })
+    ) {
+      setCoverHidden(true);
+    }
+  }, [fontsReady, heroReady, gsapReady, timedOut]);
 
   const goChapter = (index: number) => {
     const st = trigger.current;
@@ -645,6 +702,51 @@ export default function LandingPage() {
         trigger.current = tl.scrollTrigger as ScrollTrigger;
         progress.current = 0;
         applyFrame(0);
+        setGsapReady(true);
+
+        // Video mini-cut: the film card cross-fades through the four
+        // thumbnail pictures (3s each) with a slow push-in, the matching
+        // thumbnail is outlined, the caption follows, and the red playhead
+        // runs the whole 12s loop in sync. It plays once the chapter's rest
+        // is reached and pauses when it leaves; film and playhead animate
+        // with transform and opacity only, driven by stage classes.
+        const videoStage =
+          stage ?? scope.querySelector<HTMLElement>(".land-stage");
+        let shot = 0;
+        let elapsed = 0;
+        let lastTick = performance.now();
+        let playing = false;
+        const setShot = (next: number) => {
+          shot = next;
+          videoStage?.setAttribute("data-shot", String(next));
+          if (capEl.current) {
+            capEl.current.textContent =
+              VIDEO_CAPTIONS[next] ?? VIDEO_CAPTIONS[0];
+          }
+          for (let k = 0; k < VIDEO_SHOT_CARD_IDS.length; k++) {
+            outerEls.current
+              .get(VIDEO_SHOT_CARD_IDS[k])
+              ?.classList.toggle("shot-now", k === next);
+          }
+        };
+        setShot(0);
+        const videoTick = () => {
+          const now = performance.now();
+          const dt = (now - lastTick) / 1000;
+          lastTick = now;
+          const shouldPlay = videoPlayingAt(progress.current, VIDEO_IDX);
+          if (shouldPlay !== playing) {
+            playing = shouldPlay;
+            videoStage?.classList.toggle("playing-video", shouldPlay);
+            headEl.current?.classList.toggle("playing", shouldPlay);
+          }
+          if (playing) {
+            elapsed += dt;
+            const next = videoShotIndexAt(elapsed);
+            if (next !== shot) setShot(next);
+          }
+        };
+        const videoTimer = window.setInterval(videoTick, 200);
 
         const onResize = () => {
           buildGeo();
@@ -684,6 +786,9 @@ export default function LandingPage() {
         }
 
         return () => {
+          gsap.ticker.remove(videoTick);
+          videoStage?.classList.remove("playing-video");
+          videoStage?.removeAttribute("data-shot");
           window.removeEventListener("resize", onResize);
           stage?.removeEventListener("pointermove", onPointer);
           floats.forEach((tween) => tween.kill());
@@ -695,6 +800,10 @@ export default function LandingPage() {
       });
 
       mm.add(STACKED, () => {
+        // Stacked fallback (narrow screens, reduced motion): no scroll
+        // engine to wait for, so the cover's GSAP condition is met here.
+        // The mini-cut stays parked on its first shot with its caption.
+        setGsapReady(true);
         const targets = gsap.utils.toArray<HTMLElement>(".stack-reveal");
         gsap.set(targets, { opacity: 0, y: 28 });
         ScrollTrigger.batch(targets, {
@@ -718,7 +827,8 @@ export default function LandingPage() {
   );
 
   return (
-    <div ref={root} className="land">
+    <div ref={root} className={`land${gsapReady ? " land-ready" : ""}`}>
+      <LandingCover hidden={coverHidden} instant={coverInstant} />
       <header className="land-bar">
         <Link className="logo" href="/">
           Storyverse
@@ -734,7 +844,11 @@ export default function LandingPage() {
       </header>
 
       <div className="land-pin">
-        <div className="land-stage">
+        <div
+          ref={stageEl}
+          className="land-stage"
+          data-shot="0"
+        >
           {CHAPTERS.map((chapter, k) => (
             <div
               key={chapter.id}
@@ -743,7 +857,11 @@ export default function LandingPage() {
               ref={(el) => {
                 tintEls.current[k] = el;
               }}
-              style={{ background: chapter.tint, opacity: 0 }}
+              style={{
+                background: chapter.tint,
+                opacity: k === 0 ? 1 : 0,
+                visibility: k === 0 ? "visible" : "hidden",
+              }}
             />
           ))}
           {CARDS.map((card) => (
@@ -811,7 +929,7 @@ export default function LandingPage() {
             ) : null,
           )}
           <div ref={capEl} className="land-cap" data-cap>
-            {VIDEO_CAPTION}
+            {VIDEO_CAPTIONS[0]}
           </div>
           <div ref={headEl} className="land-head" data-head>
             <div className="land-playhead" />
@@ -902,6 +1020,9 @@ export default function LandingPage() {
             {chapter.soon ? <span className="soon">Coming next</span> : null}
             <h2>{chapter.heading}</h2>
             <p>{chapter.body}</p>
+            {chapter.id === "video" ? (
+              <p className="land-stack-cap">{VIDEO_CAPTIONS[0]}</p>
+            ) : null}
           </section>
         ))}
         <section className="stack-reveal" data-stack="begin">

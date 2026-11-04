@@ -1651,6 +1651,36 @@ p {
 .land {
   background: var(--paper);
 }
+
+/* First-paint cover: quiet full-screen paper with the logo. It holds until
+   fonts, the hero images and the GSAP setup are ready, then fades in 400ms
+   (no fade with reduced motion) and unmounts. A 3s cap keeps it unstuck. */
+.land-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+}
+.land-cover-logo {
+  font: 400 22px var(--serif);
+  color: var(--ink);
+}
+.land-cover.hide {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease;
+}
+.land-cover.instant.hide {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .land-cover.hide {
+    transition: none;
+  }
+}
 .land-bar {
   position: fixed;
   top: 0;
@@ -1721,6 +1751,14 @@ p {
   position: absolute;
   left: 0;
   top: 0;
+  /* Reserved size before images and the scroll engine arrive, so the first
+     paint holds no layout shift: the engine's inline width/height/opacity
+     take over on setup. Hidden until then (hero or hidden is the final
+     first-frame state, placed by CSS, not JS). */
+  width: min(38vw, 44vh);
+  aspect-ratio: 3 / 4;
+  opacity: 0;
+  visibility: hidden;
   overflow: hidden;
   border-radius: 10px;
   box-shadow: var(--lift);
@@ -1728,6 +1766,10 @@ p {
   z-index: 2;
   outline: 3px solid transparent;
   outline-offset: 3px;
+}
+/* The mini-cut's current thumbnail shot. */
+.land-outer.shot-now {
+  outline-color: var(--ink);
 }
 .land-outer.go {
   animation: landpulse 1.1s var(--ease) 1;
@@ -1804,12 +1846,60 @@ p {
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
   opacity: 0;
   visibility: hidden;
+  /* Reserved height before the caption text swaps per shot. */
+  min-height: 3.4em;
+  box-sizing: border-box;
   will-change: transform, opacity;
   z-index: 3;
 }
 
+/* Film card mini-cut: the four thumbnail pictures stack and cross-fade
+   (opacity only); each shot pushes in slowly (transform only) while current.
+   The stage's data-shot picks the visible layer; .playing-video runs the
+   push-in, so leaving the chapter freezes the cut. */
+.land-film {
+  position: absolute;
+  inset: 0;
+}
+.land-shot {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  will-change: transform, opacity;
+}
+.land-shot img {
+  transform: scale(1);
+}
+.land-stage[data-shot="0"] .land-shot[data-shot="0"],
+.land-stage[data-shot="1"] .land-shot[data-shot="1"],
+.land-stage[data-shot="2"] .land-shot[data-shot="2"],
+.land-stage[data-shot="3"] .land-shot[data-shot="3"] {
+  opacity: 1;
+}
+.land-stage.playing-video[data-shot="0"] .land-shot[data-shot="0"] img,
+.land-stage.playing-video[data-shot="1"] .land-shot[data-shot="1"] img,
+.land-stage.playing-video[data-shot="2"] .land-shot[data-shot="2"] img,
+.land-stage.playing-video[data-shot="3"] .land-shot[data-shot="3"] img {
+  animation: landpush 3s linear;
+}
+@keyframes landpush {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .land-shot img {
+    animation: none;
+  }
+}
+
 /* Copy blocks sit in a full-stage flex row; the engine drifts them with
-   transform only. */
+   transform only. Hidden until the engine places them, so the first paint
+   shows only the centred hero. */
 .land-copywrap {
   position: absolute;
   inset: 0;
@@ -1817,6 +1907,8 @@ p {
   align-items: center;
   pointer-events: none;
   z-index: 4;
+  opacity: 0;
+  visibility: hidden;
   will-change: transform, opacity;
 }
 .land-copywrap.low {
@@ -1845,6 +1937,8 @@ p {
   font: 300 clamp(18px, 1.45vw, 21px) / 1.42 var(--serif);
   color: #4b4439;
   margin-top: 16px;
+  /* Reserved height before webfonts arrive, so copy never shifts lines. */
+  min-height: 4.4em;
 }
 .land-copy .soon,
 .soon {
@@ -1879,6 +1973,8 @@ p {
   max-width: 24em;
   margin: 18px auto 22px;
   color: var(--ink);
+  /* Reserved height before webfonts arrive: no shift under the headline. */
+  min-height: 3.1em;
 }
 .hero-line {
   display: block;
@@ -1919,9 +2015,11 @@ p {
   }
 }
 
-/* Chapter panels */
+/* Chapter panels: hidden until the engine places them at their rest. */
 .land-extra {
   z-index: 3;
+  opacity: 0;
+  visibility: hidden;
   will-change: transform, opacity;
 }
 .land-close {
@@ -1984,7 +2082,9 @@ p {
   margin-bottom: 3px;
 }
 /* Video playhead: tracks the thumbnail row with transform only; the sweep
-   across the row is a cheap CSS animation driven by --run (set on resize). */
+   across the row is a cheap CSS animation driven by --run (set on resize).
+   It runs the full 12s mini-cut loop in sync with the shots, paused until
+   the chapter's rest is reached (.playing) and frozen again on leave. */
 .land-head {
   position: absolute;
   left: 0;
@@ -2003,7 +2103,11 @@ p {
   width: 2px;
   background: var(--clay);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
-  animation: landplay 7s linear infinite;
+  animation: landplay 12s linear infinite;
+  animation-play-state: paused;
+}
+.land-head.playing .land-playhead {
+  animation-play-state: running;
 }
 @keyframes landplay {
   from {
@@ -2011,6 +2115,11 @@ p {
   }
   to {
     transform: translateX(var(--run));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .land-playhead {
+    animation: none;
   }
 }
 .land-line {
@@ -2101,7 +2210,8 @@ p {
   color: var(--soft);
 }
 
-/* Right-hand chapter marks */
+/* Right-hand chapter marks: hidden on first paint (final first-frame
+   state), revealed once the scroll engine is set up. */
 .land-rail {
   position: fixed;
   right: 22px;
@@ -2111,6 +2221,13 @@ p {
   flex-direction: column;
   gap: 4px;
   z-index: 40;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0.4s;
+}
+.land-ready .land-rail {
+  opacity: 1;
+  visibility: visible;
 }
 .land-rail button {
   all: unset;
@@ -2190,6 +2307,14 @@ p {
   justify-content: flex-start;
   flex-wrap: wrap;
   margin: 20px 0 28px;
+}
+/* Stacked fallback: the video chapter's opening caption, static. */
+.land-stack-cap {
+  font: 300 18px/1.42 var(--serif);
+  color: #4b4439;
+  margin-top: 10px;
+  padding-left: 12px;
+  border-left: 3px solid var(--shorts);
 }
 .land-static .land-pin,
 .land-static .land-rail {
