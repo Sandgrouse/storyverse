@@ -1,9 +1,16 @@
-import { AbsoluteFill, Img, Sequence, interpolate } from "remotion";
+import {
+  AbsoluteFill,
+  Img,
+  Sequence,
+  interpolate,
+  useVideoConfig,
+} from "remotion";
 import { useCurrentFrame } from "remotion";
 import { Audio } from "@remotion/media";
 import {
   VIDEO_CROSSFADE_FRAMES,
   shotFrames,
+  shotObjectPosition,
   shotStartFrames,
 } from "@/lib/video";
 import type { ShortShot } from "@/lib/world/schemas";
@@ -17,7 +24,15 @@ import type { ShortShot } from "@/lib/world/schemas";
 export type StoryShortShot = Pick<
   ShortShot,
   "imagePath" | "caption" | "durationSec" | "motion"
-> & { audioSrc?: string };
+> & {
+  audioSrc?: string;
+  /**
+   * True when the art's natural size is portrait. The page loads each
+   * image once and passes the flag down, so the player and the export
+   * frame heads the same way without each reading the size itself.
+   */
+  portrait?: boolean;
+};
 
 /** Slow zoom for "push", slight sideways drift for "pan". */
 function motionTransform(
@@ -38,9 +53,11 @@ function motionTransform(
 function ShotView({
   shot,
   fadeIn,
+  tall,
 }: {
   shot: StoryShortShot;
   fadeIn: boolean;
+  tall: boolean;
 }) {
   const frame = useCurrentFrame();
   const duration = shotFrames(shot.durationSec);
@@ -59,7 +76,12 @@ function ShotView({
       >
         <Img
           src={shot.imagePath}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: shotObjectPosition(shot.portrait ?? false, tall),
+          }}
         />
       </AbsoluteFill>
       <div
@@ -86,6 +108,8 @@ function ShotView({
 
 export function StoryShort({ shots }: { shots: StoryShortShot[] }) {
   const starts = shotStartFrames(shots);
+  const { width, height } = useVideoConfig();
+  const tall = height > width;
   return (
     <AbsoluteFill style={{ backgroundColor: "#111" }}>
       {shots.map((shot, index) => (
@@ -95,7 +119,7 @@ export function StoryShort({ shots }: { shots: StoryShortShot[] }) {
           durationInFrames={shotFrames(shot.durationSec)}
           name={`Shot ${index + 1}`}
         >
-          <ShotView shot={shot} fadeIn={index > 0} />
+          <ShotView shot={shot} fadeIn={index > 0} tall={tall} />
         </Sequence>
       ))}
     </AbsoluteFill>

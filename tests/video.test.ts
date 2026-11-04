@@ -11,14 +11,18 @@ import { upsertScript } from "@/lib/script";
 import { stripImageData } from "@/lib/story";
 import {
   VIDEO_PLAN_FAILED_MESSAGE,
+  VIDEO_PLAN_INSTRUCTIONS,
   VIDEO_PLAN_JSON_SCHEMA,
   availableArtPaths,
   clampShotDuration,
+  fitPlayer,
+  isPortraitArt,
   moveShot,
   planToShort,
   sanitizePlannedShots,
   shortForScene,
   shotFrames,
+  shotObjectPosition,
   shotStartFrames,
   toPlannedShots,
   totalFrames,
@@ -247,7 +251,30 @@ describe("video plan validation and art fallback", () => {
     expect(res.status).toBe(400);
   });
 
-  it("fails with the friendly message when fewer than 2 shots are usable", async () => {
+  it("asks the model for at least 4 shots", () => {
+    expect(VIDEO_PLAN_INSTRUCTIONS).toContain("Return at least 4 shots");
+  });
+
+  it("keeps the shots when fewer than 4 come back", async () => {
+    mockModel(
+      JSON.stringify({
+        title: "Arrival",
+        shots: [shot("One", 4), shot("Two", 4), shot("Three", 4)],
+      }),
+    );
+    const res = await planPOST(
+      post("/api/video/plan", {
+        world: makeWorld(),
+        channelId: "shorts",
+        partId: "part-1",
+      }),
+    );
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { short: World["shorts"][number] };
+    expect(json.short.shots).toHaveLength(3);
+  });
+
+  it("keeps a single usable shot instead of failing", async () => {
     mockModel(
       JSON.stringify({ title: "Arrival", shots: [shot("One", 4)] }),
     );
@@ -258,20 +285,33 @@ describe("video plan validation and art fallback", () => {
         partId: "part-1",
       }),
     );
-    expect(res.status).toBe(500);
-    const json = (await res.json()) as {
-      error: { code: string; message: string };
-    };
-    expect(json.error.message).toBe(VIDEO_PLAN_FAILED_MESSAGE);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { short: World["shorts"][number] };
+    expect(json.short.shots).toHaveLength(1);
   });
 
-  it("fails when only one shot survives sanitizing", async () => {
+  it("keeps the one shot that survives sanitizing", async () => {
     mockModel(
       JSON.stringify({
         title: "Arrival",
         shots: [shot("", 4), shot("Only", 4)],
       }),
     );
+    const res = await planPOST(
+      post("/api/video/plan", {
+        world: makeWorld(),
+        channelId: "shorts",
+        partId: "part-1",
+      }),
+    );
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { short: World["shorts"][number] };
+    expect(json.short.shots).toHaveLength(1);
+    expect(json.short.shots[0].caption).toBe("Only");
+  });
+
+  it("fails with the friendly message only when no usable shots remain", async () => {
+    mockModel(JSON.stringify({ title: "Arrival", shots: [shot("", 4)] }));
     const res = await planPOST(
       post("/api/video/plan", {
         world: makeWorld(),
@@ -588,6 +628,69 @@ describe("shot ordering", () => {
     expect(moveShot(frames, 1, 1)).toEqual(frames);
     expect(moveShot(frames, -1, 2)).toEqual(frames);
     expect(moveShot(frames, 0, 99).map((s) => s.id)[3]).toBe("shot-1");
+  });
+});
+
+describe("player fit", () => {
+  // Stage boxes measured from the page grid at real viewports: 1440x900
+  // leaves about 1080x574 for the frame, 1280x720 about 920x394, after
+  // the top bar, the timeline row, the stage padding and the transport.
+  it("fits the tall player inside the stage height at 1440x900", () => {
+    const fitted = fitPlayer(1080, 574, true);
+    expect(fitted.height).toBe(574);
+    expect(fitted.width).toBe(Math.floor((574 * 9) / 16));
+    expect(fitted.width).toBeLessThanOrEqual(1080);
+  });
+
+  it("fits the wide player inside the stage height at 1440x900", () => {
+    const fitted = fitPlayer(1080, 574, false);
+    expect(fitted.height).toBe(574);
+    expect(fitted.width).toBe(Math.floor((574 * 16) / 9));
+    expect(fitted.width).toBeLessThanOrEqual(1080);
+  });
+
+  it("fits both shapes inside the stage at 1280x720", () => {
+    const tall = fitPlayer(920, 394, true);
+    expect(tall).toEqual({
+      width: Math.floor((394 * 9) / 16),
+      height: 394,
+    });
+    const wide = fitPlayer(920, 394, false);
+    expect(wide).toEqual({
+      width: Math.floor((394 * 16) / 9),
+      height: 394,
+    });
+  });
+
+  it("shrinks to the stage width when height alone overflows", () => {
+    expect(fitPlayer(200, 1000, false)).toEqual({
+      width: 200,
+      height: Math.floor((200 * 9) / 16),
+    });
+    expect(fitPlayer(200, 1000, true)).toEqual({ width: 200, height: 355 });
+  });
+
+  it("never goes negative on an unmeasured stage", () => {
+    expect(fitPlayer(0, 0, true)).toEqual({ width: 0, height: 0 });
+    expect(fitPlayer(0, 0, false)).toEqual({ width: 0, height: 0 });
+  });
+});
+
+describe("shot framing", () => {
+  it("spots portrait art by its natural size", () => {
+    expect(isPortraitArt(720, 1280)).toBe(true);
+    expect(isPortraitArt(1280, 720)).toBe(false);
+    expect(isPortraitArt(720, 720)).toBe(false);
+  });
+
+  it("anchors portrait art near the top in a wide cut", () => {
+    expect(shotObjectPosition(true, false)).toBe("50% 12%");
+  });
+
+  it("keeps landscape art and tall cuts centred", () => {
+    expect(shotObjectPosition(false, false)).toBe("50% 50%");
+    expect(shotObjectPosition(true, true)).toBe("50% 50%");
+    expect(shotObjectPosition(false, true)).toBe("50% 50%");
   });
 });
 

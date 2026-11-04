@@ -27,7 +27,7 @@ export const EDIT_SHOT_MIN_SEC = 2;
 export const EDIT_SHOT_MAX_SEC = 12;
 
 export const VIDEO_PLAN_INSTRUCTIONS =
-  "You cut a short vertical-or-wide video from one scene of a story told across several channels. Use only the canon and the secrets this channel may know, listed below. A secret that belongs to another channel must never appear or be hinted at. Pick each shot's image only from the numbered list of available art, returning its exact path. Write one caption per shot of under 90 characters in the scene's own voice. Keep each shot 3 to 7 seconds long. Optionally give one shot a spoken line: the id of a character who is in the scene and the exact words they say, using their real name's voice. Use the world's real names and details exactly. Never rename anyone or change an established detail. Return only the shots.";
+  "You cut a short vertical-or-wide video from one scene of a story told across several channels. Use only the canon and the secrets this channel may know, listed below. A secret that belongs to another channel must never appear or be hinted at. Pick each shot's image only from the numbered list of available art, returning its exact path. Write one caption per shot of under 90 characters in the scene's own voice. Keep each shot 3 to 7 seconds long. Optionally give one shot a spoken line: the id of a character who is in the scene and the exact words they say, using their real name's voice. Use the world's real names and details exactly. Never rename anyone or change an established detail. Return at least 4 shots. Return only the shots.";
 
 export const VIDEO_PLAN_SCHEMA_NAME = "video_plan";
 
@@ -113,8 +113,12 @@ export const PLAN_CAPTION_MAX = 90;
 /** Most shots one plan keeps. */
 export const VIDEO_PLAN_MAX_SHOTS = 6;
 
-/** Fewest usable shots for a plan to succeed. */
-export const VIDEO_PLAN_MIN_USABLE_SHOTS = 2;
+/**
+ * Fewest usable shots for a plan to succeed. A short plan asks for at
+ * least 4 shots, but when fewer come back the cut keeps them without
+ * complaint; only a plan with nothing usable fails.
+ */
+export const VIDEO_PLAN_MIN_USABLE_SHOTS = 1;
 
 /**
  * Every non-empty art path in the world: part art, beat art, then
@@ -244,7 +248,7 @@ export function clampShotDuration(durationSec: number): number | null {
 /**
  * Turn raw model shots into usable planned shots: drop empty captions
  * and bad durations, clamp the rest, map null voice to no voice, keep
- * at most 6. The caller fails the plan when fewer than 2 remain.
+ * at most 6. The caller fails the plan only when nothing remains.
  */
 export function sanitizePlannedShots(
   modelShots: Array<{
@@ -413,4 +417,43 @@ export function clockLabel(currentSec: number, totalSec: number): string {
     return `${Math.floor(clamped / 60)}:${String(clamped % 60).padStart(2, "0")}`;
   };
   return `${format(currentSec)} / ${format(totalSec)}`;
+}
+
+/**
+ * Fit the player inside the stage box without covering the transport
+ * or the timeline: start from the stage's height, keep the 16:9 or 9:16
+ * ratio, and shrink to the stage's width only when that still overflows.
+ * Pure so tests can check both shapes at real viewport sizes.
+ */
+export function fitPlayer(
+  stageWidth: number,
+  stageHeight: number,
+  tall: boolean,
+): { width: number; height: number } {
+  const ratio = tall ? 9 / 16 : 16 / 9;
+  let height = Math.max(0, stageHeight);
+  let width = height * ratio;
+  if (width > stageWidth) {
+    width = Math.max(0, stageWidth);
+    height = width / ratio;
+  }
+  return { width: Math.floor(width), height: Math.floor(height) };
+}
+
+/** True when an image's natural size is portrait: taller than wide. */
+export function isPortraitArt(
+  naturalWidth: number,
+  naturalHeight: number,
+): boolean {
+  return naturalHeight > naturalWidth;
+}
+
+/**
+ * Where a shot's image sits in the frame. Portrait art in a wide cut
+ * anchors near the top so heads stay in frame instead of torsos; a
+ * tall cut and landscape art stay centred. Plain CSS keywords and
+ * percentages only, so the web renderer supports them.
+ */
+export function shotObjectPosition(portrait: boolean, tall: boolean): string {
+  return !tall && portrait ? "50% 12%" : "50% 50%";
 }

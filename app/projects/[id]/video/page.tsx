@@ -3,7 +3,7 @@
 import "@/app/video.css";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import type { PlayerRef } from "@remotion/player";
 import { MissingStory, useProject } from "@/components/projects/ProjectContext";
@@ -22,6 +22,8 @@ import {
   VIDEO_PLAN_FAILED_MESSAGE,
   availableArtPaths,
   clockLabel,
+  fitPlayer,
+  isPortraitArt,
   moveShot,
   shortForScene,
   shotStartFrames,
@@ -83,6 +85,75 @@ function newLineId(): string {
   return `line-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
+/**
+ * Which shot images are portrait, by path. Loads each image once and
+ * reads its natural size; anything unknown or failed stays centred.
+ */
+function usePortraitArt(imagePaths: string[]): Record<string, boolean> {
+  const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const seen = useRef(new Set<string>());
+  // Keyed on the joined paths so the 150ms transport tick re-rendering
+  // this page never restarts an image load already in flight.
+  const key = imagePaths.join("\n");
+  useEffect(() => {
+    let cancelled = false;
+    for (const path of key.split("\n").filter((entry) => entry.length > 0)) {
+      if (seen.current.has(path)) continue;
+      seen.current.add(path);
+      const img = new Image();
+      img.onload = () => {
+        if (cancelled) return;
+        const portrait = isPortraitArt(img.naturalWidth, img.naturalHeight);
+        setFlags((prev) =>
+          prev[path] === undefined ? { ...prev, [path]: portrait } : prev,
+        );
+      };
+      img.onerror = () => {
+        seen.current.delete(path);
+      };
+      img.src = path;
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+  return flags;
+}
+
+/**
+ * The stage box the player must fit inside, measured live so the tall
+ * player sizes from the stage's height instead of overflowing it.
+ */
+function useFrameBox(): {
+  ref: (el: HTMLDivElement | null) => void;
+  box: { width: number; height: number };
+} {
+  const [frameEl, setFrameEl] = useState<HTMLDivElement | null>(null);
+  const [box, setBox] = useState({ width: 0, height: 0 });
+  // Stable identity so React only attaches it on mount, not on the
+  // 150ms transport tick re-renders.
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    setFrameEl(el);
+  }, []);
+  useEffect(() => {
+    if (!frameEl) return;
+    const update = () => {
+      const rect = frameEl.getBoundingClientRect();
+      setBox((prev) => {
+        if (prev.width === rect.width && prev.height === rect.height) {
+          return prev;
+        }
+        return { width: rect.width, height: rect.height };
+      });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(frameEl);
+    return () => observer.disconnect();
+  }, [frameEl]);
+  return { ref, box };
+}
+
 /** Audio for one shot: the saved line's data URL, if it is playable. */
 function audioForShot(world: World, shot: ShortShot): string | undefined {
   const lineId = shot.voice?.lineId;
@@ -140,6 +211,17 @@ function VideoPageInner() {
   const [frame, setFrame] = useState(0);
   const playerRef = useRef<PlayerRef | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { ref: frameRef, box: frameBox } = useFrameBox();
+  const portraitPaths = world
+    ? [
+        ...new Set(
+          (world.shorts ?? []).flatMap((entry) =>
+            entry.shots.map((shot) => shot.imagePath),
+          ),
+        ),
+      ]
+    : [];
+  const portraitFlags = usePortraitArt(portraitPaths);
 
   useEffect(
     () => () => {
@@ -202,7 +284,15 @@ function VideoPageInner() {
     durationSec: shot.durationSec,
     motion: shot.motion,
     audioSrc: audioForShot(world, shot),
+    portrait: portraitFlags[shot.imagePath] ?? false,
   }));
+  // Exact pixels from the measured stage box, so the tall player fits the
+  // available height instead of covering the transport and the timeline.
+  // Before the first measure the CSS aspect-ratio sizing stands in.
+  const fittedPlayer =
+    frameBox.height > 0
+      ? fitPlayer(frameBox.width, frameBox.height, tall)
+      : null;
   const art = availableArtPaths(world);
   const usedArt = new Set(
     shots.map((shot) => shot.imagePath).filter((path) => path.length > 0),
@@ -551,8 +641,18 @@ function VideoPageInner() {
   return (
     <div className="video-page">
       <div className="video-stage">
-        <div className="video-framewrap">
-          <div className={`video-player${tall ? " tall" : ""}`}>
+        <div className="video-framewrap" ref={frameRef}>
+          <div
+            className={`video-player${tall ? " tall" : ""}`}
+            style={
+              fittedPlayer
+                ? {
+                    width: fittedPlayer.width,
+                    height: fittedPlayer.height,
+                  }
+                : undefined
+            }
+          >
             {shots.length > 0 && short ? (
               <ShortPlayer
                 key={`${short.id}::${short.aspect}`}

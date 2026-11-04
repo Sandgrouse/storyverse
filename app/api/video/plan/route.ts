@@ -25,9 +25,10 @@ function errorResponse(status: number, code: string, message: string) {
 }
 
 /**
- * Cut a short video from one scene: 4 to 6 shots over the project's
- * art, with captions and optional spoken lines. The prompt holds only
- * the secrets this channel may know. The client strips images before
+ * Cut a short video from one scene: at least 4 shots over the project's
+ * art, with captions and optional spoken lines. When fewer come back the
+ * cut keeps them; only a plan with nothing usable fails. The prompt holds
+ * only the secrets this channel may know. The client strips images before
  * sending. Unknown images fall back to the part's own art.
  */
 export async function POST(req: Request) {
