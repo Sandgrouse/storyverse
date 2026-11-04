@@ -3,7 +3,8 @@
  *
  * Copy is final (owner-approved) and must be used word for word.
  * Layouts use viewport-relative seats: x/y are offsets in vw/vh from the
- * stage centre, r is rotation in degrees, s is uniform scale (never
+ * stage centre, r is in-plane rotation in degrees, ry is the curved
+ * gallery facing angle, z is translateZ depth, s is uniform scale (never
  * stretched), and depth scales the pointer parallax. The scroll engine
  * only ever animates transform and opacity; card elements keep one fixed
  * size and shape in CSS.
@@ -21,7 +22,12 @@ export type LandingCard = {
   /** Seat in the pinned layout, in vw/vh from the stage centre. */
   x: number;
   y: number;
+  /** Rotate in the screen plane, in degrees. */
   r: number;
+  /** Facing angle of the curved gallery, in degrees. */
+  ry: number;
+  /** Gallery depth under the 1500px stage perspective, in px. */
+  z: number;
   s: number;
   /** Pointer parallax factor. 0 opts out (wide panels stay put). */
   depth: number;
@@ -29,15 +35,19 @@ export type LandingCard = {
   flag?: string;
   /** Outline-pulse once when the chapter arrives. */
   pulse?: boolean;
+  /** Cross-fade direction inside its chapter ("out" fades as "in" arrives). */
+  fade?: "out" | "in";
+  /** Strip attached to the card's lower edge, moving with it. */
+  secret?: { channel: string; text: string; tint: string };
 };
 
 export type ChapterFeature =
   | "none"
   | "script"
-  | "secrets"
   | "line"
   | "tree"
-  | "browser";
+  | "browser"
+  | "video";
 
 export type Chapter = {
   id: string;
@@ -110,9 +120,58 @@ export const CHANGE_LINE = "Enyinyi told them how to kill him.";
 export const VIDEO_CAPTION =
   "One night they run across the Omabala to escape him.";
 
+/**
+ * Prototype ring seat: four cards a side, curving away from the centre
+ * under the 1500px stage perspective. `out0` pushes every seat outward.
+ */
+export function ringSeat(side: -1 | 1, k: number, out0 = 0) {
+  return {
+    x: side * (26.5 + out0 + k * 7 + k * k * 1.2),
+    y: 0,
+    r: 0,
+    ry: -side * (26 + k * 13),
+    z: k * 34,
+  };
+}
+
+/** The eight hero cards as a curved gallery. Inner cards sit at ±26.5vw. */
+function heroCards(out0 = 0): LandingCard[] {
+  const left: Array<[string, string]> = [
+    ["roots", "Oral history"],
+    ["storm", "The storm"],
+    ["hippo", "The stream"],
+    ["enyinyi", "Enyinyi"],
+  ];
+  const right: Array<[string, string]> = [
+    ["pots", "Clay pots"],
+    ["anukili", "Anukili"],
+    ["fire", "Firelight"],
+    ["omabala", "The Omabala river"],
+  ];
+  const scales = [0.9, 0.8, 0.7, 0.6];
+  const depths = [0.5, 0.8, 1, 1.2];
+  const build = (
+    side: -1 | 1,
+    [name, alt]: [string, string],
+    k: number,
+  ): LandingCard => ({
+    src: ART(name),
+    kind: "art",
+    alt,
+    ...ringSeat(side, k, out0),
+    s: scales[k] ?? 0.6,
+    depth: depths[k] ?? 1,
+  });
+  return [
+    ...left.map((entry, k) => build(-1, entry, k)),
+    ...right.map((entry, k) => build(1, entry, k)),
+  ];
+}
+
 export const VIDEO_THUMBS = [
-  { src: ART("hippo"), alt: "A hippopotamus at the stream" },
+  { src: ART("pots"), alt: "Clay pots by the fire" },
   { src: ART("storm"), alt: "Storm clouds over the river" },
+  { src: ART("hippo"), alt: "A hippopotamus at the stream" },
   { src: ART("fire"), alt: "Firelight at night" },
 ];
 
@@ -128,16 +187,7 @@ export const CHAPTERS: Chapter[] = [
     side: null,
     tint: "#efe8db",
     feature: "none",
-    cards: [
-      { src: ART("roots"), kind: "art", alt: "Oral history", x: -9, y: -2, r: -4, s: 1, depth: 0.5 },
-      { src: ART("anukili"), kind: "art", alt: "Anukili", x: 9, y: -2, r: 4, s: 1, depth: 0.5 },
-      { src: ART("hippo"), kind: "art", alt: "The stream", x: -19, y: 2, r: -8, s: 0.86, depth: 0.8 },
-      { src: ART("storm"), kind: "art", alt: "The storm", x: 19, y: 2, r: 8, s: 0.86, depth: 0.8 },
-      { src: ART("pots"), kind: "art", alt: "Clay pots", x: -28, y: 8, r: -12, s: 0.72, depth: 1 },
-      { src: ART("fire"), kind: "art", alt: "Firelight", x: 28, y: 8, r: 12, s: 0.72, depth: 1 },
-      { src: ART("enyinyi"), kind: "art", alt: "Enyinyi", x: -36, y: 15, r: -15, s: 0.6, depth: 1.2 },
-      { src: ART("omabala"), kind: "art", alt: "The Omabala river", x: 36, y: 15, r: 15, s: 0.6, depth: 1.2 },
-    ],
+    cards: heroCards(0),
   },
   {
     id: "world",
@@ -149,10 +199,10 @@ export const CHAPTERS: Chapter[] = [
     body: "Your world, characters, plot and goal live in one master story. Everything else draws from it.",
     feature: "none",
     cards: [
-      { src: ART("roots"), kind: "art", alt: "Oral history", x: -24, y: 0, r: -2, s: 1, depth: 0.4 },
-      { src: ART("fire"), kind: "art", alt: "Firelight", x: -38, y: -14, r: -8, s: 0.62, depth: 0.9 },
-      { src: ART("storm"), kind: "art", alt: "The storm", x: -10, y: 16, r: 6, s: 0.62, depth: 0.9 },
-      { src: ART("pots"), kind: "art", alt: "Clay pots", x: -38, y: 16, r: 5, s: 0.5, depth: 1.1 },
+      { src: ART("roots"), kind: "art", alt: "Oral history", x: -24, y: 0, r: -2, ry: 0, z: 0, s: 1, depth: 0.4 },
+      { src: ART("fire"), kind: "art", alt: "Firelight", x: -38, y: -14, r: -8, ry: 0, z: 0, s: 0.62, depth: 0.9 },
+      { src: ART("storm"), kind: "art", alt: "The storm", x: -10, y: 16, r: 6, ry: 0, z: 0, s: 0.62, depth: 0.9 },
+      { src: ART("pots"), kind: "art", alt: "Clay pots", x: -38, y: 16, r: 5, ry: 0, z: 0, s: 0.5, depth: 1.1 },
     ],
   },
   {
@@ -165,11 +215,11 @@ export const CHAPTERS: Chapter[] = [
     body: "Create full character sheets and game-ready cutouts, and keep each character the same everywhere.",
     feature: "none",
     cards: [
-      { src: SHEET("anukili-ugama/front"), kind: "sheet", alt: "Anukili, front view", x: -24, y: 0, r: -1, s: 1, depth: 0.4 },
-      { src: SHEET("anukili-ugama/left"), kind: "sheet", alt: "Anukili, left view", x: -38, y: 3, r: -7, s: 0.78, depth: 0.8 },
-      { src: SHEET("anukili-ugama/walking"), kind: "sheet", alt: "Anukili, walking pose", x: -10, y: 3, r: 6, s: 0.78, depth: 0.8 },
-      { src: SHEET("anukili-ugama/back"), kind: "sheet", alt: "Anukili, back view", x: -45, y: 12, r: -10, s: 0.6, depth: 1.1 },
-      { src: SHEET("enyinyi/front"), kind: "sheet", alt: "Enyinyi, front view", x: -3, y: 12, r: 9, s: 0.6, depth: 1.1 },
+      { src: SHEET("anukili-ugama/front"), kind: "sheet", alt: "Anukili, front view", x: -22, y: 0, r: -1, ry: 0, z: 0, s: 1, depth: 0.4 },
+      { src: SHEET("anukili-ugama/left"), kind: "sheet", alt: "Anukili, left view", x: -36, y: 3, r: -7, ry: 0, z: 0, s: 0.78, depth: 0.8 },
+      { src: SHEET("anukili-ugama/walking"), kind: "sheet", alt: "Anukili, walking pose", x: -8, y: 3, r: 6, ry: 0, z: 0, s: 0.78, depth: 0.8 },
+      { src: SHEET("anukili-ugama/back"), kind: "sheet", alt: "Anukili, back view", x: -42, y: 12, r: -10, ry: 0, z: 0, s: 0.6, depth: 1.1 },
+      { src: SHEET("enyinyi/front"), kind: "sheet", alt: "Enyinyi, front view", x: -1, y: 12, r: 9, ry: 0, z: 0, s: 0.6, depth: 1.1 },
     ],
   },
   {
@@ -182,7 +232,7 @@ export const CHAPTERS: Chapter[] = [
     body: "Your script knows your characters and your canon, so it stays true to both.",
     feature: "script",
     cards: [
-      { src: ART("hippo"), kind: "art", alt: "The stream", x: -2, y: -24, r: 5, s: 0.5, depth: 0.7 },
+      { src: ART("hippo"), kind: "art", alt: "The stream", x: 6, y: -20, r: 5, ry: 0, z: 0, s: 0.55, depth: 0.7 },
     ],
   },
   {
@@ -193,11 +243,11 @@ export const CHAPTERS: Chapter[] = [
     kicker: "Parts",
     heading: "Break it across screens",
     body: "Split your story into a series, a game and shorts. Each holds a secret the others don't, so fans follow them all.",
-    feature: "secrets",
+    feature: "none",
     cards: [
-      { src: ART("storm"), kind: "art", alt: "The series", x: -24, y: -6, r: -3, s: 0.78, depth: 0.5 },
-      { src: ART("hippo"), kind: "art", alt: "The game", x: -6, y: -6, r: 1, s: 0.78, depth: 0.7 },
-      { src: ART("pots"), kind: "art", alt: "The shorts", x: 12, y: -6, r: 4, s: 0.78, depth: 0.9 },
+      { src: ART("storm"), kind: "art", alt: "The series", x: -3, y: 0, r: 0, ry: 0, z: 0, s: 0.8, depth: 0.5, secret: SECRETS[0] },
+      { src: ART("hippo"), kind: "art", alt: "The game", x: 16, y: 0, r: 0, ry: 0, z: 0, s: 0.8, depth: 0.7, secret: SECRETS[1] },
+      { src: ART("pots"), kind: "art", alt: "The shorts", x: 35, y: 0, r: 0, ry: 0, z: 0, s: 0.8, depth: 0.9, secret: SECRETS[2] },
     ],
   },
   {
@@ -211,12 +261,12 @@ export const CHAPTERS: Chapter[] = [
     low: true,
     feature: "line",
     cards: [
-      { src: ART("roots"), kind: "art", alt: "Oral history", x: -14, y: -16, r: -2, s: 0.52, depth: 0.5 },
-      { src: ART("hippo"), kind: "art", alt: "The stream", x: 2, y: -16, r: 2, s: 0.52, depth: 0.6 },
-      { src: ART("storm"), kind: "art", alt: "The storm", x: 18, y: -16, r: -1, s: 0.52, depth: 0.7 },
-      { src: ART("pots"), kind: "art", alt: "Clay pots", x: -14, y: 12, r: 2, s: 0.52, depth: 0.8, flag: "Breaks", pulse: true },
-      { src: ART("fire"), kind: "art", alt: "Firelight", x: 2, y: 12, r: -2, s: 0.52, depth: 0.9, flag: "Breaks", pulse: true },
-      { src: ART("omabala"), kind: "art", alt: "The Omabala river", x: 18, y: 12, r: 1, s: 0.52, depth: 1, flag: "Breaks", pulse: true },
+      { src: ART("roots"), kind: "art", alt: "Oral history", x: 0, y: -16, r: 0, ry: 0, z: 0, s: 0.52, depth: 0.5 },
+      { src: ART("hippo"), kind: "art", alt: "The stream", x: 18, y: -16, r: 0, ry: 0, z: 0, s: 0.52, depth: 0.6 },
+      { src: ART("storm"), kind: "art", alt: "The storm", x: 36, y: -16, r: 0, ry: 0, z: 0, s: 0.52, depth: 0.7 },
+      { src: ART("pots"), kind: "art", alt: "Clay pots", x: 0, y: 16, r: 0, ry: 0, z: 0, s: 0.52, depth: 0.8, flag: "Breaks", pulse: true },
+      { src: ART("fire"), kind: "art", alt: "Firelight", x: 18, y: 16, r: 0, ry: 0, z: 0, s: 0.52, depth: 0.9, flag: "Breaks", pulse: true },
+      { src: ART("omabala"), kind: "art", alt: "The Omabala river", x: 36, y: 16, r: 0, ry: 0, z: 0, s: 0.52, depth: 1, flag: "Breaks", pulse: true },
     ],
   },
   {
@@ -229,11 +279,11 @@ export const CHAPTERS: Chapter[] = [
     body: "Every agent, image and video draws from the same characters and canon, so nothing drifts.",
     feature: "none",
     cards: [
-      { src: ART("enyinyi"), kind: "art", alt: "Enyinyi", x: -24, y: 0, r: 0, s: 0.95, depth: 0.4 },
-      { src: ART("roots"), kind: "art", alt: "Oral history", x: -40, y: -16, r: -7, s: 0.55, depth: 0.9 },
-      { src: ART("hippo"), kind: "art", alt: "The stream", x: -8, y: -16, r: 6, s: 0.55, depth: 0.9 },
-      { src: ART("fire"), kind: "art", alt: "Firelight", x: -40, y: 17, r: 6, s: 0.55, depth: 1 },
-      { src: ART("storm"), kind: "art", alt: "The storm", x: -8, y: 17, r: -5, s: 0.55, depth: 1 },
+      { src: ART("enyinyi"), kind: "art", alt: "Enyinyi", x: -24, y: 0, r: 0, ry: 0, z: 0, s: 0.95, depth: 0.4 },
+      { src: ART("roots"), kind: "art", alt: "Oral history", x: -40, y: -16, r: -7, ry: 0, z: 0, s: 0.55, depth: 0.9 },
+      { src: ART("hippo"), kind: "art", alt: "The stream", x: -8, y: -16, r: 6, ry: 0, z: 0, s: 0.55, depth: 0.9 },
+      { src: ART("fire"), kind: "art", alt: "Firelight", x: -40, y: 17, r: 6, ry: 0, z: 0, s: 0.55, depth: 1 },
+      { src: ART("storm"), kind: "art", alt: "The storm", x: -8, y: 17, r: -5, ry: 0, z: 0, s: 0.55, depth: 1 },
     ],
   },
   {
@@ -244,16 +294,18 @@ export const CHAPTERS: Chapter[] = [
     kicker: "Video",
     heading: "Turn scenes into shorts",
     body: "Muse turns your scenes into short videos you can edit and publish.",
-    feature: "none",
+    feature: "video",
     cards: [
-      { src: ART("omabala"), kind: "art", alt: "The Omabala river", x: -40, y: -4, r: -3, s: 0.72, depth: 0.5 },
-      { src: ART("omabala"), kind: "player", alt: "Crossing the Omabala, video preview", x: -12, y: -10, r: 0, s: 1, depth: 0 },
+      { src: ART("omabala"), kind: "art", alt: "The Omabala river", x: -12, y: -10, r: 0, ry: 0, z: 0, s: 0.72, depth: 0, fade: "out" },
+      { src: ART("omabala"), kind: "player", alt: "Crossing the Omabala, video preview", x: -12, y: -10, r: 0, ry: 0, z: 0, s: 1, depth: 0, fade: "in" },
       ...VIDEO_THUMBS.map((thumb, i) => ({
         ...thumb,
         kind: "thumb" as const,
-        x: [-30, -12, 6][i] ?? 0,
+        x: [-27, -17, -7, 3][i] ?? 0,
         y: 22,
         r: 0,
+        ry: 0,
+        z: 0,
         s: 1,
         depth: 0,
       })),
@@ -269,7 +321,7 @@ export const CHAPTERS: Chapter[] = [
     body: "Give a coding agent the package for your game, holding only what the game may know.",
     feature: "tree",
     cards: [
-      { src: ART("hippo"), kind: "art", alt: "The stream", x: -4, y: -2, r: 4, s: 0.66, depth: 0.6 },
+      { src: ART("hippo"), kind: "art", alt: "The stream", x: -3, y: 0, r: 4, ry: 0, z: 0, s: 0.66, depth: 0.6 },
     ],
   },
   {
@@ -290,7 +342,7 @@ export const CHAPTERS: Chapter[] = [
     side: null,
     tint: "#efe8db",
     feature: "none",
-    cards: [],
+    cards: heroCards(7),
   },
 ];
 

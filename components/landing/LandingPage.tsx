@@ -7,7 +7,7 @@ import Lenis from "lenis";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, type PointerEvent } from "react";
+import { useEffect, useRef, type CSSProperties, type PointerEvent } from "react";
 import {
   BROWSER_SUB,
   BROWSER_TITLE,
@@ -20,7 +20,6 @@ import {
   LANDING_IMAGES,
   SCRIPT_LINES,
   SCRIPT_NOTE,
-  SECRETS,
   TREE_LINES,
   TREE_SECRET,
   VIDEO_CAPTION,
@@ -67,21 +66,17 @@ function ChapterExtras({ chapter }: { chapter: Chapter }) {
       </div>
     );
   }
-  if (chapter.feature === "secrets") {
+  if (chapter.feature === "video") {
+    // Playhead line sweeping across the thumbnail row, which spans the
+    // player's width. Thumbs sit at y 22vh; the track covers their height.
     return (
-      <>
-        {SECRETS.map((secret, i) => (
-          <div
-            key={secret.channel}
-            className="land-extra land-secret"
-            data-secret={i}
-            style={{ background: secret.tint }}
-          >
-            <b>{secret.channel}</b>
-            {secret.text}
-          </div>
-        ))}
-      </>
+      <div
+        className="land-extra land-track"
+        style={{ left: "18vw", width: "40vw", "--run": "40vw" } as CSSProperties}
+        aria-hidden
+      >
+        <div className="land-playhead" />
+      </div>
     );
   }
   if (chapter.feature === "line") {
@@ -308,6 +303,8 @@ export default function LandingPage() {
               x: `${card.x}vw`,
               y: `${card.y}vh`,
               rotation: card.r,
+              rotationY: card.ry,
+              z: card.z,
               scale: card.s,
             });
           });
@@ -389,7 +386,9 @@ export default function LandingPage() {
             { autoAlpha: 1, y: "0vh", duration: 0.45 },
             pos + 0.05,
           );
-          const cards = curr.querySelectorAll(".land-outer");
+          const cards = curr.querySelectorAll(
+            ".land-outer:not([data-fade])",
+          );
           if (cards.length) {
             tl.from(
               cards,
@@ -402,6 +401,26 @@ export default function LandingPage() {
               },
               pos + 0.1,
             );
+          }
+          if (CHAPTERS[i].id === "video") {
+            // The story art sits on the player's seat, then fades out as
+            // the player fades in, leaving the player and the timeline.
+            const out = curr.querySelector("[data-fade='out']");
+            const inn = curr.querySelector("[data-fade='in']");
+            if (out && inn) {
+              tl.fromTo(
+                out,
+                { opacity: 1 },
+                { opacity: 0, duration: 0.3 },
+                pos + 0.35,
+              );
+              tl.fromTo(
+                inn,
+                { opacity: 0 },
+                { opacity: 1, duration: 0.3 },
+                pos + 0.35,
+              );
+            }
           }
           const kids = curr.querySelectorAll(
             ".land-copy > *, .land-extra, .land-hero > *",
@@ -529,6 +548,9 @@ export default function LandingPage() {
               </section>
             ) : chapter.id === "begin" ? (
               <section key={chapter.id} className={`land-ch land-ch-${i}`} aria-label="Begin">
+                {chapter.cards.map((card, k) => (
+                  <LandingCard key={`${card.src}-${k}`} card={card} />
+                ))}
                 <div className="land-hero">
                   <h2 className="big">
                     {CLOSE_HEADING.map((line) => (
