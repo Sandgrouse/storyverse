@@ -17,6 +17,7 @@ import {
   fitsRequestLimit,
   pickSceneReferences,
   scenePrompt,
+  sketchPrompt,
 } from "@/lib/art";
 
 export const maxDuration = 60;
@@ -54,7 +55,8 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return errorResponse(400, "VALIDATION_ERROR", "Expected { part }.");
   }
-  const { part, characters, styleImage, change } = parsed.data;
+  const { part, characters, styleImage, change, style, framing } =
+    parsed.data;
   let { description } = parsed.data;
   const references = pickSceneReferences(parsed.data.references);
   if (references.length === 0 && styleImage) references.push(styleImage);
@@ -68,15 +70,27 @@ export async function POST(req: Request) {
     return errorResponse(429, "BUDGET", budgetMessage(charge.scope));
   }
 
+  const promptFor = (text: string | undefined) =>
+    style === "sketch"
+      ? sketchPrompt({
+          part,
+          characters,
+          referenceCount: references.length,
+          framing,
+          change,
+          description: text,
+        })
+      : scenePrompt({
+          part,
+          characters,
+          referenceCount: references.length,
+          change,
+          description: text,
+        });
+
   const attempt = (text: string | undefined) =>
     generateImage({
-      prompt: scenePrompt({
-        part,
-        characters,
-        referenceCount: references.length,
-        change,
-        description: text,
-      }),
+      prompt: promptFor(text),
       referenceImages: references,
       size: "1536x1024",
     });
@@ -106,13 +120,7 @@ export async function POST(req: Request) {
     const rewrite = await completeJson(
       {
         instructions: REWRITE_INSTRUCTIONS,
-        input: scenePrompt({
-          part,
-          characters,
-          referenceCount: references.length,
-          change,
-          description,
-        }),
+        input: promptFor(description),
         schemaName: REWRITE_SCHEMA_NAME,
         jsonSchema: REWRITE_JSON_SCHEMA,
       },

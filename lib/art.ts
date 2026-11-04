@@ -35,6 +35,9 @@ export const SHEET_SUFFIX =
 export const SCENE_SUFFIX =
   "Keep each character exactly as in their reference. Do not draw any text, letters, logos or watermarks.";
 
+export const SKETCH_SUFFIX =
+  "Loose pencil storyboard drawing, black and grey with no colour, simple shading and clear composition. Do not draw any text, letters, logos or watermarks.";
+
 export const REWRITE_INSTRUCTIONS =
   "Rewrite this image description so it passes a content filter. Keep the same people, place and moment. Describe it through composition, distance, light and aftermath, with no violence, gore or distress shown directly.";
 
@@ -108,6 +111,8 @@ export const SceneArtRequestSchema = z.object({
   styleImage: z.string().min(1).optional(),
   change: z.string().min(1).max(1000).optional(),
   description: z.string().min(1).max(2000).optional(),
+  style: z.enum(["sketch"]).optional(),
+  framing: z.string().min(1).max(40).optional(),
 });
 
 export const SceneArtResponseSchema = z.object({
@@ -171,6 +176,30 @@ export function scenePrompt(request: {
       : "";
   const change = request.change ? ` New story detail: ${request.change}` : "";
   return `${scene}${cast}${change} ${SCENE_SUFFIX}`;
+}
+
+/**
+ * One storyboard sketch prompt. The references still carry the
+ * likeness; the text names which reference shows whom. The sketch
+ * suffix replaces the scene suffix, naming the frame's framing.
+ */
+export function sketchPrompt(request: {
+  part: { title: string; summary: string };
+  characters: Array<{ id: string; name: string }>;
+  referenceCount: number;
+  framing?: string;
+  change?: string;
+  description?: string;
+}): string {
+  const scene =
+    request.description ?? `Scene: ${request.part.title}. ${request.part.summary}`;
+  const cast =
+    request.referenceCount > 0
+      ? ` ${referenceNames(request.characters, request.referenceCount)}`
+      : "";
+  const change = request.change ? ` New story detail: ${request.change}` : "";
+  const framing = request.framing ? ` Framing: ${request.framing}.` : "";
+  return `${scene}${cast}${change}${framing} ${SKETCH_SUFFIX}`;
 }
 
 /** At most three references travel with a scene request. */

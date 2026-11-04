@@ -172,6 +172,19 @@ export function extractImageEntries(world: World): {
           ),
         })),
       })),
+      storyboards: (world.storyboards ?? []).map((board) => ({
+        ...board,
+        frames: board.frames.map((frame) => ({
+          ...frame,
+          imagePath: frame.imagePath
+            ? swap(
+                frame.imagePath,
+                entryName("storyboard", board.id, frame.id),
+                entries,
+              )
+            : frame.imagePath,
+        })),
+      })),
     },
     entries,
   };
@@ -222,6 +235,13 @@ export function restoreImageRefs(
         imagePath: fill(shot.imagePath) ?? "",
       })),
     })),
+    storyboards: (world.storyboards ?? []).map((board) => ({
+      ...board,
+      frames: board.frames.map((frame) => ({
+        ...frame,
+        imagePath: frame.imagePath ? fill(frame.imagePath) : frame.imagePath,
+      })),
+    })),
   };
 }
 
@@ -265,6 +285,13 @@ export function dropStoredRefs(world: World): World {
         imagePath: drop(shot.imagePath),
       })),
     })),
+    storyboards: (world.storyboards ?? []).map((board) => ({
+      ...board,
+      frames: board.frames.map((frame) => ({
+        ...frame,
+        imagePath: frame.imagePath ? drop(frame.imagePath) : frame.imagePath,
+      })),
+    })),
   };
 }
 
@@ -281,6 +308,9 @@ export function hasStoredRefs(world: World): boolean {
   for (const beat of world.beats) paths.push(beat.imagePath);
   for (const short of world.shorts ?? []) {
     for (const shot of short.shots) paths.push(shot.imagePath);
+  }
+  for (const board of world.storyboards ?? []) {
+    for (const frame of board.frames) paths.push(frame.imagePath);
   }
   return paths.some(isStoredRef);
 }

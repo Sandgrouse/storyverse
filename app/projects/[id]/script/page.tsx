@@ -426,6 +426,13 @@ function ScriptEditor({
           <Link
             className="pill"
             style={{ width: "100%" }}
+            href={`/projects/${projectId}/storyboard?channel=${encodeURIComponent(channelId)}&part=${encodeURIComponent(partId)}`}
+          >
+            Make a storyboard
+          </Link>
+          <Link
+            className="pill light"
+            style={{ width: "100%", marginTop: 8 }}
             href={`/projects/${projectId}/video?channel=${encodeURIComponent(channelId)}&part=${encodeURIComponent(partId)}`}
           >
             Turn this into a short
