@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { MAX_BODY_BYTES } from "@/lib/budget";
 import {
-  CUSTOM_VOICE_LIMIT_MESSAGE,
   CustomRequestSchema,
-  ELEVENLABS_ADD_VOICE_URL,
   NO_VOICE_KEY_MESSAGE,
   OWNER_CONSENT_TEXT,
-  customVoiceErrorFor,
-  logVoiceFailure,
-  upstreamMessage,
 } from "@/lib/voice";
+import { getVoiceProvider } from "@/lib/voice-provider";
 import { requireOwnerCode } from "@/lib/voice-owner";
 import { VoiceStoreError, getSample } from "@/lib/voice-store";
 
@@ -20,16 +15,9 @@ function errorResponse(status: number, code: string, message: string) {
   return NextResponse.json({ error: { code, message } }, { status });
 }
 
-const AddVoiceResponseSchema = z.object({
-  voice_id: z.string().min(1),
-  requires_verification: z.boolean().optional(),
-});
-
 /**
- * Owner: create a custom ElevenLabs voice from stored samples. Reads the
- * sample files and calls POST https://api.elevenlabs.io/v1/voices/add
- * as multipart, with name, files, remove_background_noise false and a
- * description. Consent is required: the checkbox must be ticked.
+ * Owner: create a custom voice from stored samples through the live
+ * voice provider. Consent is required: the checkbox must be ticked.
  */
 export async function POST(req: Request) {
   const owner = requireOwnerCode(req);
@@ -60,8 +48,8 @@ export async function POST(req: Request) {
   }
   const { characterName, sampleIds } = parsed.data;
 
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) {
+  const provider = getVoiceProvider();
+  if (!provider) {
     return errorResponse(503, "NO_VOICE_KEY", NO_VOICE_KEY_MESSAGE);
   }
 
@@ -83,41 +71,15 @@ export async function POST(req: Request) {
     files.push({ bytes: audio.bytes, mime: audio.mime, name: `sample-${files.length}.${ext}` });
   }
 
-  const form = new FormData();
-  form.set("name", characterName);
-  for (const file of files) {
-    form.append("files", new Blob([file.bytes as unknown as BlobPart], { type: file.mime }), file.name);
-  }
-  form.set("remove_background_noise", "false");
-  form.set("description", `Storyverse custom voice for ${characterName}.`);
-
-  let res: Response;
-  try {
-    res = await fetch(ELEVENLABS_ADD_VOICE_URL, {
-      method: "POST",
-      headers: { "xi-api-key": apiKey },
-      body: form,
-    });
-  } catch (error) {
-    logVoiceFailure("custom", 0, error instanceof Error ? error.message : String(error));
-    return errorResponse(500, "VOICE_FAILED", "Creating that voice failed.");
-  }
-  if (!res.ok) {
-    const message = await upstreamMessage(res);
-    logVoiceFailure("custom", res.status, message);
-    const mapped = customVoiceErrorFor(res.status, message);
-    const code = mapped === CUSTOM_VOICE_LIMIT_MESSAGE ? "VOICE_LIMIT" : "VOICE_FAILED";
-    const status = res.status >= 400 && res.status < 600 ? res.status : 502;
-    return errorResponse(status, code, mapped);
-  }
-  const payload: unknown = await res.json().catch(() => null);
-  const voice = AddVoiceResponseSchema.safeParse(payload);
-  if (!voice.success) {
-    logVoiceFailure("custom", res.status, "unparseable voice response");
-    return errorResponse(502, "VOICE_FAILED", "Creating that voice failed.");
+  const created = await provider.createCustomVoice({
+    name: characterName,
+    files,
+  });
+  if (!created.ok) {
+    return errorResponse(created.status, created.code, created.message);
   }
   return NextResponse.json({
-    voiceId: voice.data.voice_id,
-    requiresVerification: voice.data.requires_verification ?? false,
+    voiceId: created.voiceId,
+    requiresVerification: created.requiresVerification,
   });
 }

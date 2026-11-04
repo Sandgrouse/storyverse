@@ -80,6 +80,8 @@ beforeEach(() => {
   __resetVoiceMemory();
   __resetVoiceListCache();
   vi.stubEnv("ELEVENLABS_API_KEY", "test-voice-key");
+  vi.stubEnv("FISH_API_KEY", "");
+  vi.stubEnv("VOICE_PROVIDER", "");
   vi.stubEnv("MODEL_API_KEY", "test-key");
   vi.unstubAllGlobals();
 });
@@ -99,9 +101,10 @@ describe("voice list", () => {
       async () => new Response(JSON.stringify(upstreamVoices()), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
-    const res = await listGET();
+    const res = await listGET(new Request("http://localhost/api/voice/list"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
+      provider: "elevenlabs",
       voices: [
         {
           id: "v-aria",
@@ -130,8 +133,8 @@ describe("voice list", () => {
       async () => new Response(JSON.stringify(upstreamVoices()), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
-    await listGET();
-    await listGET();
+    await listGET(new Request("http://localhost/api/voice/list"));
+    await listGET(new Request("http://localhost/api/voice/list"));
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -139,7 +142,7 @@ describe("voice list", () => {
     vi.stubEnv("ELEVENLABS_API_KEY", "");
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const res = await listGET();
+    const res = await listGET(new Request("http://localhost/api/voice/list"));
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({
       error: { code: "NO_VOICE_KEY", message: "Voices aren't set up here yet." },
@@ -152,7 +155,7 @@ describe("voice list", () => {
       "fetch",
       vi.fn(async () => new Response("Unauthorized", { status: 401 })),
     );
-    const res = await listGET();
+    const res = await listGET(new Request("http://localhost/api/voice/list"));
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({
       error: {

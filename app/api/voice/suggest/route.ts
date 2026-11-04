@@ -11,6 +11,7 @@ import {
   SuggestRequestSchema,
   logVoiceFailure,
 } from "@/lib/voice";
+import { getVoiceProvider } from "@/lib/voice-provider";
 
 export const maxDuration = 60;
 
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
     return errorResponse(400, "VALIDATION_ERROR", "Unknown character.");
   }
 
-  if (!process.env.ELEVENLABS_API_KEY) {
+  if (!getVoiceProvider()) {
     return errorResponse(503, "NO_VOICE_KEY", NO_VOICE_KEY_MESSAGE);
   }
 

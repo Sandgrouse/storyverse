@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Character, World } from "@/lib/world/schemas";
 import Recorder, { type VoiceTake } from "@/components/voice/Recorder";
 
@@ -102,7 +102,28 @@ type Submission = {
 export default function CustomVoice({ world, character, onWorld }: Props) {
   const [code, setCode] = useState(readOwnerCode);
   const [unlocked, setUnlocked] = useState(readOwnerCode().length > 0);
-  const [tab, setTab] = useState<"record" | "upload" | "ask">("record");
+  const [tab, setTab] = useState<"record" | "upload" | "ask" | "describe">("record");
+  const [provider, setProvider] = useState<"fish" | "elevenlabs" | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/voice/list")
+      .then(async (res) => {
+        const json: unknown = await res.json().catch(() => null);
+        if (cancelled || !res.ok) return;
+        const record =
+          json !== null && typeof json === "object"
+            ? (json as Record<string, unknown>)
+            : null;
+        setProvider(record?.provider === "fish" ? "fish" : "elevenlabs");
+      })
+      .catch(() => {
+        // Provider stays unknown; the Describe option stays hidden.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [lines, setLines] = useState<string[]>(character.lines?.map((l) => l.text) ?? []);
   const [pickingLines, setPickingLines] = useState(false);
@@ -123,6 +144,78 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [checking, setChecking] = useState(false);
   const [useTakes, setUseTakes] = useState<string[]>([]);
+
+  const [designing, setDesigning] = useState(false);
+  const [designDescription, setDesignDescription] = useState("");
+  const [designTestLine, setDesignTestLine] = useState("");
+  const [designCandidates, setDesignCandidates] = useState<
+    Array<{ id: string; audioDataUrl: string }>
+  >([]);
+  const [usingCandidate, setUsingCandidate] = useState<string | null>(null);
+
+  const imagineVoice = async () => {
+    setDesigning(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/voice/design", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-voice-owner-code": readOwnerCode() },
+        body: JSON.stringify({ world, characterId: character.id }),
+      });
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(voiceErrorMessage(json, "Imagining that voice failed."));
+      const record = json as Record<string, unknown>;
+      if (typeof record.description === "string") setDesignDescription(record.description);
+      if (typeof record.testLine === "string") setDesignTestLine(record.testLine);
+      if (Array.isArray(record.candidates)) {
+        setDesignCandidates(
+          (record.candidates as unknown[]).filter(
+            (c): c is { id: string; audioDataUrl: string } =>
+              c !== null &&
+              typeof c === "object" &&
+              typeof (c as Record<string, unknown>).id === "string" &&
+              typeof (c as Record<string, unknown>).audioDataUrl === "string",
+          ),
+        );
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Imagining that voice failed.");
+    } finally {
+      setDesigning(false);
+    }
+  };
+
+  const createDesignedVoice = async (candidate: { id: string; audioDataUrl: string }) => {
+    setUsingCandidate(candidate.id);
+    setError(null);
+    try {
+      // No real speaker is involved, so no consent checkbox: the
+      // owner's click on "Use this voice" is the confirmation the
+      // custom-voice route needs.
+      const blob = dataUrlToBlob(candidate.audioDataUrl);
+      if (!blob) throw new Error("That recording could not be read.");
+      const code = readOwnerCode();
+      const sampleId = await uploadTake(code, character.id, blob);
+      const { voiceId: id } = await createVoice(code, character.name, [sampleId]);
+      setSampleIds([sampleId]);
+      setVoiceId(id);
+      onWorld({
+        ...world,
+        characters: world.characters.map((c) =>
+          c.id === character.id
+            ? {
+                ...c,
+                voice: { id, name: character.name, kind: "custom" as const, source: "designed" },
+              }
+            : c,
+        ),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Creating that voice failed.");
+    } finally {
+      setUsingCandidate(null);
+    }
+  };
 
   const enterCode = (value: string) => {
     setCode(value);
@@ -158,7 +251,12 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
   }
 
   const totalSeconds = takes.reduce((sum, take) => sum + take.seconds, 0);
-  const canCreate = consent && !working && totalSeconds >= 10 && takes.length > 0;
+  const shortTakes = takes.filter((take) => take.seconds < 10);
+  // Fish Audio needs every sample to be at least 10 seconds long.
+  const longEnough =
+    takes.length > 0 &&
+    (provider === "fish" ? shortTakes.length === 0 : totalSeconds >= 10);
+  const canCreate = consent && !working && longEnough;
 
   const pickLines = async () => {
     setPickingLines(true);
@@ -351,7 +449,22 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
             {t === "record" ? "Record" : t === "upload" ? "Upload" : "Ask a voice artist"}
           </button>
         ))}
+        {provider === "fish" && (
+          <button
+            key="describe"
+            type="button"
+            className={tab === "describe" ? "pill" : "pill light"}
+            onClick={() => setTab("describe")}
+          >
+            Describe
+          </button>
+        )}
       </div>
+      {provider === "fish" && tab !== "describe" && (
+        <div className="vx-sub" style={{ marginBottom: 8 }}>
+          Fish Audio needs every sample to be at least 10 seconds long.
+        </div>
+      )}
 
       {tab === "record" && (
         <div>
@@ -381,6 +494,15 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
             </button>
           </div>
           <Recorder lines={lines.filter((l) => l.trim())} onChange={setTakes} />
+          {provider === "fish" && shortTakes.length > 0 && (
+            <div className="artstate">
+              <p>
+                {shortTakes.length === 1
+                  ? "One take is under 10 seconds. Record it again, a little longer."
+                  : `${shortTakes.length} takes are under 10 seconds. Record them again, a little longer.`}
+              </p>
+            </div>
+          )}
           <label className="vx-consent" style={{ display: "flex", gap: 8, margin: "12px 0" }}>
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>{OWNER_CONSENT_TEXT}</span>
@@ -566,6 +688,51 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "describe" && provider === "fish" && (
+        <div>
+          <div className="vx-sub" style={{ marginBottom: 8 }}>
+            Let Muse imagine it. No recording, no consent form: there is no real speaker.
+          </div>
+          <button
+            type="button"
+            className="pill"
+            disabled={designing}
+            onClick={() => void imagineVoice()}
+          >
+            {designing ? "Imagining…" : designCandidates.length > 0 ? "Imagine again" : "Imagine a voice"}
+          </button>
+          {designCandidates.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div className="vx-sub" style={{ marginBottom: 4 }}>How it sounds</div>
+              <textarea
+                aria-label="Voice description"
+                rows={3}
+                value={designDescription}
+                onChange={(e) => setDesignDescription(e.target.value.slice(0, 300))}
+                style={{ width: "100%", font: "inherit", color: "inherit", background: "var(--sheet)", border: "1px solid var(--rule)", borderRadius: 10, padding: "8px 10px" }}
+              />
+              <span className="vx-sub">{designDescription.length} / 300</span>
+              {designTestLine && (
+                <div className="vx-sub" style={{ margin: "6px 0" }}>Test line: “{designTestLine}”</div>
+              )}
+              {designCandidates.map((candidate) => (
+                <div key={candidate.id} className="row" style={{ gap: 8, padding: "8px 0" }}>
+                  <audio controls preload="none" src={candidate.audioDataUrl} style={{ maxWidth: 220 }} />
+                  <button
+                    type="button"
+                    className="pill light"
+                    disabled={usingCandidate !== null}
+                    onClick={() => void createDesignedVoice(candidate)}
+                  >
+                    {usingCandidate === candidate.id ? "Creating…" : "Use this voice"}
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>

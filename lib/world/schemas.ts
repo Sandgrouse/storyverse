@@ -13,6 +13,11 @@ export const VoiceConsentSchema = z.object({
   at: z.string(),
 });
 
+export const PronunciationSchema = z.object({
+  name: z.string().min(1).max(120),
+  sayAs: z.string().min(1).max(120),
+});
+
 export const CharacterVoiceSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -135,6 +140,8 @@ export const WorldSchema = z.object({
   packs: z.array(PackSchema).default([]),
   scripts: z.array(ScriptEntrySchema).default([]),
   canonChanges: z.array(z.string()).default([]),
+  /** How names are said aloud. Only spoken audio uses it. */
+  pronunciations: z.array(PronunciationSchema).default([]),
 });
 
 export const FixStatusSchema = z.enum(["pending", "applied", "rejected"]);
@@ -175,6 +182,7 @@ export const RippleResultSchema = z.object({
   sample: z.boolean().optional(),
 });
 
+export type Pronunciation = z.infer<typeof PronunciationSchema>;
 export type SheetView = z.infer<typeof SheetViewSchema>;
 export type VoiceConsent = z.infer<typeof VoiceConsentSchema>;
 export type CharacterVoice = z.infer<typeof CharacterVoiceSchema>;
