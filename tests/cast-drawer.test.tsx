@@ -223,6 +223,56 @@ describe("CastDrawer one at a time", () => {
   });
 });
 
+function worldWithFullSheet(): World {
+  const base = emptyWorld();
+  return {
+    ...base,
+    characters: [
+      {
+        id: "ada",
+        name: "Ada",
+        canon: "Brave and tall.",
+        artPath: undefined,
+        sheet: ["front", "left", "right", "back", "walking", "crouching"].map(
+          (view) => ({ view, imagePath: `${view}-marker` }),
+        ),
+      },
+    ],
+  };
+}
+
+describe("CastDrawer sheet states", () => {
+  it("hides the draw button and offers the viewer when the sheet is complete", () => {
+    const noop = () => {};
+    const html = renderToString(
+      <CastDrawer
+        world={worldWithFullSheet()}
+        open
+        onClose={noop}
+        onWorld={noop}
+      />,
+    );
+    expect(html).toContain("View sheet");
+    expect(html).not.toContain("Make the missing poses");
+    expect(html).not.toContain("Generate full sheet");
+    // Every pose image opens the viewer instead of redrawing.
+    expect(html).toContain("View Ada Front");
+    // The extra-pose chips and the free text box stay.
+    expect(html).toContain("More poses");
+    expect(html).toContain("Make this pose");
+  });
+
+  it("offers to draw only the missing poses when the sheet is partial", () => {
+    const noop = () => {};
+    const html = renderToString(
+      <CastDrawer world={worldWithSheet()} open onClose={noop} onWorld={noop} />,
+    );
+    expect(html).toContain("Make the missing poses");
+    expect(html).not.toContain("View sheet");
+    expect(html).not.toContain("Generate full sheet");
+  });
+});
+
 describe("CastDrawer views grid", () => {
   it("shows each base view with its cutout action or a make pill", () => {
     const noop = () => {};
@@ -242,7 +292,10 @@ describe("CastDrawer views grid", () => {
     const html = renderToString(
       <CastDrawer world={worldWithSheet()} open onClose={noop} onWorld={noop} />,
     );
-    expect(html).toContain("Generate full sheet");
+    // Two of six views exist: the sheet is partial, so the button only
+    // draws what is missing and never redraws what exists.
+    expect(html).toContain("Make the missing poses");
+    expect(html).not.toContain("Generate full sheet");
     expect(html).toContain("Cut out all");
     expect(html).toContain("More poses");
     for (const chip of [

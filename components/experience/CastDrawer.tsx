@@ -6,10 +6,12 @@ import type { Character, World } from "@/lib/world/schemas";
 import {
   EXTRA_POSES,
   SHEET_VIEWS,
+  isSheetComplete,
   orderedSheetViews,
   poseIdFor,
   poseLabelFor,
 } from "@/lib/art";
+import SheetLightbox from "./SheetLightbox";
 import {
   filterCharacters,
   resolveCharacterId,
@@ -578,6 +580,8 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
   const [running, setRunning] = useState(false);
   const [cuttingAll, setCuttingAll] = useState(false);
   const [poseText, setPoseText] = useState("");
+  /** Open sheet lightbox pose index, or null when closed. */
+  const [lightbox, setLightbox] = useState<number | null>(null);
   const runRef = useRef(0);
   const respIds = useRef<Record<string, string>>({});
 
@@ -589,6 +593,7 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     setRunning(false);
     setCuttingAll(false);
     setPoseText("");
+    setLightbox(null);
     runRef.current += 1;
   }, [selected?.id]);
 
@@ -640,6 +645,10 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     }),
   });
 
+  /**
+   * Draw the base sheet views that are still missing an image. Views that
+   * already have one are kept as they are — never redrawn.
+   */
   const runSheet = async (character: Character) => {
     if (cutting) return;
     const run = runRef.current + 1;
@@ -647,7 +656,12 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     respIds.current = {};
     setRunning(true);
     const fresh: Record<string, SlotState> = {};
-    for (const view of SHEET_VIEWS) fresh[view.id] = { kind: "working" };
+    for (const view of SHEET_VIEWS) {
+      if (character.sheet.some((v) => v.view === view.id && v.imagePath)) {
+        continue;
+      }
+      fresh[view.id] = { kind: "working" };
+    }
     setSlots(fresh);
     setDrafts({});
 
@@ -658,25 +672,15 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     const style = reference ? undefined : await styleImageFor(world);
     if (runRef.current !== run) return;
 
-    // Start clean, but keep extra poses already made; each base
-    // view fills its slot as it arrives.
-    current = {
-      ...current,
-      characters: current.characters.map((c) =>
-        c.id === character.id
-          ? {
-              ...c,
-              sheet: c.sheet.filter(
-                (v) => !SHEET_VIEWS.some((base) => base.id === v.view),
-              ),
-            }
-          : c,
-      ),
-    };
-    onWorld(current);
-
     for (const view of SHEET_VIEWS) {
       if (runRef.current !== run) return;
+      const kept = current.characters
+        .find((c) => c.id === character.id)
+        ?.sheet.find((v) => v.view === view.id)?.imagePath;
+      if (kept) {
+        markSlot(view.id, { kind: "idle" });
+        continue;
+      }
       markSlot(view.id, { kind: "working" });
       const payload: Record<string, unknown> = {
         view: view.id,
@@ -827,6 +831,27 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
   }, [selected, slots]);
 
   const labelForTile = (viewId: string): string => poseLabelFor(viewId);
+
+  /** A complete sheet hides the draw button and opens the lightbox. */
+  const sheetComplete = !!selected && isSheetComplete(selected.sheet);
+
+  /** Poses with images, in grid order, for the lightbox. */
+  const lightViews = useMemo(
+    () =>
+      selected
+        ? orderedSheetViews(
+            selected.sheet.flatMap((v) =>
+              v.imagePath ? [{ view: v.view, imagePath: v.imagePath }] : [],
+            ),
+          )
+        : [],
+    [selected],
+  );
+
+  const openLightbox = (viewId: string) => {
+    const at = lightViews.findIndex((v) => v.view === viewId);
+    setLightbox(at >= 0 ? at : 0);
+  };
 
   /** Generate one extra pose view through the sheet-view route. */
   const makePose = async (character: Character, viewId: string) => {
@@ -1072,23 +1097,30 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
               const cutoutState = cutouts[viewId] ?? { kind: "idle" as const };
               return (
                 <div key={viewId} className="slot">
-                  <div
-                    className={`slotimg${state.kind === "working" ? " busy" : ""}${!image && state.kind === "idle" ? " empty" : ""}`}
-                    style={
-                      image ? { backgroundImage: `url(${image})` } : undefined
-                    }
-                    role={image ? "img" : undefined}
-                    aria-label={image ? `${selected?.name ?? "Character"} ${label}` : undefined}
-                  >
-                    {!image && state.kind === "working" && <span>Drawing…</span>}
-                    {!image && state.kind === "idle" && <span>{label}</span>}
-                    {!image && state.kind === "error" && (
-                      <span className="slotmsg">{state.message}</span>
-                    )}
-                    {!image && state.kind === "blocked" && (
-                      <span className="slotmsg">{state.message}</span>
-                    )}
-                  </div>
+                  {image ? (
+                    <button
+                      type="button"
+                      className={`slotimg slotbtn${state.kind === "working" ? " busy" : ""}`}
+                      style={{ backgroundImage: `url(${image})` }}
+                      onClick={() => openLightbox(viewId)}
+                      aria-label={`View ${selected?.name ?? "Character"} ${label}`}
+                      title={`View ${label}`}
+                      tabIndex={open ? 0 : -1}
+                    />
+                  ) : (
+                    <div
+                      className={`slotimg${state.kind === "working" ? " busy" : ""}${state.kind === "idle" ? " empty" : ""}`}
+                    >
+                      {state.kind === "working" && <span>Drawing…</span>}
+                      {state.kind === "idle" && <span>{label}</span>}
+                      {state.kind === "error" && (
+                        <span className="slotmsg">{state.message}</span>
+                      )}
+                      {state.kind === "blocked" && (
+                        <span className="slotmsg">{state.message}</span>
+                      )}
+                    </div>
+                  )}
                   <small>{label}</small>
                   {selected && !image && state.kind === "idle" && (
                     <button
@@ -1188,6 +1220,15 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
               >
                 Stop
               </button>
+            ) : sheetComplete ? (
+              <button
+                type="button"
+                className="pill light sm"
+                onClick={() => setLightbox(0)}
+                tabIndex={open ? 0 : -1}
+              >
+                View sheet
+              </button>
             ) : (
               <button
                 type="button"
@@ -1196,7 +1237,7 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
                 disabled={cutting}
                 tabIndex={open ? 0 : -1}
               >
-                Generate full sheet
+                Make the missing poses
               </button>
             ))}
           {selected && selected.sheet.some((view) => view.imagePath) && (
@@ -1273,6 +1314,20 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
             onWorld={onWorld}
           />
         </div>
+      )}
+      {selected && lightbox !== null && lightViews.length > 0 && (
+        <SheetLightbox
+          name={selected.name}
+          views={lightViews}
+          index={lightbox}
+          onIndex={setLightbox}
+          onClose={() => setLightbox(null)}
+          onRedraw={(viewId) => {
+            void retryView(selected, viewId);
+          }}
+          redrawing={running || cutting}
+          tabIndex={open ? 0 : -1}
+        />
       )}
     </div>
   );

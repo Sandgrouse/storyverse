@@ -5,11 +5,15 @@ import {
   EXTRA_POSE_IDS,
   SHEET_VIEWS,
   SHEET_VIEW_IDS,
+  isSheetComplete,
   isSupportedSheetView,
+  missingSheetViews,
   orderedSheetViews,
   poseIdFor,
   poseLabelFor,
+  sheetLightboxKey,
   sheetViewLine,
+  wrapSheetIndex,
 } from "@/lib/art";
 
 describe("extra pose list", () => {
@@ -111,5 +115,61 @@ describe("sheet grid ordering", () => {
     const ordered = orderedSheetViews(sheet).map((entry) => entry.view);
     expect(ordered.slice(0, 6)).toEqual(SHEET_VIEW_IDS);
     expect(ordered[6]).toBe("running");
+  });
+});
+
+describe("sheet completeness", () => {
+  it("reports an empty sheet as partial with every view missing", () => {
+    expect(isSheetComplete([])).toBe(false);
+    expect(missingSheetViews([])).toEqual(SHEET_VIEW_IDS);
+  });
+
+  it("reports a partial sheet with only its missing views", () => {
+    const sheet = [
+      { view: "front", imagePath: "front.webp" },
+      { view: "left", imagePath: "left.webp" },
+    ];
+    expect(isSheetComplete(sheet)).toBe(false);
+    expect(missingSheetViews(sheet)).toEqual([
+      "right",
+      "back",
+      "walking",
+      "crouching",
+    ]);
+  });
+
+  it("reports a full sheet as complete", () => {
+    const sheet = SHEET_VIEW_IDS.map((view) => ({
+      view,
+      imagePath: `${view}.webp`,
+    }));
+    expect(isSheetComplete(sheet)).toBe(true);
+    expect(missingSheetViews(sheet)).toEqual([]);
+  });
+
+  it("ignores extra poses when deciding completeness", () => {
+    const sheet = [
+      ...SHEET_VIEW_IDS.map((view) => ({ view, imagePath: `${view}.webp` })),
+      { view: "dancing-joyfully", imagePath: "dancing.webp" },
+    ];
+    expect(isSheetComplete(sheet)).toBe(true);
+  });
+});
+
+describe("sheet lightbox navigation", () => {
+  it("wraps the pose index past either end", () => {
+    expect(wrapSheetIndex(0, 3)).toBe(0);
+    expect(wrapSheetIndex(3, 3)).toBe(0);
+    expect(wrapSheetIndex(-1, 3)).toBe(2);
+    expect(wrapSheetIndex(5, 3)).toBe(2);
+    expect(wrapSheetIndex(0, 0)).toBe(0);
+  });
+
+  it("maps Escape to close and arrows to movement", () => {
+    expect(sheetLightboxKey("Escape")).toBe("close");
+    expect(sheetLightboxKey("ArrowRight")).toBe("next");
+    expect(sheetLightboxKey("ArrowLeft")).toBe("prev");
+    expect(sheetLightboxKey("Enter")).toBe(null);
+    expect(sheetLightboxKey(" ")).toBe(null);
   });
 });
