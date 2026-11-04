@@ -4,7 +4,7 @@ import "@/app/video.css";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type { PlayerRef } from "@remotion/player";
 import { MissingStory, useProject } from "@/components/projects/ProjectContext";
 import { StoryShort, type StoryShortShot } from "@/components/video/StoryShort";
@@ -13,7 +13,11 @@ import {
   sceneReferences,
   styleImageFor,
 } from "@/lib/images";
-import { slugForTitle, stripImageData } from "@/lib/story";
+import {
+  channelColorByIndex,
+  slugForTitle,
+  stripImageData,
+} from "@/lib/story";
 import { ShortSchema, type Short, type ShortShot, type World } from "@/lib/world/schemas";
 import {
   EDIT_SHOT_MAX_SEC,
@@ -25,6 +29,7 @@ import {
   fitPlayer,
   isPortraitArt,
   moveShot,
+  scenesByChannel,
   shortForScene,
   shotStartFrames,
   totalFrames,
@@ -194,6 +199,7 @@ type SpeakState =
 
 function VideoPageInner() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { status, world, updateWorld } = useProject();
   const worldRef = useRef<World | null>(null);
@@ -268,6 +274,12 @@ function VideoPageInner() {
   const partId = beat.partId;
   const part = world.parts.find((p) => p.id === partId);
   const channel = world.channels.find((c) => c.id === channelId);
+
+  const go = (nextChannelId: string, nextPartId: string) => {
+    router.push(
+      `/projects/${params.id}/video?channel=${encodeURIComponent(nextChannelId)}&part=${encodeURIComponent(nextPartId)}`,
+    );
+  };
   const short = shortForScene(world, channelId, partId) ?? null;
   const shots = short?.shots ?? [];
   const selected = shots.find((shot) => shot.id === selectedId) ?? shots[0] ?? null;
@@ -640,20 +652,42 @@ function VideoPageInner() {
 
   return (
     <div className="video-page">
+      <aside className="video-side" aria-label="Scenes">
+        {scenesByChannel(world).map(({ channel: entry, beats: here }, i) => (
+          <div className="video-group" key={entry.id}>
+            <h4>
+              <i
+                className="video-dot"
+                style={{ background: channelColorByIndex(i) }}
+              />
+              {entry.name}
+            </h4>
+            {here.map((b) => (
+              <button
+                key={b.id}
+                className={`video-item${b.id === beat.id ? " on" : ""}`}
+                onClick={() => go(b.channelId, b.partId)}
+              >
+                {b.unitLabel} · {b.title}
+              </button>
+            ))}
+          </div>
+        ))}
+      </aside>
       <div className="video-stage">
         <div className="video-framewrap" ref={frameRef}>
-          <div
-            className={`video-player${tall ? " tall" : ""}`}
-            style={
-              fittedPlayer
-                ? {
-                    width: fittedPlayer.width,
-                    height: fittedPlayer.height,
-                  }
-                : undefined
-            }
-          >
-            {shots.length > 0 && short ? (
+          {shots.length > 0 && short ? (
+            <div
+              className={`video-player${tall ? " tall" : ""}`}
+              style={
+                fittedPlayer
+                  ? {
+                      width: fittedPlayer.width,
+                      height: fittedPlayer.height,
+                    }
+                  : undefined
+              }
+            >
               <ShortPlayer
                 key={`${short.id}::${short.aspect}`}
                 ref={playerRef}
@@ -662,8 +696,13 @@ function VideoPageInner() {
                 height={height}
                 durationInFrames={Math.max(1, frames)}
               />
-            ) : null}
-          </div>
+            </div>
+          ) : (
+            <div className="video-quiet">
+              <p>Your cut will play here.</p>
+              <p>Plan the shots, or add the project&apos;s art with +.</p>
+            </div>
+          )}
         </div>
         <div className="video-transport">
           <button
@@ -886,13 +925,15 @@ function VideoPageInner() {
           <span className="video-scene">
             {channel?.name} · {part?.title} · Drag to reorder.
           </span>
-          <button
-            className="pill light sm"
-            onClick={() => onPlanClick("timeline")}
-            disabled={plan.kind === "working"}
-          >
-            {plan.kind === "working" ? "Planning…" : "Plan shots with Muse"}
-          </button>
+          {shots.length > 0 ? (
+            <button
+              className="pill light sm"
+              onClick={() => onPlanClick("timeline")}
+              disabled={plan.kind === "working"}
+            >
+              {plan.kind === "working" ? "Planning…" : "Plan shots with Muse"}
+            </button>
+          ) : null}
         </div>
         {plan.kind === "confirm" ? (
           <div className="video-flag" style={{ marginBottom: 8 }}>

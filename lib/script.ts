@@ -14,6 +14,43 @@ import {
 export const DRAFT_INSTRUCTIONS =
   "You write one scene of a story told across several channels, in the form that channel asks for. Use only the canon and the secrets this channel may know, listed below. A secret that belongs to another channel must never appear or be hinted at. Use the world's real names and details exactly. Never rename anyone or change an established detail. Return only the scene.";
 
+export type ScriptForm = "script" | "design" | "copy";
+
+/**
+ * The form each channel kind asks for on the script page: screenplay
+ * scenes, a game design document, or page copy. Unknown kinds read as
+ * screenplay scenes.
+ */
+export function formForKind(kind: string): ScriptForm {
+  if (kind === "game") return "design";
+  if (kind === "website" || kind === "press") return "copy";
+  return "script";
+}
+
+export const DESIGN_HEADINGS = [
+  "Core idea",
+  "What the player wants",
+  "What the player does",
+  "Levels and places",
+  "Characters in play",
+  "How the story is told",
+  "What this game keeps secret",
+  "Notes for building it in Godot",
+] as const;
+
+export const DESIGN_DRAFT_INSTRUCTIONS =
+  "You write a game design document for one game about a story told across several channels. Write plain text under these headings, in this order: Core idea, What the player wants, What the player does, Levels and places, Characters in play, How the story is told, What this game keeps secret, Notes for building it in Godot. Use only the canon and the secrets this channel may know, listed below. A secret that belongs to another channel must never appear or be hinted at. Use the world's real names and details exactly. Never rename anyone or change an established detail. Do not use screenplay formatting, character cues or scene headings. Return only the document.";
+
+export const COPY_DRAFT_INSTRUCTIONS =
+  "You write page copy for one channel's page about a story told across several channels: a headline, an intro, sections with subheadings, and a call to action. Use only the canon and the secrets this channel may know, listed below. A secret that belongs to another channel must never appear or be hinted at. Use the world's real names and details exactly. Never rename anyone or change an established detail. Return only the copy.";
+
+/** System prompt for the channel's form, derived server-side. */
+export function draftInstructionsForForm(form: ScriptForm): string {
+  if (form === "design") return DESIGN_DRAFT_INSTRUCTIONS;
+  if (form === "copy") return COPY_DRAFT_INSTRUCTIONS;
+  return DRAFT_INSTRUCTIONS;
+}
+
 export const CHECK_INSTRUCTIONS =
   "You check one script draft against the canon. The canon lists every secret and the channels that may know it, so you can spot leaks: a line leaks when it reveals a secret to a channel that may not know it. Report each real problem as either a contradiction (the line is false against the canon) or a leak (the line reveals what this channel must not know). Quote the exact line you mean. For a contradiction, the problem must say plainly what is wrong and what the canon says, using the real names and details from the canon. For a leak, the problem says which channel the information belongs to, without repeating that secret's text. replacement is the exact script text that replaces the quote, written in the script's own form. Never describe an edit. Use an empty string only if the line should simply be removed. Never repeat a secret from another channel in problem or replacement: describe the problem and write the replacement without quoting or paraphrasing that secret's text.";
 
@@ -173,6 +210,7 @@ export function scriptDraftInput(
 ): string {
   const channel = channelOf(world, channelId);
   const part = partOf(world, partId);
+  const form = formForKind(channel?.kind ?? "series");
   const lines: string[] = [
     `Write ${scriptFormForKind(channel?.kind ?? "series")} for ${channel?.name ?? channelId}, ${channel?.title ?? ""}.`.replace(
       /, \.$/,
@@ -199,6 +237,19 @@ export function scriptDraftInput(
   for (const secret of secrets) lines.push(`- ${secret.text}. ${secret.note}`);
   if (!channelSecret && secrets.length === 0) {
     lines.push("- None yet: everything this channel shows is on the surface.");
+  }
+  if (form === "design") {
+    lines.push(
+      "",
+      "Write plain text under these headings, in this order:",
+      ...DESIGN_HEADINGS.map((heading) => `- ${heading}`),
+      "Do not use screenplay formatting, character cues or scene headings.",
+    );
+  } else if (form === "copy") {
+    lines.push(
+      "",
+      "Write page copy: a headline, an intro, sections with subheadings, and a call to action.",
+    );
   }
   if (options?.text) lines.push("", `Current draft:\n${options.text}`);
   if (options?.selection) {
@@ -320,18 +371,24 @@ export function initialScriptText(
   return pack?.script ?? "";
 }
 
-/** Add or replace one script in the world. Pure. */
+/**
+ * Add or replace one script in the world. Pure. The form is derived
+ * from the channel's kind unless the caller passes one explicitly.
+ */
 export function upsertScript(
   world: World,
   channelId: string,
   partId: string,
   text: string,
+  form?: ScriptForm,
 ): World {
+  const kind = world.channels.find((c) => c.id === channelId)?.kind ?? "series";
   const entry: ScriptEntry = {
     channelId,
     partId,
     text,
     updatedAt: Date.now(),
+    form: form ?? formForKind(kind),
   };
   const rest = world.scripts.filter(
     (script) => !(script.channelId === channelId && script.partId === partId),
@@ -357,6 +414,112 @@ export type HighlightSegment = {
   mark: boolean;
   strong: boolean;
 };
+
+export type MentionKind = "character" | "place";
+
+export type MentionCandidate = { name: string; kind: MentionKind };
+
+/** Everyone the @ menu can insert: characters, then places. Pure. */
+export function mentionCandidates(world: World): MentionCandidate[] {
+  const candidates: MentionCandidate[] = [
+    ...world.characters.map(
+      (c): MentionCandidate => ({ name: c.name, kind: "character" }),
+    ),
+    ...world.locations.map(
+      (l): MentionCandidate => ({ name: l.name, kind: "place" }),
+    ),
+  ];
+  return candidates.filter((c) => c.name.trim().length > 0);
+}
+
+/** Narrow the @ menu as the creator types, case-insensitively. Pure. */
+export function filterMentions(
+  candidates: MentionCandidate[],
+  query: string,
+): MentionCandidate[] {
+  const needle = query.trim().toLowerCase();
+  if (needle.length === 0) return candidates;
+  return candidates.filter((c) => c.name.toLowerCase().includes(needle));
+}
+
+/**
+ * The @ query before the caret, if the caret sits in one: the text
+ * after the nearest @ that starts the line or follows whitespace, with
+ * no line break between. Null when the caret is not in a mention.
+ * Pure, so the editor and tests share it.
+ */
+export function mentionQueryBeforeCaret(
+  text: string,
+  caret: number,
+): string | null {
+  const before = text.slice(0, Math.max(0, Math.min(caret, text.length)));
+  const at = before.lastIndexOf("@");
+  if (at === -1) return null;
+  if (at > 0 && !/\s/.test(before[at - 1] ?? "")) return null;
+  const token = before.slice(at + 1);
+  if (/[\n\r]/.test(token)) return null;
+  return token;
+}
+
+/** How a picked name lands in the draft. Pure. */
+export function formatMentionName(
+  candidate: MentionCandidate,
+  form: ScriptForm,
+): string {
+  if (form === "script" && candidate.kind === "character") {
+    return candidate.name.toUpperCase();
+  }
+  return candidate.name;
+}
+
+/**
+ * Swap the @ query before the caret for the picked name. Pure.
+ * Returns the caret just after the inserted name.
+ */
+export function insertMentionAtCaret(
+  text: string,
+  caret: number,
+  name: string,
+): { text: string; caret: number } {
+  const safe = Math.max(0, Math.min(caret, text.length));
+  const before = text.slice(0, safe);
+  const at = before.lastIndexOf("@");
+  if (at === -1) return { text, caret: safe };
+  const next = before.slice(0, at) + name + text.slice(safe);
+  return { text: next, caret: at + name.length };
+}
+
+export type InsertKind = "scene" | "character" | "action" | "dialogue";
+
+/**
+ * One correctly formatted screenplay line to drop at the caret.
+ * Scene headings open the place and time, character cues read
+ * uppercase, dialogue sits indented. Pure.
+ */
+export function insertSnippet(kind: InsertKind): string {
+  if (kind === "scene") return "INT. LOCATION - DAY\n\n";
+  if (kind === "character") return "CHARACTER\n";
+  if (kind === "dialogue") return "\tDialogue.\n";
+  return "Action.\n";
+}
+
+/**
+ * Drop a snippet at the caret, replacing any selection. Starts the
+ * snippet on its own line so it never lands mid-sentence. Pure.
+ * Returns the caret just after the inserted snippet.
+ */
+export function applyInsertAtCaret(
+  text: string,
+  start: number,
+  end: number,
+  snippet: string,
+): { text: string; caret: number } {
+  const from = Math.max(0, Math.min(start, text.length));
+  const to = Math.max(from, Math.min(end, text.length));
+  const prefix = from > 0 && text[from - 1] !== "\n" ? "\n" : "";
+  const next = text.slice(0, from) + prefix + snippet + text.slice(to);
+  return { text: next, caret: from + prefix.length + snippet.length };
+}
 
 /**
  * Split draft text into plain, name and issue-quote segments. Issue
