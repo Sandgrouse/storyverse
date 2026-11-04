@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storyverse script and video prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#efe8db; --sheet:#fbf8f1; --ink:#1f1b16; --soft:#6f675a; --rule:rgba(31,27,22,.13); --clay:#c64f26; --clay-soft:rgba(198,79,38,.13); --leaf:#3d7a58; --series:#a9771f; --game:#2c7f93; --shorts:#a8476a; --serif:"Newsreader",Georgia,serif; --sans:"Instrument Sans",system-ui,sans-serif; --lift:0 24px 50px -18px rgba(50,35,15,.45),0 4px 12px rgba(50,35,15,.12); --ease:cubic-bezier(.2,.75,.12,1); }
+* { box-sizing:border-box; }
+html,body { height:100%; }
+body { margin:0; background:var(--paper); color:var(--ink); font:14.5px/1.5 var(--sans); overflow:hidden; }
+button,input,textarea,select { font:inherit; color:inherit; }
+button { background:none; border:0; cursor:pointer; }
+:focus-visible { outline:2px solid var(--clay); outline-offset:3px; }
+h1,h2,h3,p { margin:0; font-weight:400; }
+.bar { height:64px; padding:0 28px; display:flex; align-items:center; justify-content:space-between; gap:20px; background:rgba(239,232,219,.86); border-bottom:1px solid var(--rule); }
+.left { display:flex; align-items:center; gap:18px; }
+.logo { font:400 20px var(--serif); }
+.quiet { color:var(--soft); padding:4px 2px; transition:color .2s; } .quiet:hover { color:var(--ink); }
+.title { font:400 18px var(--serif); }
+.tabs { display:flex; padding:3px; border-radius:99px; background:var(--ink); }
+.tabs button { padding:6px 14px; border-radius:99px; color:var(--sheet); font-size:13px; transition:background .2s; }
+.tabs button.on { background:var(--sheet); color:var(--ink); }
+.pill { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:42px; padding:0 20px; border-radius:99px; background:var(--ink); color:var(--sheet); font-weight:500; white-space:nowrap; transition:transform .25s var(--ease),background .25s; }
+.pill:hover { transform:translateY(-2px); background:#000; }
+.pill:active { transform:scale(.97); }
+.pill.light { background:var(--sheet); color:var(--ink); box-shadow:0 1px 0 var(--rule),0 6px 18px -8px rgba(50,35,15,.3); }
+.pill.light:hover { background:#fff; }
+.pill.sm { height:34px; padding:0 14px; font-size:13px; }
+.kicker { color:var(--clay); font-size:12px; margin-bottom:6px; }
+.sub { color:var(--soft); font-size:13px; }
+.view { display:none; height:calc(100vh - 64px); } .view.on { display:grid; }
+
+/* Script */
+#script { grid-template-columns:250px 1fr 300px; }
+.side { padding:22px 18px; overflow:auto; }
+.group { margin-bottom:18px; }
+.group h4 { margin:0 0 6px; font:500 12px var(--sans); display:flex; align-items:center; gap:7px; }
+.dot { width:8px; height:8px; border-radius:50%; }
+.item { display:block; width:100%; text-align:left; padding:7px 10px; border-radius:8px; transition:background .2s,transform .25s var(--ease); }
+.item:hover { background:rgba(251,248,241,.8); transform:translateX(2px); }
+.item.on { background:var(--sheet); box-shadow:0 1px 0 var(--rule); }
+.desk { overflow:auto; padding:26px 20px 60px; }
+.page { max-width:660px; min-height:92%; margin:0 auto; padding:52px 62px; background:var(--sheet); border-radius:6px; box-shadow:var(--lift); font:400 15px/1.65 "Courier New",monospace; outline:0; }
+.page .h { font-weight:700; margin-bottom:18px; }
+.page p { margin:0 0 16px; }
+.who { margin:18px 0 0 30%; } .say { margin:0 14% 0 16%; }
+mark { background:var(--clay-soft); color:inherit; border-bottom:1.5px solid var(--clay); padding:0 1px; cursor:help; }
+mark.bad { background:rgba(198,79,38,.28); }
+.tools { padding:22px 20px; overflow:auto; border-left:1px solid var(--rule); }
+.tool { margin-bottom:22px; }
+.tool h3 { font:400 21px/1.15 var(--serif); margin-bottom:6px; }
+.face { display:flex; gap:9px; align-items:center; padding:6px 0; }
+.face i { width:34px; height:34px; border-radius:50%; background-size:cover; background-position:50% 12%; flex:none; }
+.play { width:26px; height:26px; flex:none; margin-left:auto; border-radius:50%; background:var(--ink); color:var(--sheet); font-size:9px; transition:transform .2s var(--ease); }
+.play:hover { transform:scale(1.12); }
+.flag { padding:12px; border-radius:10px; background:var(--clay-soft); margin-top:8px; }
+.flag b { font-weight:500; }
+.row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+
+/* Video */
+#video { grid-template-rows:1fr 186px; grid-template-columns:1fr 320px; }
+.stage { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:18px 20px 8px; min-height:0; }
+.player { position:relative; height:100%; max-height:100%; aspect-ratio:16/9; max-width:100%; border-radius:10px; overflow:hidden; background:#111; box-shadow:var(--lift); }
+.player.tall { aspect-ratio:9/16; }
+.frame { position:absolute; inset:-4%; background-size:cover; background-position:center; opacity:0; transition:opacity .7s; }
+.frame.on { opacity:1; animation:drift 6s linear both; }
+@keyframes drift { from { transform:scale(1); } to { transform:scale(1.09) translateX(-1.2%); } }
+.cap { position:absolute; left:0; right:0; bottom:0; padding:44px 26px 20px; text-align:center; color:#fff; font:400 clamp(16px,1.7vw,23px)/1.25 var(--serif); background:linear-gradient(transparent,rgba(0,0,0,.76)); }
+.transport { display:flex; align-items:center; gap:14px; margin-top:10px; color:var(--soft); font-size:13px; }
+.transport button.big { width:40px; height:40px; border-radius:50%; background:var(--ink); color:var(--sheet); transition:transform .2s var(--ease); }
+.transport button.big:hover { transform:scale(1.08); }
+.props { grid-row:1 / 3; grid-column:2; border-left:1px solid var(--rule); padding:22px 20px; overflow:auto; }
+.props label { display:block; margin:14px 0 5px; font-size:12.5px; color:var(--soft); }
+.props select,.props textarea { width:100%; padding:9px 11px; border:1px solid var(--rule); border-radius:10px; background:#fff; }
+.props textarea { font:400 16px/1.3 var(--serif); resize:vertical; }
+.seg { display:flex; padding:3px; border-radius:99px; background:rgba(31,27,22,.08); width:max-content; }
+.seg button { padding:5px 13px; border-radius:99px; font-size:13px; }
+.seg button.on { background:var(--sheet); box-shadow:0 1px 2px rgba(0,0,0,.14); }
+.timeline { padding:6px 20px 16px; min-width:0; overflow-x:auto; }
+.tl-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.track { display:flex; gap:7px; width:max-content; position:relative; padding-bottom:4px; }
+.shot { position:relative; height:84px; border-radius:8px; background-size:cover; background-position:center; box-shadow:0 8px 16px -10px rgba(50,35,15,.6); transition:transform .3s var(--ease),box-shadow .3s; flex:none; cursor:grab; text-align:left; }
+.shot:hover { transform:translateY(-5px) rotate(-.6deg); box-shadow:0 18px 26px -14px rgba(50,35,15,.7); }
+.shot.on { outline:2.5px solid var(--clay); outline-offset:2px; }
+.shot span { position:absolute; right:6px; bottom:5px; padding:0 6px; border-radius:99px; background:rgba(0,0,0,.65); color:#fff; font-size:11px; }
+.audio { display:flex; gap:7px; margin-top:6px; }
+.wave { height:20px; flex:none; border-radius:5px; background:repeating-linear-gradient(90deg,rgba(168,71,106,.6) 0 2px,transparent 2px 5px); opacity:.85; }
+.wave.none { background:none; }
+.add { width:84px; height:84px; flex:none; border:1.5px dashed var(--rule); border-radius:8px; font:300 26px var(--serif); color:var(--soft); }
+.note { position:fixed; left:16px; bottom:12px; font-size:11.5px; color:var(--soft); }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="left"><button class="quiet">Back</button><span class="logo">Storyverse</span><span class="quiet">Your projects</span><span class="title">Anukili Ugama</span></div>
+  <nav class="tabs"><button>Story</button><button>Characters</button><button class="on" data-v="script">Script</button><button data-v="video">Video</button><button>Agent package</button></nav>
+</header>
+
+<section class="view on" id="script">
+  <aside class="side">
+    <div class="group"><h4><i class="dot" style="background:var(--series)"></i>Series</h4>
+      <button class="item">Episode 1 · The Omen</button><button class="item">Episode 2 · The Weight</button><button class="item on">Episode 3 · The Stream</button><button class="item">Episode 4 · The Pots</button><button class="item">Episode 5 · The Fire</button></div>
+    <div class="group"><h4><i class="dot" style="background:var(--game)"></i>Game</h4><button class="item">The hunt at the stream</button></div>
+    <div class="group"><h4><i class="dot" style="background:var(--shorts)"></i>Shorts</h4><button class="item">The women of Eziagulu 1</button><button class="item">The women of Eziagulu 2</button></div>
+  </aside>
+  <main class="desk"><div class="page" contenteditable="true" spellcheck="false">
+    <div class="h">THE STREAM · EPISODE 3<br>EXT. THE STREAM, AGULERI. DAY</div>
+    <p>Nobody goes down to the water now. A <mark>hippopotamus</mark> has been attacking people at the stream. They come to <mark>Anukili</mark>.</p>
+    <div class="who">ANUKILI</div><div class="say">Are you sure it's a hippopotamus?</div>
+    <div class="who">A WOMAN</div><div class="say">We have seen it.</div>
+    <div class="who">ANUKILI</div><div class="say">That tiny thing. Show me where it waits.</div>
+    <p style="margin-top:18px"><mark>Enyinyi</mark> watches from the bank, herbs in his hand. <mark>Anukili</mark> walks into the water alone.</p>
+  </div></main>
+  <aside class="tools">
+    <div class="tool"><div class="kicker">Muse</div><h3>Write with your story</h3><p class="sub">Muse knows your canon, and what this channel is allowed to know.</p>
+      <div class="row"><button class="pill sm">Draft this scene</button><button class="pill light sm">Rewrite selection</button></div></div>
+    <div class="tool"><h3>Check against canon</h3><button class="pill light sm">Check this script</button>
+      <div class="flag"><b>One thing to look at.</b> The series doesn't reveal what the stream hides. This line comes close. Only the game may show it.<div class="row"><button class="pill light sm">Show fix</button><button class="quiet">Keep it</button></div></div></div>
+    <div class="tool"><h3>In this scene</h3>
+      <div class="face"><i style="background-image:url(anukili/anukili.webp)"></i><span>Anukili Ugama</span><button class="play" aria-label="Hear this character">▶</button></div>
+      <div class="face"><i style="background-image:url(anukili/enyinyi.webp)"></i><span>Enyinyi</span><button class="play" aria-label="Hear this character">▶</button></div></div>
+    <button class="pill" style="width:100%" id="tovideo">Turn this into a short</button>
+  </aside>
+</section>
+
+<section class="view" id="video">
+  <div class="stage">
+    <div style="flex:1;min-height:0;display:flex;justify-content:center;width:100%"><div class="player" id="player"><div class="cap" id="cap"></div></div></div>
+    <div class="transport"><button class="big" id="pp" aria-label="Play or pause">❚❚</button><span id="time">0:00 / 0:23</span></div>
+  </div>
+  <aside class="props">
+    <div class="kicker">Shot 2 of 5</div><h3 style="font:400 24px var(--serif)">The stream</h3>
+    <label>Caption</label><textarea rows="3">He tells them to show him where it waits.</textarea>
+    <label>Voice line</label><select><option>Anukili Ugama: "That tiny thing."</option><option>No voice</option></select>
+    <label>Length</label><input type="range" min="2" max="12" value="5" style="width:100%;accent-color:var(--clay)">
+    <label>Motion</label><div class="seg"><button class="on">Slow push</button><button>Pan</button><button>Still</button></div>
+    <div class="row" style="margin-top:18px"><button class="pill light sm">Redraw this shot</button><button class="quiet">Remove</button></div>
+    <div style="height:1px;background:var(--rule);margin:22px 0"></div>
+    <label style="margin-top:0">Shape</label><div class="seg" id="shape"><button class="on">Wide 16:9</button><button>Tall 9:16</button></div>
+    <div class="row" style="margin-top:18px"><button class="pill" style="width:100%">Export video</button></div>
+  </aside>
+  <div class="timeline">
+    <div class="tl-head"><span class="sub">Drag to reorder.</span><button class="pill light sm">Plan shots with Muse</button></div>
+    <div class="track" id="track"></div>
+    <div class="audio" id="audio"></div>
+  </div>
+</section>
+
+<script>
+const SHOTS=[["roots",4,"A boy is born in Aguleri legs first, clutching roots and herbs.",0],["hippo",5,"He tells them to show him where it waits.",1],["pots",5,"No quantity of water satisfies him.",0],["omabala",5,"One night they run across the Omabala to escape him.",1],["storm",4,"So Anukili could die after all?",1]];
+const track=document.getElementById("track"),audio=document.getElementById("audio"),player=document.getElementById("player"),cap=document.getElementById("cap");
+SHOTS.forEach(([n,d,c,v],i)=>{const f=document.createElement("div");f.className="frame";f.style.backgroundImage=`url(anukili/${n}.webp)`;player.insertBefore(f,cap);
+ const s=document.createElement("button");s.className="shot"+(i==1?" on":"");s.style.width=d*30+"px";s.style.backgroundImage=`url(anukili/${n}.webp)`;s.innerHTML=`<span>${d}s</span>`;s.onclick=()=>{cur=i;t=SHOTS.slice(0,i).reduce((a,x)=>a+x[1],0);show();};track.append(s);
+ const w=document.createElement("div");w.className="wave"+(v?"":" none");w.style.width=d*30+"px";audio.append(w);});
+const add=document.createElement("button");add.className="add";add.textContent="+";track.append(add);
+const frames=[...player.querySelectorAll(".frame")],shots=[...track.querySelectorAll(".shot")];let cur=0,t=0,on=true;const total=SHOTS.reduce((a,x)=>a+x[1],0);
+function show(){frames.forEach((f,i)=>{if(i===cur&&!f.classList.contains("on")){f.classList.add("on")}else if(i!==cur)f.classList.remove("on")});cap.textContent=SHOTS[cur][2];shots.forEach((s,i)=>s.classList.toggle("on",i===cur));}
+show();setInterval(()=>{if(!on)return;t=(t+.1)%total;let a=0,i=0;for(;i<SHOTS.length;i++){a+=SHOTS[i][1];if(t<a)break}if(i!==cur){cur=i;show()}const f=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;document.getElementById("time").textContent=`${f(t)} / ${f(total)}`},100);
+const pp=document.getElementById("pp");pp.onclick=()=>{on=!on;pp.textContent=on?"❚❚":"▶"};
+function go(v){document.querySelectorAll(".view").forEach(x=>x.classList.toggle("on",x.id===v));document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));}
+document.querySelectorAll(".tabs button[data-v]").forEach(b=>b.onclick=()=>go(b.dataset.v));
+document.getElementById("tovideo").onclick=()=>go("video");
+document.querySelectorAll(".seg").forEach(s=>s.querySelectorAll("button").forEach(b=>b.onclick=()=>{s.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));if(s.id==="shape")player.classList.toggle("tall",b.textContent.includes("9:16"))}));
+</script>
+</body>
+</html>

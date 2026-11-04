@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storyverse voice prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#efe8db; --sheet:#fbf8f1; --ink:#1f1b16; --soft:#6f675a; --rule:rgba(31,27,22,.13); --clay:#c64f26; --leaf:#3d7a58; --serif:"Newsreader",Georgia,serif; --sans:"Instrument Sans",system-ui,sans-serif; --lift:0 24px 50px -18px rgba(50,35,15,.45),0 4px 12px rgba(50,35,15,.12); --ease:cubic-bezier(.2,.75,.12,1); }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 var(--sans); }
+button,input,textarea,select { font:inherit; color:inherit; }
+button { background:none; border:0; cursor:pointer; }
+:focus-visible { outline:2px solid var(--clay); outline-offset:3px; }
+h1,h2,h3,p { margin:0; font-weight:400; }
+.switch { position:fixed; right:16px; bottom:16px; z-index:9; display:flex; gap:4px; padding:4px; border-radius:99px; background:var(--ink); color:var(--sheet); font-size:12.5px; }
+.switch button { padding:6px 12px; border-radius:99px; color:inherit; }
+.switch button.on { background:var(--sheet); color:var(--ink); }
+.pill { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:44px; padding:0 22px; border-radius:99px; background:var(--ink); color:var(--sheet); font-weight:500; white-space:nowrap; transition:transform .25s var(--ease),background .25s; }
+.pill:hover { transform:translateY(-2px); background:#000; }
+.pill:active { transform:scale(.97); }
+.pill.light { background:var(--sheet); color:var(--ink); box-shadow:0 1px 0 var(--rule),0 6px 18px -8px rgba(50,35,15,.3); }
+.pill.light:hover { background:#fff; }
+.pill[disabled] { opacity:.3; pointer-events:none; }
+.pill.rec { background:var(--clay); }
+.quiet { color:var(--soft); padding:4px 2px; } .quiet:hover { color:var(--ink); }
+.kicker { color:var(--clay); font-size:12.5px; margin-bottom:6px; }
+.view { display:none; } .view.on { display:block; }
+
+.drawer { max-width:900px; margin:0 auto; padding:40px 24px 90px; }
+.drawer > h1 { font:300 40px/1.05 var(--serif); margin-bottom:24px; }
+.panel { background:var(--sheet); border-radius:14px; padding:26px; box-shadow:var(--lift); margin-bottom:22px; }
+.row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.between { justify-content:space-between; }
+.voicecard { display:flex; gap:14px; align-items:flex-start; margin-bottom:16px; }
+.voicecard h3 { font:400 24px/1.15 var(--serif); }
+.sub { color:var(--soft); font-size:13.5px; }
+select,textarea,input[type=text] { width:100%; padding:10px 12px; border:1px solid var(--rule); border-radius:10px; background:#fff; }
+textarea { font:400 18px/1.35 var(--serif); resize:vertical; }
+.tag { padding:1px 9px; border-radius:99px; background:rgba(61,122,88,.14); color:var(--leaf); font-size:11.5px; }
+.lines { list-style:none; margin:14px 0 0; padding:0; }
+.lines li { display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid var(--rule); }
+.play { width:32px; height:32px; flex:none; border-radius:50%; background:var(--ink); color:var(--sheet); font-size:11px; transition:transform .2s var(--ease); }
+.play:hover { transform:scale(1.1); }
+.lines span { flex:1; font:400 17px/1.3 var(--serif); }
+
+.tabs { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:14px 0 20px; }
+.tab { text-align:left; padding:16px; border:1px solid var(--rule); border-radius:12px; transition:transform .25s var(--ease),box-shadow .25s,background .25s; }
+.tab:hover { transform:translateY(-3px); box-shadow:0 12px 24px -14px rgba(50,35,15,.4); }
+.tab.on { background:#fff; border-color:var(--ink); }
+.tab b { display:block; font:400 20px var(--serif); }
+.tab small { color:var(--soft); }
+.pane { display:none; } .pane.on { display:block; }
+
+.line { padding:26px; border-radius:12px; background:var(--paper); text-align:center; }
+.line q { display:block; font:300 27px/1.25 var(--serif); quotes:none; margin:8px 0 18px; }
+.meter { display:flex; align-items:center; justify-content:center; gap:3px; height:30px; margin-bottom:14px; }
+.meter i { width:4px; height:5px; border-radius:2px; background:var(--soft); opacity:.4; }
+.recording .meter i { background:var(--clay); opacity:1; animation:lv .7s ease-in-out infinite alternate; }
+.meter i:nth-child(2n) { animation-delay:.12s !important; } .meter i:nth-child(3n) { animation-delay:.27s !important; } .meter i:nth-child(5n) { animation-delay:.4s !important; }
+@keyframes lv { to { height:28px; } }
+.prog { display:flex; justify-content:space-between; color:var(--soft); font-size:13px; margin:12px 2px 0; }
+.drop { padding:36px; border:1.5px dashed var(--rule); border-radius:12px; text-align:center; }
+.drop b { font:400 22px var(--serif); display:block; }
+.consent { display:flex; gap:10px; align-items:flex-start; margin:18px 0; color:#4b4439; }
+.consent input { margin-top:4px; accent-color:var(--clay); }
+.link { display:flex; gap:8px; align-items:center; padding:8px 8px 8px 14px; border-radius:99px; background:var(--paper); margin-top:14px; font-size:13.5px; }
+.link span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.who { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.chip { padding:6px 14px; border-radius:99px; border:1px solid var(--rule); }
+.chip.on { background:var(--ink); color:var(--sheet); border-color:var(--ink); }
+.take { display:flex; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--rule); }
+.take span { flex:1; }
+
+.artist { max-width:640px; margin:0 auto; padding:44px 16px 90px; }
+.artist h1 { font:300 clamp(38px,8vw,56px)/1.04 var(--serif); margin:6px 0 10px; }
+.artist .note { font:300 19px/1.4 var(--serif); margin-bottom:26px; }
+.brief { font:300 18px/1.4 var(--serif); margin:4px 0 14px; color:#4b4439; }
+.logo { font:400 20px var(--serif); margin-bottom:28px; }
+.ok { display:none; text-align:center; padding:60px 0; }
+.ok h2 { font:300 40px/1.05 var(--serif); margin-bottom:8px; }
+@media (max-width:640px) { .tabs { grid-template-columns:1fr; } .line q { font-size:22px; } .panel { padding:18px; } }
+</style>
+</head>
+<body>
+<div class="switch"><button class="on" data-v="owner">In Characters</button><button data-v="art">Voice artist's page</button></div>
+
+<section class="view on" id="owner"><div class="drawer">
+  <div class="kicker">Anukili Ugama</div>
+  <h1>Voice</h1>
+
+  <div class="panel">
+    <div class="voicecard"><div style="flex:1"><h3>Marcus <span class="tag">Muse's pick</span></h3><div class="sub">Deep and weathered, for a giant who has never been told no.</div></div><button class="quiet">Hear this voice</button></div>
+    <select aria-label="Voice"><option>Marcus, ready-made</option><option>Change voice…</option></select>
+    <div style="height:14px"></div>
+    <textarea rows="2" aria-label="Line">Are you sure it's a hippopotamus? That tiny thing?</textarea>
+    <div class="row between" style="margin-top:10px"><span class="sub">50 / 300</span><button class="pill">Speak this line</button></div>
+    <ul class="lines"><li><button class="play" aria-label="Play">▶</button><span>Show me where it waits.</span><button class="quiet">Remove</button></li></ul>
+    <div class="sub" style="margin-top:12px">Voices by ElevenLabs.</div>
+  </div>
+
+  <div class="panel">
+    <h3 style="font:400 26px var(--serif)">Make a custom voice</h3>
+    <div class="tabs">
+      <button class="tab on" data-p="rec"><b>Record</b><small>Read the lines yourself</small></button>
+      <button class="tab" data-p="up"><b>Upload</b><small>Use a sample you have</small></button>
+      <button class="tab" data-p="ask"><b>Ask a voice artist</b><small>Send a link to record</small></button>
+    </div>
+
+    <div class="pane on" id="rec">
+      <div class="line" id="linebox"><div class="sub">Line 3 of 10</div><q>That tiny thing. Show me where it waits.</q><div class="meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="row" style="justify-content:center"><button class="pill rec" id="recbtn">Record</button><button class="pill light">Play back</button><button class="quiet">Retake</button><button class="quiet">Next line</button></div></div>
+      <div class="prog"><span>0:24 recorded</span><span>One to two minutes works best.</span></div>
+      <label class="consent"><input type="checkbox" class="c"><span>I have the right and the speaker's consent to create an AI voice from this audio.</span></label>
+      <button class="pill go" disabled>Create this voice</button>
+    </div>
+
+    <div class="pane" id="up">
+      <div class="drop"><b>Drop a voice sample here</b><span class="sub">MP3, WAV or M4A. One to two minutes of one clear voice works best.</span></div>
+      <label class="consent"><input type="checkbox" class="c"><span>I have the right and the speaker's consent to create an AI voice from this audio.</span></label>
+      <button class="pill go" disabled>Create this voice</button>
+    </div>
+
+    <div class="pane" id="ask">
+      <div class="sub" style="margin-bottom:8px">Who should they voice?</div>
+      <div class="who"><button class="chip on">Anukili Ugama</button><button class="chip on">Enyinyi</button><button class="chip">Anukili's father</button></div>
+      <div class="sub" style="margin-bottom:6px">Note for the artist</div>
+      <textarea rows="2" style="font:400 15px var(--sans)">Thanks for doing this. Take your time, and read each line as the character would.</textarea>
+      <div class="row between" style="margin-top:14px"><span class="sub">10 lines each, picked from the story. Secrets are never included.</span><button class="quiet">Edit lines</button></div>
+      <div class="row" style="margin-top:14px"><button class="pill" id="mk">Create link</button><button class="pill light">Check for recordings</button></div>
+      <div class="link" id="lnk" style="display:none"><span>storyverse.app/voice/7fKq2xVb…</span><button class="pill light" style="height:34px;padding:0 16px">Copy</button></div>
+      <div style="margin-top:20px"><div class="sub">Recordings from Chidi. Consent given Nov 4, 2:14 PM.</div>
+        <div class="take"><button class="play">▶</button><span>Anukili Ugama, 10 takes, 1:42</span><label class="sub"><input type="checkbox" checked> Use</label></div>
+        <div class="take"><button class="play">▶</button><span>Enyinyi, 10 takes, 1:31</span><label class="sub"><input type="checkbox" checked> Use</label></div>
+        <button class="pill" style="margin-top:12px">Create these voices</button></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="view" id="art"><div class="artist">
+  <div class="logo">Storyverse</div>
+  <div id="form">
+    <div class="kicker">A voice request</div>
+    <h1>Anukili Ugama</h1>
+    <p class="note">Thanks for doing this. Take your time, and read each line as the character would.</p>
+    <div class="panel">
+      <h3 style="font:400 28px var(--serif)">Anukili Ugama</h3>
+      <p class="brief">A giant of a man, loud and sure of himself. He has never been told no.</p>
+      <div class="line"><div class="sub">Line 3 of 10</div><q>That tiny thing. Show me where it waits.</q><div class="meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="row" style="justify-content:center"><button class="pill rec">Record</button><button class="pill light">Play back</button><button class="quiet">Retake</button><button class="quiet">Next line</button></div></div>
+      <div class="prog"><span>0:24 recorded</span><button class="quiet" style="padding:0">Upload a recording instead</button></div>
+    </div>
+    <div class="panel">
+      <h3 style="font:400 28px var(--serif)">Enyinyi</h3>
+      <p class="brief">His confidant and medicine man. Quiet, and always close by.</p>
+      <button class="pill light">Start recording</button>
+    </div>
+    <div class="panel">
+      <input type="text" placeholder="Your name" aria-label="Your name">
+      <label class="consent"><input type="checkbox" class="c"><span>I'm the person speaking, and I agree that the owner of Anukili Ugama may create an AI voice from these recordings for the characters listed here.</span></label>
+      <button class="pill go" disabled id="send">Send recordings</button>
+    </div>
+  </div>
+  <div class="ok" id="ok"><h2>Thanks, your recordings were sent.</h2><p class="sub">You can close this page.</p></div>
+</div></section>
+
+<script>
+document.querySelectorAll(".switch button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".switch button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === b.dataset.v));
+  scrollTo(0,0);
+});
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.id === t.dataset.p));
+});
+document.querySelectorAll(".consent .c").forEach(c => c.onchange = () => { c.closest(".pane,.panel").querySelector(".go").disabled = !c.checked; });
+document.querySelectorAll(".pill.rec").forEach(b => b.onclick = () => { const box = b.closest(".line"); const on = box.classList.toggle("recording"); b.textContent = on ? "Stop" : "Record"; });
+document.getElementById("mk").onclick = () => document.getElementById("lnk").style.display = "flex";
+document.querySelectorAll(".chip").forEach(c => c.onclick = () => c.classList.toggle("on"));
+document.getElementById("send").onclick = () => { document.getElementById("form").style.display = "none"; document.getElementById("ok").style.display = "block"; };
+</script>
+</body>
+</html>
