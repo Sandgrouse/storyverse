@@ -36,7 +36,8 @@ h1, h2, p { margin: 0; font-weight: 400; }
 .card { position: absolute; left: 0; top: 0; border-radius: 10px; background-size: cover; background-position: center; box-shadow: var(--lift); will-change: transform, opacity; transform-origin: center; }
 .card::after { content: attr(data-flag); position: absolute; left: 10px; top: 10px; padding: 3px 9px; border-radius: 99px; background: var(--clay); color: #fff; font: 500 11px var(--sans); opacity: 0; transition: opacity .3s; }
 .card.hit { outline: 3px solid var(--clay); outline-offset: 3px; }
-.card.hit::after { opacity: 1; }
+.card.hit::after, .card.shot::after { opacity: 1; }
+.card.shot::after { background: var(--ink); }
 
 .copy { position: absolute; top: 50%; width: min(29vw, 440px); z-index: 20; will-change: opacity, transform; }
 .copy.r { left: 62vw; } .copy.l { left: 5vw; }
@@ -136,22 +137,22 @@ h1, h2, p { margin: 0; font-weight: 400; }
     <small>Highlighted names come from your story's characters.</small>
   </div>
 
-  <div class="x secret" data-ch="4" data-at="7" style="background:var(--series)"><b>Only the series knows</b>Why the baby lived</div>
-  <div class="x secret" data-ch="4" data-at="2" style="background:var(--game)"><b>Only the game knows</b>What the stream hides</div>
-  <div class="x secret" data-ch="4" data-at="3" style="background:var(--shorts)"><b>Only the shorts know</b>Who first spoke the vow</div>
+  <div class="x secret" data-ch="5" data-at="2" style="background:var(--series)"><b>Only the series knows</b>Why the baby lived</div>
+  <div class="x secret" data-ch="5" data-at="4" style="background:var(--game)"><b>Only the game knows</b>What the stream hides</div>
+  <div class="x secret" data-ch="5" data-at="3" style="background:var(--shorts)"><b>Only the shorts know</b>Who first spoke the vow</div>
 
-  <div class="x" id="line" data-ch="5">Enyinyi told them how to kill him.</div>
+  <div class="x" id="line" data-ch="9">Enyinyi told them how to kill him.</div>
 
-  <div class="x" id="cap" data-ch="7">One night they run across the Omabala to escape him.</div>
-  <div class="x" id="head" data-ch="7"></div>
+  <div class="x" id="cap" data-ch="6">One night they run across the Omabala to escape him.</div>
+  <div class="x" id="head" data-ch="6"></div>
 
-  <div class="x sheet" id="tree" data-ch="8">
+  <div class="x sheet" id="tree" data-ch="7">
     <b>the-hunt-at-the-stream/</b>
     <div class="in">AGENT_BRIEF.md<br>canon.json<br>characters/<br>scenes/<br>secrets.json</div>
     <div class="sec">secrets.json holds one secret: <b>what the stream hides</b>. The other channels' secrets aren't in the package at all.</div>
   </div>
 
-  <div class="x" id="browser" data-ch="9">
+  <div class="x" id="browser" data-ch="8">
     <div class="chrome"><i></i><i></i><i></i><span>your-story.storyverse</span></div>
     <div class="art"></div>
     <div class="txt">Anukili Ugama<small>The series, the game and the shorts, all in one place.</small></div>
@@ -172,12 +173,13 @@ const CH = [
   { label: "Your world", side: "r", tint: "#e9e0ce", h: "Everything starts with your world", p: "Your world, characters, plot and goal live in one master story. Everything else draws from it.", img: "roots" },
   { label: "Characters", side: "r", tint: "#e5dccf", h: "Assemble your cast once", p: "Create full character sheets and game-ready cutouts, and keep each character the same everywhere.", img: "anukili" },
   { label: "Story", side: "r", tint: "#dbe4e0", h: "Write the story inside it", p: "Your script knows your characters and your canon, so it stays true to both.", img: "hippo" },
-  { label: "Parts", side: "l", tint: "#ecd9c9", h: "Break it across screens", p: "Split your story into a series, a game and shorts. Each holds a secret the others don't, so fans follow them all.", img: "storm" },
-  { label: "Change", side: "l", tint: "#e8d6c6", h: "Change it once. See what follows.", p: "Change one fact and find every scene it breaks. Approve each fix, and the story updates.", img: "pots", low: true },
-  { label: "One base", side: "r", tint: "#e2e0d2", h: "One base for every agent", p: "Every agent, image and video draws from the same characters and canon, so nothing drifts.", img: "enyinyi" },
+  { label: "Storyboard", side: "l", tint: "#e4ded1", h: "See it before you make it", p: "Turn any scene of your script into a storyboard, shot by shot, with sketches you can change.", img: "fire" },
+  { label: "Publish", side: "l", tint: "#ecd9c9", h: "Publish it wherever it belongs", p: "A series, a game, shorts or a full-length film. Each can hold a secret the others don't, so fans follow them all.", img: "storm" },
   { label: "Video", side: "r", tint: "#d9dfe4", h: "Turn scenes into shorts", p: "Muse turns your scenes into short videos you can edit and publish.", img: "omabala" },
   { label: "Game", side: "r", tint: "#d5e3e4", h: "Hand your game to an agent", p: "Give a coding agent the package for your game, holding only what the game may know.", img: "hippo" },
-  { label: "Next", side: "r", tint: "#eadfd0", h: "Your story's website", p: "Publish a home for your story from the same base.", soon: true, img: "storm" },
+  { label: "Website", side: "r", tint: "#eadfd0", h: "Your story's website", p: "Publish a home for your story from the same base.", soon: true, img: "storm" },
+  { label: "Change", side: "l", tint: "#e8d6c6", h: "Change it once. See what follows.", p: "Change one fact and find every scene it breaks. Approve each fix, and the story updates.", img: "pots", low: true },
+  { label: "One base", side: "r", tint: "#e2e0d2", h: "One base for every agent", p: "Every agent, image and video draws from the same characters and canon, so nothing drifts.", img: "enyinyi" },
   { label: "Begin", tint: "#efe8db" },
 ];
 CH[0].tint = "#efe8db";
@@ -197,20 +199,23 @@ function ring(out0 = 0) {
   return out;
 }
 function seat(side,k,out0=0) {
-  const h = 30 + k*9 + k*k*4;
-  return { x: 50 + side*(26.5 + out0 + k*7 + k*k*1.2), y: 50, w: h*(.62+k*.05), h, ry: -side*(26+k*13), rz: 0, tz: k*34, o: 1 };
+  const h = 30 + k*6 + k*k*1;
+  return { x: 50 + side*(27 + out0 + k*7 + k*k*1.2), y: 50, w: h*(.62+k*.05), h, ry: -side*(26+k*13), rz: 0, tz: k*20, o: 1 };
 }
 const L = [
   ring(),
   { 0:{x:24,y:52,w:46,h:31,rz:-9,o:1}, 2:{x:27,y:48,w:46,h:31,rz:6,o:1}, 3:{x:30,y:55,w:46,h:31,rz:-3,o:1}, 4:{x:32,y:47,w:46,h:31,rz:10,o:1}, 6:{x:25,y:58,w:46,h:31,rz:4,o:1}, 7:{x:33,y:57,w:46,h:31,rz:-7,o:1}, 5:{x:39,y:50,w:32,h:48,rz:7,o:1}, 1:{x:29,y:51,w:38,h:57,rz:-2,o:1} },
   { [SH(0)]:{x:9,y:53,w:26,h:39,rz:-7,o:1}, [SH(1)]:{x:27,y:50,w:40,h:60,rz:-1,o:1}, [SH(2)]:{x:41,y:53,w:26,h:39,rz:5,o:1}, [SH(3)]:{x:13,y:82,w:15,h:22,rz:-3,o:0}, [SH(4)]:{x:52,y:56,w:24,h:36,rz:9,o:1} },
   { 2:{x:50,y:27,w:30,h:20,rz:5,o:1} },
-  { 7:{x:47,y:50,wv:17.5,h:62,o:1}, 2:{x:66,y:50,wv:17.5,h:62,o:1}, 3:{x:85,y:50,wv:17.5,h:62,o:1} },
-  { 0:{x:50,y:34,wv:16.5,h:27,o:1}, 2:{x:68,y:34,wv:16.5,h:27,o:1}, 7:{x:86,y:34,wv:16.5,h:27,o:1}, 3:{x:50,y:66,wv:16.5,h:27,o:1,hit:"Breaks"}, 4:{x:68,y:66,wv:16.5,h:27,o:1,hit:"Breaks"}, 6:{x:86,y:66,wv:16.5,h:27,o:1,hit:"Breaks"} },
-  { 1:{x:30,y:50,w:34,h:46,o:1}, 2:{x:11,y:24,w:17,h:23,rz:-6,o:1}, 3:{x:49,y:24,w:17,h:23,rz:6,o:1}, 4:{x:11,y:76,w:17,h:23,rz:5,o:1}, 6:{x:49,y:76,w:17,h:23,rz:-5,o:1} },
+  // Storyboard: six 16:9 frames, read left to right, top to bottom
+  { 0:{x:63,y:22,w:30,h:17,rz:-1.5,o:1,shot:"Shot 1"}, 2:{x:87,y:22,w:30,h:17,rz:1.5,o:1,shot:"Shot 2"}, 7:{x:63,y:50,w:30,h:17,rz:1,o:1,shot:"Shot 3"}, 3:{x:87,y:50,w:30,h:17,rz:-1,o:1,shot:"Shot 4"}, 4:{x:63,y:78,w:30,h:17,rz:-1,o:1,shot:"Shot 5"}, 6:{x:87,y:78,w:30,h:17,rz:1.5,o:1,shot:"Shot 6"} },
+  // Publish: four different shapes, one per form
+  { 2:{x:64,y:31,w:40,h:22.5,rz:-2,o:1,shot:"Series"}, 3:{x:88,y:33,w:18,h:32,rz:3,o:1,shot:"Shorts"}, 4:{x:61,y:70,w:26,h:26,rz:2,o:1,shot:"Game"}, 6:{x:85,y:72,w:44,h:18.4,rz:-2,o:1,shot:"Film"} },
   { 6:{x:31,y:42,wv:52,h:58,o:1}, 3:{x:11.5,y:83,wv:12.5,h:15,o:1}, 7:{x:24.5,y:83,wv:12.5,h:15,o:1}, 2:{x:37.5,y:83,wv:12.5,h:15,o:1}, 4:{x:50.5,y:83,wv:12.5,h:15,o:1} },
   { [SH(1)]:{x:44,y:50,w:26,h:39,rz:-5,o:1}, [SH(4)]:{x:50,y:60,w:26,h:39,rz:6,o:1}, 2:{x:44,y:24,w:30,h:20,rz:3,o:1} },
   {},
+  { 0:{x:50,y:34,wv:16.5,h:27,o:1}, 2:{x:68,y:34,wv:16.5,h:27,o:1}, 7:{x:86,y:34,wv:16.5,h:27,o:1}, 3:{x:50,y:66,wv:16.5,h:27,o:1,hit:"Breaks"}, 4:{x:68,y:66,wv:16.5,h:27,o:1,hit:"Breaks"}, 6:{x:86,y:66,wv:16.5,h:27,o:1,hit:"Breaks"} },
+  { 1:{x:30,y:50,w:34,h:46,o:1}, 2:{x:11,y:24,w:17,h:23,rz:-6,o:1}, 3:{x:49,y:24,w:17,h:23,rz:6,o:1}, 4:{x:11,y:76,w:17,h:23,rz:5,o:1}, 6:{x:49,y:76,w:17,h:23,rz:-5,o:1} },
   ring(7),
 ];
 
@@ -270,8 +275,9 @@ function frame() {
     const o = lerp(a.o,b.o,t);
     d.style.opacity = o; d.style.visibility = o < .01 ? "hidden" : "visible";
     d.style.zIndex = a.o || b.o ? 2 + (L[Math.round(s)][n] ? n : 0) : 0;
-    const flag = L[Math.round(s)][n]?.hit;
-    d.classList.toggle("hit", !!flag && Math.abs(s - Math.round(s)) < .12);
+    const lay = L[Math.round(s)][n], flag = lay?.hit || lay?.shot, near = Math.abs(s - Math.round(s)) < .12;
+    d.classList.toggle("hit", !!lay?.hit && near);
+    d.classList.toggle("shot", !!lay?.shot && near);
     if (flag) d.dataset.flag = flag;
   });
 
@@ -290,8 +296,8 @@ function frame() {
       d.style.left = (c.x*W/100 - w/2) + "px"; d.style.width = w + "px";
       d.style.top = (c.y*H/100 + h/2 - 76) + "px"; d.style.minHeight = "76px";
     } else if (d.id !== "script" && d.id !== "tree" && d.id !== "browser" && d.id !== "line") {
-      if (d.id === "cap") { const c = get(7,6); const w = c.w*H/100, h = c.h*H/100; d.style.left = (c.x*W/100-w/2)+"px"; d.style.right = "auto"; d.style.width = w+"px"; d.style.top = "auto"; d.style.bottom = (H - (c.y*H/100+h/2))+"px"; }
-      if (d.id === "head") { const a = get(7,3), z = get(7,4); const x0 = (a.x*W/100 - a.w*H/200), x1 = (z.x*W/100 + z.w*H/200); d.style.left = x0+"px"; d.style.top = (a.y-a.h/2-1)+"vh"; d.style.height = (a.h+2)+"vh"; d.style.setProperty("--run",(x1-x0)+"px"); }
+      if (d.id === "cap") { const c = get(6,6); const w = c.w*H/100, h = c.h*H/100; d.style.left = (c.x*W/100-w/2)+"px"; d.style.right = "auto"; d.style.width = w+"px"; d.style.top = "auto"; d.style.bottom = (H - (c.y*H/100+h/2))+"px"; }
+      if (d.id === "head") { const a = get(6,3), z = get(6,4); const x0 = (a.x*W/100 - a.w*H/200), x1 = (z.x*W/100 + z.w*H/200); d.style.left = x0+"px"; d.style.top = (a.y-a.h/2-1)+"vh"; d.style.height = (a.h+2)+"vh"; d.style.setProperty("--run",(x1-x0)+"px"); }
     }
     if (["script","tree","browser"].includes(d.id)) d.style.transform = `translateY(${-dist*70}px)`;
   });
