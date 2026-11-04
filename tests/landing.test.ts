@@ -4,28 +4,36 @@ import { describe, expect, it } from "vitest";
 import {
   BROWSER_SUB,
   BROWSER_TITLE,
-  CHANGE_LINE,
+  CARDS,
   CHAPTERS,
+  CHANGE_LINE,
+  clampSeatBelowBar,
   LANDING_IMAGES,
+  LAYOUTS,
+  layoutRects,
+  resolveSeat,
   SCRIPT_LINES,
   SCRIPT_NOTE,
   SECRETS,
+  segmentEase,
+  stagger,
+  TOP_BAR_H,
   TREE_LINES,
   TREE_SECRET,
   VIDEO_CAPTION,
-  VIDEO_THUMBS,
 } from "@/lib/landing";
 
-const CONTENT_CHAPTERS = [
+const CONTENT_IDS = [
   "world",
   "characters",
   "story",
-  "parts",
-  "change",
-  "onebase",
+  "storyboard",
+  "publish",
   "video",
   "game",
-  "next",
+  "website",
+  "change",
+  "onebase",
 ];
 
 describe("landing chapters", () => {
@@ -35,33 +43,83 @@ describe("landing chapters", () => {
       "world",
       "characters",
       "story",
-      "parts",
-      "change",
-      "onebase",
+      "storyboard",
+      "publish",
       "video",
       "game",
-      "next",
+      "website",
+      "change",
+      "onebase",
       "begin",
     ]);
   });
 
-  it("gives every content chapter a kicker, heading and body", () => {
-    for (const chapter of CHAPTERS) {
-      if (!CONTENT_CHAPTERS.includes(chapter.id)) continue;
-      // The website chapter shows its "Coming next" badge, not a kicker.
-      if (!chapter.soon) {
-        expect(chapter.kicker, `${chapter.id} kicker`).toBeTruthy();
-      }
-      expect(chapter.heading, `${chapter.id} heading`).toBeTruthy();
-      expect(chapter.body, `${chapter.id} body`).toBeTruthy();
-    }
+  it("gives every content chapter its final copy word for word", () => {
+    expect(
+      Object.fromEntries(
+        CHAPTERS.filter((c) => CONTENT_IDS.includes(c.id)).map((c) => [
+          c.id,
+          [c.kicker ?? null, c.heading, c.body],
+        ]),
+      ),
+    ).toEqual({
+      world: [
+        "Your world",
+        "Everything starts with your world",
+        "Your world, characters, plot and goal live in one master story. Everything else draws from it.",
+      ],
+      characters: [
+        "Characters",
+        "Assemble your cast once",
+        "Create full character sheets and game-ready cutouts, and keep each character the same everywhere.",
+      ],
+      story: [
+        "Story",
+        "Write the story inside it",
+        "Your script knows your characters and your canon, so it stays true to both.",
+      ],
+      storyboard: [
+        "Storyboard",
+        "See it before you make it",
+        "Turn any scene of your script into a storyboard, shot by shot, with sketches you can change.",
+      ],
+      publish: [
+        "Publish",
+        "Publish it wherever it belongs",
+        "A series, a game, shorts or a full-length film. Each can hold a secret the others don't, so fans follow them all.",
+      ],
+      video: [
+        "Video",
+        "Turn scenes into shorts",
+        "Muse turns your scenes into short videos you can edit and publish.",
+      ],
+      game: [
+        "Game",
+        "Hand your game to an agent",
+        "Give a coding agent the package for your game, holding only what the game may know.",
+      ],
+      website: [
+        null,
+        "Your story's website",
+        "Publish a home for your story from the same base.",
+      ],
+      change: [
+        "Change",
+        "Change it once. See what follows.",
+        "Change one fact and find every scene it breaks. Approve each fix, and the story updates.",
+      ],
+      onebase: [
+        "One base",
+        "One base for every agent",
+        "Every agent, image and video draws from the same characters and canon, so nothing drifts.",
+      ],
+    });
   });
 
-  it("keeps the website chapter's Coming next label", () => {
-    const next = CHAPTERS.find((c) => c.id === "next");
-    expect(next?.soon).toBe(true);
-    expect(next?.heading).toBeTruthy();
-    expect(next?.body).toBeTruthy();
+  it("keeps Coming next on the website chapter only", () => {
+    const soon = CHAPTERS.filter((c) => c.soon).map((c) => c.id);
+    expect(soon).toEqual(["website"]);
+    expect(CHAPTERS.find((c) => c.id === "storyboard")?.soon).toBeFalsy();
   });
 
   it("leaves the hero and close chapters to their own headlines", () => {
@@ -74,20 +132,46 @@ describe("landing chapters", () => {
 
   it("keeps every feature panel's copy", () => {
     expect(SCRIPT_LINES.length).toBeGreaterThan(0);
-    expect(SCRIPT_NOTE).toBeTruthy();
+    expect(SCRIPT_NOTE).toBe(
+      "Highlighted names come from your story's characters.",
+    );
+    expect(
+      SCRIPT_LINES.some(
+        (l) => l.type === "say" && l.text === "Are you sure it's a hippopotamus?",
+      ),
+    ).toBe(true);
     expect(TREE_LINES.length).toBeGreaterThan(0);
     expect(TREE_SECRET).toBeTruthy();
-    expect(SECRETS).toHaveLength(3);
-    expect(CHANGE_LINE).toBeTruthy();
-    expect(VIDEO_CAPTION).toBeTruthy();
-    expect(VIDEO_THUMBS.length).toBeGreaterThan(0);
-    expect(BROWSER_TITLE).toBeTruthy();
-    expect(BROWSER_SUB).toBeTruthy();
+    expect(SECRETS).toEqual([
+      {
+        channel: "Only the series knows",
+        text: "Why the baby lived",
+        tint: "#a9771f",
+      },
+      {
+        channel: "Only the game knows",
+        text: "What the stream hides",
+        tint: "#2c7f93",
+      },
+      {
+        channel: "Only the shorts know",
+        text: "Who first spoke the vow",
+        tint: "#a8476a",
+      },
+    ]);
+    expect(CHANGE_LINE).toBe("Enyinyi told them how to kill him.");
+    expect(VIDEO_CAPTION).toBe(
+      "One night they run across the Omabala to escape him.",
+    );
+    expect(BROWSER_TITLE).toBe("Anukili Ugama");
+    expect(BROWSER_SUB).toBe(
+      "The series, the game and the shorts, all in one place.",
+    );
   });
 });
 
 describe("landing images", () => {
-  it("resolves every card and thumb path under public/", () => {
+  it("resolves every card and chapter path under public/", () => {
     expect(LANDING_IMAGES.length).toBeGreaterThan(0);
     for (const src of LANDING_IMAGES) {
       expect(src.startsWith("/"), src).toBe(true);
@@ -96,190 +180,148 @@ describe("landing images", () => {
     }
   });
 
-  it("covers every card src, every thumb, and the browser art", () => {
+  it("covers every card src and every chapter img", () => {
     const covered = new Set(LANDING_IMAGES);
+    for (const card of CARDS) {
+      expect(covered.has(card.src), card.src).toBe(true);
+    }
     for (const chapter of CHAPTERS) {
-      for (const card of chapter.cards) {
-        expect(covered.has(card.src), card.src).toBe(true);
-      }
-    }
-    for (const thumb of VIDEO_THUMBS) {
-      expect(covered.has(thumb.src), thumb.src).toBe(true);
-    }
-  });
-});
-
-/**
- * Seat geometry at the 1440x900 review viewport. Card CSS widths are
- * capped (art 300px, sheet 270px, player 620px, thumb 170px), so spans
- * below are in vw at 1440px wide.
- */
-const VIEWPORT_W = 1440;
-
-function cardWidthVw(
-  kind: "art" | "sheet" | "player" | "thumb",
-  s: number,
-): number {
-  const px =
-    kind === "art"
-      ? Math.min(0.22 * VIEWPORT_W, 300)
-      : kind === "sheet"
-        ? Math.min(0.19 * VIEWPORT_W, 270)
-        : kind === "player"
-          ? Math.min(0.4 * VIEWPORT_W, 620)
-          : Math.min(0.11 * VIEWPORT_W, 170);
-  return ((px * s) / VIEWPORT_W) * 100;
-}
-
-function spanVw(card: {
-  kind: "art" | "sheet" | "player" | "thumb";
-  x: number;
-  s: number;
-}): [number, number] {
-  const centre = 50 + card.x;
-  const half = cardWidthVw(card.kind, card.s) / 2;
-  return [centre - half, centre + half];
-}
-
-describe("hero gallery", () => {
-  it("curves four cards a side with rotateY and depth, inner pair at ±26.5vw", () => {
-    const start = CHAPTERS.find((c) => c.id === "start");
-    expect(start?.cards).toHaveLength(8);
-    const left = start!.cards.filter((c) => c.x < 0);
-    const right = start!.cards.filter((c) => c.x > 0);
-    expect(left).toHaveLength(4);
-    expect(right).toHaveLength(4);
-    for (const card of start!.cards) {
-      expect(typeof card.ry, card.src).toBe("number");
-      expect(typeof card.z, card.src).toBe("number");
-    }
-    const innerLeft = left.reduce((a, b) => (Math.abs(a.x) < Math.abs(b.x) ? a : b));
-    const innerRight = right.reduce((a, b) => (Math.abs(a.x) < Math.abs(b.x) ? a : b));
-    expect(Math.abs(innerLeft.x)).toBeCloseTo(26.5, 5);
-    expect(Math.abs(innerRight.x)).toBeCloseTo(26.5, 5);
-    expect(innerLeft.ry).toBeGreaterThan(0);
-    expect(innerRight.ry).toBeLessThan(0);
-    // Facing angle and depth grow outward on each side.
-    for (const side of [left, right]) {
-      const ordered = [...side].sort((a, b) => Math.abs(a.x) - Math.abs(b.x));
-      for (let i = 1; i < ordered.length; i++) {
-        expect(Math.abs(ordered[i]!.ry)).toBeGreaterThan(
-          Math.abs(ordered[i - 1]!.ry),
+      if (chapter.img) {
+        expect(covered.has(`/anukili/${chapter.img}.webp`), chapter.id).toBe(
+          true,
         );
-        expect(ordered[i]!.z).toBeGreaterThan(ordered[i - 1]!.z);
       }
-    }
-    // Outer cards are larger and closer, like the prototype wall.
-    for (const side of [left, right]) {
-      const ordered = [...side].sort((a, b) => Math.abs(a.x) - Math.abs(b.x));
-      for (let i = 1; i < ordered.length; i++) {
-        expect(ordered[i]!.s).toBeGreaterThan(ordered[i - 1]!.s);
-      }
-    }
-    // The headline column (roughly 36-64vw) stays clear.
-    for (const card of start!.cards) {
-      const [l, r] = spanVw(card);
-      expect(l > 64 || r < 36, card.src).toBe(true);
-    }
-  });
-
-  it("brings the same gallery back for the closing chapter, pushed out by 7vw", () => {
-    const start = CHAPTERS.find((c) => c.id === "start");
-    const begin = CHAPTERS.find((c) => c.id === "begin");
-    expect(begin?.cards).toHaveLength(start?.cards.length ?? 0);
-    expect((begin?.cards.length ?? 0)).toBeGreaterThan(0);
-    for (let i = 0; i < start!.cards.length; i++) {
-      const a = start!.cards[i]!;
-      const b = begin!.cards[i]!;
-      expect(b.src).toBe(a.src);
-      expect(Math.abs(b.x) - Math.abs(a.x)).toBeCloseTo(7, 5);
-      expect(b.ry).toBe(a.ry);
-      expect(b.z).toBe(a.z);
     }
   });
 });
 
-describe("chapter layouts", () => {
-  it("keeps every parts card clear of the copy column with its own secret", () => {
-    const parts = CHAPTERS.find((c) => c.id === "parts");
-    const centres = parts!.cards.map((c) => 50 + c.x).sort((a, b) => a - b);
-    expect(centres.map(Math.round)).toEqual([47, 66, 85]);
-    for (const card of parts!.cards) {
-      // Fits within 17.5vw at the review viewport.
-      expect(cardWidthVw(card.kind, card.s)).toBeLessThanOrEqual(17.5);
-      const [l] = spanVw(card);
-      expect(l, card.src).toBeGreaterThanOrEqual(34);
-      expect(card.secret?.channel).toBeTruthy();
-      expect(card.secret?.text).toBeTruthy();
-      expect(card.secret?.tint).toBeTruthy();
-    }
+describe("persistent cards", () => {
+  it("has 13 stable cards: 8 art, then 5 sheets", () => {
+    expect(CARDS.map((c) => c.id)).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    ]);
+    expect(CARDS.slice(0, 8).every((c) => !c.src.includes("/sheets/"))).toBe(
+      true,
+    );
+    expect(CARDS.slice(8).every((c) => c.src.includes("/sheets/"))).toBe(true);
   });
 
-  it("keeps the change rows and lines clear of the copy column", () => {
-    const change = CHAPTERS.find((c) => c.id === "change");
-    expect(change!.cards).toHaveLength(6);
-    for (const card of change!.cards) {
-      const [l] = spanVw(card);
-      expect(l, card.src).toBeGreaterThanOrEqual(34);
-    }
-    expect(change!.cards.filter((c) => c.flag === "Breaks")).toHaveLength(3);
-  });
-
-  it("keeps the game cards between the file tree and the copy", () => {
-    const game = CHAPTERS.find((c) => c.id === "game");
-    // Hippo art plus the Anukili and Enyinyi sheets, overlapping it.
-    expect(game!.cards).toHaveLength(3);
-    const kinds = game!.cards.map((c) => c.kind).sort();
-    expect(kinds).toEqual(["art", "sheet", "sheet"]);
-    const srcs = game!.cards.map((c) => c.src);
-    expect(srcs).toContain("/anukili/hippo.webp");
-    expect(srcs).toContain("/anukili/sheets/anukili-ugama/front.webp");
-    expect(srcs).toContain("/anukili/sheets/enyinyi/front.webp");
-    for (const card of game!.cards) {
-      const [l, r] = spanVw(card);
-      expect(l, card.src).toBeGreaterThanOrEqual(32);
-      expect(r, card.src).toBeLessThanOrEqual(62);
-    }
-  });
-
-  it("clears gallery rotation to 0 outside the hero and closing chapters", () => {
-    for (const chapter of CHAPTERS) {
-      if (chapter.id === "start" || chapter.id === "begin") continue;
-      for (const card of chapter.cards) {
-        expect(card.ry, `${chapter.id} ${card.src}`).toBe(0);
-        expect(card.z, `${chapter.id} ${card.src}`).toBe(0);
+  it("references only real card ids in every chapter layout", () => {
+    const ids = new Set(CARDS.map((c) => c.id));
+    expect(LAYOUTS).toHaveLength(CHAPTERS.length);
+    for (let ch = 0; ch < LAYOUTS.length; ch++) {
+      for (const key of Object.keys(LAYOUTS[ch])) {
+        expect(ids.has(Number(key)), `chapter ${ch} card ${key}`).toBe(true);
       }
     }
   });
 
-  it("shows every characters card on stage with its image path", () => {
-    const characters = CHAPTERS.find((c) => c.id === "characters");
-    expect(characters!.cards.length).toBeGreaterThan(0);
-    for (const card of characters!.cards) {
-      const [l, r] = spanVw(card);
-      expect(l, card.src).toBeGreaterThanOrEqual(0);
-      expect(r, card.src).toBeLessThanOrEqual(62);
-      const file = join(process.cwd(), "public", card.src.slice(1));
-      expect(existsSync(file), card.src).toBe(true);
+  it("travels shared cards between consecutive chapters instead of swapping", () => {
+    // Every layout is keyed by stable card id, so the same element moves.
+    // Check the sharing directly: neighbours must overlap, except that the
+    // website chapter carries no cards and its neighbours fade in/out.
+    for (let ch = 0; ch < LAYOUTS.length - 1; ch++) {
+      const a = new Set(Object.keys(LAYOUTS[ch]).map(Number));
+      const b = new Set(Object.keys(LAYOUTS[ch + 1]).map(Number));
+      if (ch === 7 || ch === 8) {
+        expect(b.size === 0 || a.size === 0).toBe(true);
+        continue;
+      }
+      const shared = [...a].filter((id) => b.has(id));
+      expect(shared.length, `chapters ${ch} -> ${ch + 1}`).toBeGreaterThan(0);
+    }
+    // Card 2 (the stream) is the through-line across most chapters.
+    const appearances = LAYOUTS.filter((l) => l[2]).length;
+    expect(appearances).toBeGreaterThanOrEqual(6);
+  });
+
+  it("carries every tag label the prototype shows", () => {
+    const shots = new Set<string>();
+    const hits = new Set<string>();
+    const publishTags: string[] = [];
+    for (const layout of LAYOUTS) {
+      for (const seat of Object.values(layout)) {
+        if (seat.shot) shots.add(seat.shot);
+        if (seat.hit) hits.add(seat.hit);
+      }
+    }
+    for (const seat of Object.values(LAYOUTS[5])) {
+      if (seat.shot) publishTags.push(seat.shot);
+    }
+    expect([...shots].sort()).toEqual([
+      "Film",
+      "Game",
+      "Series",
+      "Shot 1",
+      "Shot 2",
+      "Shot 3",
+      "Shot 4",
+      "Shot 5",
+      "Shot 6",
+      "Shorts",
+    ]);
+    expect([...hits]).toEqual(["Breaks"]);
+    expect(publishTags.sort()).toEqual(["Film", "Game", "Series", "Shorts"]);
+    expect(
+      Object.values(LAYOUTS[9]).filter((s) => s.hit === "Breaks"),
+    ).toHaveLength(3);
+  });
+});
+
+describe("prototype scroll math", () => {
+  it("eases each segment with holds at both ends", () => {
+    expect(segmentEase(0)).toBe(0);
+    expect(segmentEase(1)).toBe(1);
+    expect(segmentEase(0.2)).toBe(0);
+    expect(segmentEase(0.95)).toBe(1);
+    const mid = segmentEase(0.61);
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(1);
+  });
+
+  it("staggers cards so the gallery deals in one by one", () => {
+    for (let n = 0; n < 13; n++) {
+      expect(stagger(0, n)).toBe(0);
+      expect(stagger(1, n)).toBe(1);
+    }
+    // Later cards start later: at e=0.1 only the first cards have moved.
+    expect(stagger(0.1, 0)).toBeGreaterThan(0);
+    expect(stagger(0.1, 7)).toBe(0);
+  });
+
+  it("resolves vw widths with the viewport aspect", () => {
+    const wide = resolveSeat(6, 6, 16 / 9);
+    expect(wide.w).toBeCloseTo(52 * (16 / 9), 5);
+    expect(wide.h).toBe(58);
+  });
+});
+
+describe("hero top bar", () => {
+  it("never overlaps the top bar from 1100px wide up", () => {
+    for (const W of [1100, 1280, 1440, 1920, 2560]) {
+      for (const H of [500, 600, 700, 800, 900, 1080]) {
+        for (const ch of [0, CHAPTERS.length - 1]) {
+          for (const rect of layoutRects(ch, W, H)) {
+            const left = rect.cx - rect.wpx / 2;
+            const right = rect.cx + rect.wpx / 2;
+            const top = rect.cy - rect.hpx / 2;
+            const overlaps =
+              left < W && right > 0 && top < TOP_BAR_H && rect.hpx > 0;
+            expect(overlaps, `${W}x${H} ch${ch} card${rect.id}`).toBe(false);
+          }
+        }
+      }
     }
   });
 
-  it("cross-fades one story art card into the player with four thumbs", () => {
-    const video = CHAPTERS.find((c) => c.id === "video");
-    expect(VIDEO_THUMBS).toHaveLength(4);
-    const thumbs = video!.cards.filter((c) => c.kind === "thumb");
-    expect(thumbs).toHaveLength(4);
-    const out = video!.cards.find((c) => c.fade === "out");
-    const inn = video!.cards.find((c) => c.fade === "in");
-    expect(out?.kind).toBe("art");
-    expect(inn?.kind).toBe("player");
-    // Same seat, so one dissolves into the other.
-    expect(out?.x).toBe(inn?.x);
-    expect(out?.y).toBe(inn?.y);
-    // Thumbnails span the player's width.
-    const [pl, pr] = spanVw(inn!);
-    const edges = thumbs.flatMap((t) => spanVw(t));
-    expect(Math.min(...edges)).toBeGreaterThanOrEqual(pl - 1.5);
-    expect(Math.max(...edges)).toBeLessThanOrEqual(pr + 1.5);
+  it("clamps a ring seat that would reach into the bar", () => {
+    const low = { x: 50, y: 10, w: 30, h: 40, ry: 0, rz: 0, tz: 0, o: 1 };
+    const clamped = clampSeatBelowBar(low, 800);
+    expect(clamped.y - clamped.h / 2).toBeGreaterThanOrEqual(
+      ((TOP_BAR_H + 20) / 800) * 100,
+    );
+    // Seats already clear pass through untouched.
+    const clear = { x: 50, y: 50, w: 30, h: 40, ry: 0, rz: 0, tz: 0, o: 1 };
+    expect(clampSeatBelowBar(clear, 800)).toEqual(clear);
   });
 });
