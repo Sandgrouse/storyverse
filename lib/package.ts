@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import { packToMarkdown } from "@/lib/pack";
-import type { World } from "@/lib/world/schemas";
+import type { Storyboard, World } from "@/lib/world/schemas";
 
 /**
  * Agent package: a per-channel ZIP an outside coding agent can build
@@ -24,6 +24,8 @@ export type PackageFileType =
   | "scene-art"
   | "scene-brief"
   | "script"
+  | "storyboard"
+  | "storyboard-sketch"
   | "pack";
 
 export type PackageFile = {
@@ -67,6 +69,9 @@ export function channelWorld(world: World, channelId: string): World {
     beats: world.beats.filter((beat) => beat.channelId === channelId),
     packs: world.packs.filter((pack) => pack.channelId === channelId),
     scripts: world.scripts.filter((script) => script.channelId === channelId),
+    storyboards: (world.storyboards ?? []).filter(
+      (board) => board.channelId === channelId,
+    ),
     characters: world.characters.map((character) => ({
       ...character,
       secret: undefined,
@@ -208,6 +213,19 @@ export function sceneBrief(
   }
   lines.push("");
   return lines.join("\n");
+}
+
+/** A storyboard's frames in order, text only: no sketch bytes. */
+export function storyboardJson(board: Storyboard): string {
+  const frames = board.frames.map((frame) => ({
+    id: frame.id,
+    framing: frame.framing,
+    action: frame.action,
+    ...(frame.dialogue !== undefined ? { dialogue: frame.dialogue } : {}),
+    ...(frame.camera !== undefined ? { camera: frame.camera } : {}),
+    characterIds: frame.characterIds,
+  }));
+  return `${JSON.stringify(frames, null, 2)}\n`;
 }
 
 /** A character's voice index: which voice speaks, and each saved line. */
@@ -414,6 +432,29 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
       missing: false,
       content: script.text,
     });
+  }
+
+  for (const board of filtered.storyboards) {
+    if (!covered.has(board.partId)) continue;
+    files.push({
+      path: `${root}/scenes/${board.partId}/storyboard.json`,
+      type: "storyboard",
+      part: board.partId,
+      suggested: false,
+      missing: false,
+      content: storyboardJson(board),
+    });
+    for (const frame of board.frames) {
+      files.push(
+        imageEntry(
+          root,
+          `scenes/${board.partId}/storyboard/${frame.id}.webp`,
+          "storyboard-sketch",
+          frame.imagePath,
+          { part: board.partId },
+        ),
+      );
+    }
   }
 
   const manifest: ManifestEntry[] = files.map((file) => ({

@@ -10,6 +10,7 @@ Storyverse holds one master copy of a story world and shows how it plays across 
 - **Fish Audio** is the live voice provider and speaks the saved voice lines, because Meta has no text-to-speech model. Muse Spark chooses each character's voice and writes the line; Fish Audio only speaks it.
 - **ElevenLabs** is an optional, untested fallback provider: kept in the code for when a key is added. See [Known limitations](docs/KNOWN-LIMITATIONS.md).
 - **Muse Code** wrote the application code, from task specs in `docs/tasks/`.
+- **Storyboards:** Muse Spark plans the storyboard and Muse Image draws the sketches.
 
 ## Run it
 
