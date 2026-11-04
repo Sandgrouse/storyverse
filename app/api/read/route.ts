@@ -7,6 +7,7 @@ import {
   READ_INSTRUCTIONS,
   ReadModelOutputSchema,
   ReadRequestSchema,
+  VISUAL_STYLE_INSTRUCTIONS,
   buildReadInput,
   readModelJsonSchema,
   sanitizeArtFiles,
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
   try {
     const model = await completeJson(
       {
-        instructions: READ_INSTRUCTIONS,
+        instructions: `${READ_INSTRUCTIONS} ${VISUAL_STYLE_INSTRUCTIONS}`,
         input: buildReadInput(files, idea, instruction),
         schemaName: "canon",
         jsonSchema: readModelJsonSchema(),

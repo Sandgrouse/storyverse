@@ -187,9 +187,10 @@ export function loadStoredWorld(id: string): World | null {
 
 /**
  * Fill in what the seed has and an old stored sample lacks: facts when
- * empty, and each part's text when empty (matched by part id). Everything
- * the owner edited or made — scripts, storyboards, shorts, voices, lines,
- * secrets, art, canon changes, facts that are already there — is kept.
+ * empty, each part's text when empty (matched by part id), and the
+ * visual style when empty. Everything the owner edited or made —
+ * scripts, storyboards, shorts, voices, lines, secrets, art, canon
+ * changes, facts and a style that are already there — is kept.
  * Pure: the caller saves the upgraded world back. Never upgrades a
  * project that is not the sample.
  */
@@ -215,8 +216,27 @@ export function upgradeSampleWorld(
       return { ...part, text };
     });
   }
+  let visualStyle = stored.visualStyle;
+  let visualStyleSource = stored.visualStyleSource;
+  if (
+    (visualStyle?.preset ?? "") === "" &&
+    (seed.visualStyle?.preset ?? "") !== ""
+  ) {
+    visualStyle = seed.visualStyle;
+    visualStyleSource = seed.visualStyleSource;
+    upgraded = true;
+  }
   if (!upgraded) return { world: stored, upgraded: false };
-  return { world: { ...stored, facts: facts ?? [], parts }, upgraded: true };
+  return {
+    world: {
+      ...stored,
+      facts: facts ?? [],
+      parts,
+      visualStyle: visualStyle ?? { preset: "", notes: "" },
+      visualStyleSource: visualStyleSource ?? "",
+    },
+    upgraded: true,
+  };
 }
 
 /** A project with its images filled back in. Null when unknown or invalid. */
@@ -389,9 +409,16 @@ export function mergeWorldAssets(oldWorld: World, nextWorld: World): World {
   const oldPronunciations = oldWorld.pronunciations ?? [];
   const nextFacts = nextWorld.facts ?? [];
   const oldFacts = oldWorld.facts ?? [];
+  const nextHasStyle = (nextWorld.visualStyle?.preset ?? "").length > 0;
   return {
     ...nextWorld,
     facts: nextFacts.length > 0 ? nextFacts : oldFacts,
+    visualStyle: nextHasStyle
+      ? (nextWorld.visualStyle ?? { preset: "", notes: "" })
+      : (oldWorld.visualStyle ?? nextWorld.visualStyle),
+    visualStyleSource: nextHasStyle
+      ? (nextWorld.visualStyleSource ?? "")
+      : (oldWorld.visualStyleSource ?? ""),
     pronunciations:
       nextPronunciations.length > 0 ? nextPronunciations : oldPronunciations,
     scripts: [...scriptsByKey.values()],

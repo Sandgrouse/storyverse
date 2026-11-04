@@ -24,7 +24,9 @@ describe("backFor", () => {
     expect(backFor("/projects/abc/storyboard")).toBe("/projects/abc/script");
     expect(backFor("/projects/abc/material")).toBe("/projects/abc/understood");
     expect(backFor("/projects/abc/reading")).toBe("/projects/abc/material");
-    expect(backFor("/projects/abc/canon")).toBe("/projects/abc/story");
+    expect(backFor("/projects/abc/canon")).toBe(
+      "/projects/abc/story?view=book",
+    );
   });
 
   it("has no back outside the projects pages", () => {

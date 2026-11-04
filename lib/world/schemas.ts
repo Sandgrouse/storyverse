@@ -51,6 +51,14 @@ export const LocationSchema = z.object({
   description: z.string(),
 });
 
+export const VisualStyleSchema = z.object({
+  preset: z.string(),
+  notes: z.string(),
+});
+
+export const VisualStyleSourceSchema = z.enum(["art", "muse", "you", ""]);
+
+/** FactSchema-style provenance for the project's visual style. */
 export const ChannelKindSchema = z.enum([
   "game",
   "series",
@@ -214,6 +222,8 @@ export const WorldSchema = z.object({
   secrets: z.array(SecretSchema),
   gaps: z.array(GapSchema),
   facts: z.array(FactSchema).default([]),
+  visualStyle: VisualStyleSchema.default({ preset: "", notes: "" }),
+  visualStyleSource: VisualStyleSourceSchema.default(""),
   packs: z.array(PackSchema).default([]),
   scripts: z.array(ScriptEntrySchema).default([]),
   shorts: z.array(ShortSchema).default([]),
@@ -268,6 +278,8 @@ export type CharacterVoice = z.infer<typeof CharacterVoiceSchema>;
 export type CharacterLine = z.infer<typeof CharacterLineSchema>;
 export type FactSource = z.infer<typeof FactSourceSchema>;
 export type Fact = z.infer<typeof FactSchema>;
+export type VisualStyle = z.infer<typeof VisualStyleSchema>;
+export type VisualStyleSource = z.infer<typeof VisualStyleSourceSchema>;
 export type Character = z.infer<typeof CharacterSchema>;
 export type Location = z.infer<typeof LocationSchema>;
 export type ChannelKind = z.infer<typeof ChannelKindSchema>;

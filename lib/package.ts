@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { visualStyleLine } from "@/lib/style";
 import { packToMarkdown } from "@/lib/pack";
 import { hasFullSheet } from "@/lib/readiness";
 import type { Storyboard, World } from "@/lib/world/schemas";
@@ -736,8 +737,13 @@ export function gameArtBibleMd(
   assets: { sheets: string[]; scenes: string[] },
 ): string {
   const tints = [...new Set(filtered.parts.map((p) => p.tint).filter(Boolean))];
+  const styleLine = visualStyleLine(filtered.visualStyle);
   const lines = [
     `# Art bible — ${filtered.title}`,
+    ``,
+    `## Visual style`,
+    ``,
+    styleLine.length > 0 ? styleLine : `No visual style chosen yet.`,
     ``,
     `## Palette`,
     ``,

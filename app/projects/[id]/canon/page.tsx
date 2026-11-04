@@ -1,28 +1,11 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import Link from "next/link";
-import CanonBook from "@/components/experience/CanonBook";
-import { MissingStory, useProject } from "@/components/projects/ProjectContext";
-
-/** The book with no reading animation. Back goes to Story. */
-export default function CanonPage() {
-  const { status, world } = useProject();
-
-  if (status === "loading" || !world) {
-    if (status === "missing") return <MissingStory />;
-    return <main />;
-  }
-
-  return (
-    <main>
-      <CanonBook world={world} />
-      <div className="canon-foot">
-        <Link className="quiet" href={`/projects/${world.id}/story`}>
-          Back
-        </Link>
-        <span className="canon-status">{world.title}</span>
-        <span />
-      </div>
-    </main>
-  );
+/** The canon book now lives on the Story page's Book view. */
+export default async function CanonPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  redirect(`/projects/${id}/story?view=book`);
 }

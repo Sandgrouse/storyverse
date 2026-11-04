@@ -55,9 +55,23 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return errorResponse(400, "VALIDATION_ERROR", "Expected { part }.");
   }
-  const { part, characters, styleImage, change, style, framing } =
-    parsed.data;
+  const {
+    part,
+    characters,
+    styleImage,
+    change,
+    style,
+    framing,
+    stylePreset,
+    styleNotes,
+  } = parsed.data;
   let { description } = parsed.data;
+  // Storyboard sketches stay pencil sketches: the style steers sheet,
+  // scene and video-shot prompts, never the sketch prompt.
+  const visualStyle =
+    style === "sketch"
+      ? undefined
+      : { preset: stylePreset, notes: styleNotes };
   const references = pickSceneReferences(parsed.data.references);
   if (references.length === 0 && styleImage) references.push(styleImage);
 
@@ -86,6 +100,7 @@ export async function POST(req: Request) {
           referenceCount: references.length,
           change,
           description: text,
+          style: visualStyle,
         });
 
   const attempt = (text: string | undefined) =>

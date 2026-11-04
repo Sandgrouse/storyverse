@@ -6,15 +6,23 @@
   align-items: stretch;
   padding: 96px 34px 26px;
   min-height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
   background: var(--paper);
   color: var(--ink);
 }
 
+/* The side columns stay put under the top bar while only the book
+   page scrolls: the book fills the viewport, so there is no page
+   scroll to carry the columns away. */
 .canon-toc {
   width: 210px;
   flex: none;
   overflow: auto;
   max-height: calc(100vh - 122px);
+  position: sticky;
+  top: 96px;
 }
 
 .canon-toc h4 {
@@ -106,6 +114,7 @@
 
 .canon-pagescroll {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 46px 8% 60px 9%;
   scroll-behavior: smooth;
@@ -192,6 +201,8 @@
   flex-direction: column;
   min-height: 0;
   max-height: calc(100vh - 122px);
+  position: sticky;
+  top: 96px;
 }
 
 .canon-tabs {
@@ -288,7 +299,7 @@
 }
 
 .canon-t {
-  padding: 14px 16px 16px;
+  padding: 14px 16px 20px;
   font: 300 17px/1.45 var(--serif);
   color: #4b4439;
 }
@@ -317,13 +328,15 @@
 @media (max-width: 1000px) {
   .canonbook {
     flex-direction: column;
-    overflow: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   .canon-toc,
   .canon-side {
     width: auto;
     max-height: none;
+    position: static;
   }
 
   .canon-tocselect {
@@ -606,4 +619,163 @@
 
 .side a.sidebtn:hover {
   color: var(--clay);
+}
+
+/* Story page Timeline/Book switch: a quiet pill pinned to the top,
+   clear of the change bar and the book page below it. */
+
+.viewswitch {
+  position: absolute;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 99px;
+  background: rgba(239, 232, 219, 0.88);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 1px 0 var(--rule), 0 8px 22px -12px rgba(50, 35, 15, 0.4);
+}
+
+.viewswitch button {
+  all: unset;
+  cursor: pointer;
+  padding: 4px 16px;
+  border-radius: 99px;
+  font: 500 13px var(--sans);
+  color: var(--soft);
+}
+
+.viewswitch button.on {
+  background: var(--ink);
+  color: var(--sheet);
+}
+
+/* Understood page: the visual style card in the basics grid. */
+
+.stylechips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
+.stylechips button {
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--soft);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.stylechips button.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--sheet);
+}
+
+.styleedit textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--ink);
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.stylerow {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* Channels page: the small editor panel for one screen. */
+
+.chanedit-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(31, 27, 22, 0.45);
+}
+
+.chanedit {
+  width: min(440px, 100%);
+  max-height: calc(100vh - 60px);
+  overflow: auto;
+  background: var(--sheet);
+  color: var(--ink);
+  border-radius: 14px;
+  padding: 22px 24px 20px;
+  box-shadow: var(--lift);
+  text-align: left;
+}
+
+.chanedit h3 {
+  font: 400 24px/1.15 var(--serif);
+  margin: 2px 0 4px;
+}
+
+.chanedit .lede {
+  color: var(--soft);
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+
+.chanedit label {
+  display: block;
+  font-size: 12.5px;
+  color: var(--soft);
+  margin: 12px 0 4px;
+}
+
+.chanedit input[type="text"],
+.chanedit textarea,
+.chanedit select {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--ink);
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.chanedit textarea {
+  resize: vertical;
+}
+
+.chanedit .row {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  align-items: center;
+}
+
+.chanedit .danger {
+  color: var(--clay);
+}
+
+.chanedit .confirm {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+}
+
+.chanedit .confirm p {
+  font-size: 14.5px;
+  margin-bottom: 8px;
 }

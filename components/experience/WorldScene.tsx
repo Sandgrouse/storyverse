@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
+import CanonBook from "./CanonBook";
 import type {
   Part,
   RippleDecision,
@@ -97,15 +98,20 @@ type RegenState =
 
 export type WorldDrawer = "cast" | "pack" | "story" | null;
 
+export type StoryView = "timeline" | "book";
+
 type Props = {
   active?: boolean;
   world: World;
   onWorld: (world: World) => void;
   drawer?: WorldDrawer;
   onDrawer?: (drawer: WorldDrawer) => void;
+  /** Timeline is the default; Book shows the canon book. */
+  view?: StoryView;
+  onViewChange?: (view: StoryView) => void;
 };
 
-export default function WorldScene({ active = true, world, onWorld, drawer: controlled, onDrawer }: Props) {
+export default function WorldScene({ active = true, world, onWorld, drawer: controlled, onDrawer, view: controlledView, onViewChange }: Props) {
   const [liveWorld, setLiveWorld] = useState<World>(world);
   const parts = [...liveWorld.parts].sort((a, b) => a.order - b.order);
   const [partId, setPartId] = useState(parts[2]?.id ?? parts[0]?.id);
@@ -130,6 +136,14 @@ export default function WorldScene({ active = true, world, onWorld, drawer: cont
     if (controlled === undefined) setLocalDrawer(next);
     onDrawer?.(next);
   };
+  const [localView, setLocalView] = useState<StoryView>("timeline");
+  const view = controlledView !== undefined ? controlledView : localView;
+  const changeView = (next: StoryView) => {
+    if (controlledView === undefined) setLocalView(next);
+    onViewChange?.(next);
+  };
+  // The book needs the full page: opening any drawer returns to Timeline.
+  const showBook = view === "book" && drawer === null;
 
   // The ask bar suggests the sample project's change, from the seed
   // ripple data. Any other world starts empty.
@@ -483,6 +497,8 @@ export default function WorldScene({ active = true, world, onWorld, drawer: cont
       part: { id: target.id, title: target.title, summary: target.summary },
       characters,
       references,
+      stylePreset: base.visualStyle?.preset ?? "",
+      styleNotes: base.visualStyle?.notes ?? "",
     };
     if (styleImage) payload.styleImage = styleImage;
     if (options?.change) payload.change = options.change;
@@ -641,10 +657,34 @@ export default function WorldScene({ active = true, world, onWorld, drawer: cont
 
   return (
     <section
-      className={`scene${active ? " on" : ""}${ripple ? " ripple" : ""}`}
+      className={`scene${active ? " on" : ""}${ripple ? " ripple" : ""}${showBook ? " bookview" : ""}`}
       id="world"
       style={{ "--tint": part.tint } as React.CSSProperties}
     >
+      {drawer === null && (
+        <div className="viewswitch" role="group" aria-label="Story view">
+          <button
+            type="button"
+            className={view === "timeline" ? "on" : ""}
+            aria-pressed={view === "timeline"}
+            onClick={() => changeView("timeline")}
+          >
+            Timeline
+          </button>
+          <button
+            type="button"
+            className={view === "book" ? "on" : ""}
+            aria-pressed={view === "book"}
+            onClick={() => changeView("book")}
+          >
+            Book
+          </button>
+        </div>
+      )}
+      {showBook ? (
+        <CanonBook world={liveWorld} />
+      ) : (
+      <>
       <div
         className="artwash"
         style={
@@ -740,7 +780,6 @@ export default function WorldScene({ active = true, world, onWorld, drawer: cont
         </div>
         <div className="side">
           <button onClick={() => setDrawer("story")}>Scene notes</button>
-          <Link className="sidebtn" href={`/projects/${liveWorld.id}/canon`}>Canon</Link>
           {!part.imagePath &&
             (sceneState.kind === "working" ? (
               <button disabled>Making the art…</button>
@@ -1091,9 +1130,15 @@ export default function WorldScene({ active = true, world, onWorld, drawer: cont
         </div>
       </aside>
 
-      <CastDrawer world={liveWorld} open={drawer === "cast"} onClose={() => setDrawer(null)} onWorld={setWorld} />
-      <PackDrawer world={liveWorld} open={drawer === "pack"} onClose={() => setDrawer(null)} />
-      <StoryPackDrawer world={liveWorld} partId={part.id} open={drawer === "story"} onClose={() => setDrawer(null)} onWorld={setWorld} />
+      </>
+      )}
+      {!showBook && (
+        <>
+          <CastDrawer world={liveWorld} open={drawer === "cast"} onClose={() => setDrawer(null)} onWorld={setWorld} />
+          <PackDrawer world={liveWorld} open={drawer === "pack"} onClose={() => setDrawer(null)} />
+          <StoryPackDrawer world={liveWorld} partId={part.id} open={drawer === "story"} onClose={() => setDrawer(null)} onWorld={setWorld} />
+        </>
+      )}
     </section>
   );
 }

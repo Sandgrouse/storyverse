@@ -78,9 +78,14 @@ export async function POST(req: Request) {
   if (referenceImage) references.push(referenceImage);
   else if (styleImage) references.push(styleImage);
 
+  const style = {
+    preset: parsed.data.stylePreset,
+    notes: parsed.data.styleNotes,
+  };
+
   const attempt = (text: string | undefined) =>
     generateImage({
-      prompt: sheetPrompt(view, character, text),
+      prompt: sheetPrompt(view, character, text, style),
       referenceImages: references,
       size: "1024x1536",
       previousResponseId,
@@ -111,7 +116,7 @@ export async function POST(req: Request) {
     const rewrite = await completeJson(
       {
         instructions: REWRITE_INSTRUCTIONS,
-        input: sheetPrompt(view, character, description),
+        input: sheetPrompt(view, character, description, style),
         schemaName: REWRITE_SCHEMA_NAME,
         jsonSchema: REWRITE_JSON_SCHEMA,
       },

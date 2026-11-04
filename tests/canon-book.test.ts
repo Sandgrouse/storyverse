@@ -99,7 +99,6 @@ describe("canon schemas", () => {
       parts: [],
       facts: [],
       gaps: [],
-      files: [],
     }) as {
       properties: {
         channels: { items: { properties: { kind: { enum: string[] } } } };
@@ -275,8 +274,10 @@ describe("mergeWorldAssets", () => {
 });
 
 describe("canon navigation", () => {
-  it("sends Back on the canon page to Story", () => {
-    expect(backFor("/projects/abc/canon")).toBe("/projects/abc/story");
+  it("sends Back on the canon page to the Story Book view", () => {
+    expect(backFor("/projects/abc/canon")).toBe(
+      "/projects/abc/story?view=book",
+    );
   });
 });
 

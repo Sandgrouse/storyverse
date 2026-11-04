@@ -113,6 +113,21 @@ export function buildWorld(
       value: fact.value,
       source: fact.source,
     })),
+    visualStyle: {
+      preset: canon.visualStyle?.preset ?? "",
+      notes: canon.visualStyle?.notes ?? "",
+    },
+    // "From your art" when an image was provided for the read, otherwise
+    // the model's own reading.
+    visualStyleSource:
+      (canon.visualStyle?.preset ?? "").length > 0
+        ? [
+            ...canon.characters.map((c) => c.artFile),
+            ...canon.parts.map((p) => p.artFile),
+          ].some((file) => (file ?? "").length > 0)
+          ? ("art" as const)
+          : ("muse" as const)
+        : ("" as const),
     parts: orderedParts.map((part) => {
       const fromBeats = beatsByPart.get(part.id) ?? [];
       const fromText = characterIdsForPartText(

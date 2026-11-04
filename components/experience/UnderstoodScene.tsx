@@ -3,12 +3,117 @@
 import { useState } from "react";
 import { z } from "zod";
 import { FactSchema, type Fact, type World } from "@/lib/world/schemas";
+import { VISUAL_PRESETS, visualStyleSourceLine } from "@/lib/style";
 
 const SOURCE_LINE: Record<Fact["source"], string> = {
   material: "From your treatment",
   muse: "My reading",
   you: "You edited this",
 };
+
+/** The Visual style card in the basics grid, with its own editor state. */
+function StyleCard({
+  world,
+  onWorld,
+}: {
+  world: World;
+  onWorld: (world: World) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [preset, setPreset] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const style = world.visualStyle ?? { preset: "", notes: "" };
+  const line = visualStyleSourceLine(world.visualStyleSource);
+
+  const open = () => {
+    setPreset(style.preset);
+    setNotes(style.notes);
+    setEditing(true);
+  };
+
+  const save = () => {
+    const next = preset.trim();
+    if (!next) return;
+    onWorld({
+      ...world,
+      visualStyle: { preset: next, notes: notes.trim() },
+      visualStyleSource: "you",
+    });
+    setEditing(false);
+  };
+
+  if (!editing && style.preset.trim().length === 0) {
+    return (
+      <div className="fact miss" key="visual-style">
+        <small>Visual style</small>
+        <p>No visual style yet</p>
+        <button type="button" onClick={open}>
+          Choose a style
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fact wide" key="visual-style">
+      <small>
+        Visual style
+        {!editing && (
+          <button type="button" className="edit" onClick={open}>
+            Edit
+          </button>
+        )}
+      </small>
+      {editing ? (
+        <div className="styleedit">
+          <div className="stylechips" role="group" aria-label="Visual style presets">
+            {VISUAL_PRESETS.map((entry) => (
+              <button
+                key={entry.preset}
+                type="button"
+                className={preset === entry.preset ? "on" : ""}
+                aria-pressed={preset === entry.preset}
+                title={entry.description}
+                onClick={() => setPreset(entry.preset)}
+              >
+                {entry.preset}
+              </button>
+            ))}
+          </div>
+          <textarea
+            aria-label="Visual style notes"
+            placeholder="Palette and mood, in your own words"
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+          <div className="stylerow">
+            <button
+              type="button"
+              className="quiet"
+              disabled={!preset.trim()}
+              onClick={save}
+            >
+              Save
+            </button>
+            <button type="button" className="quiet" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p>
+            {style.preset}
+            {style.notes.trim().length > 0 ? ` — ${style.notes.trim()}` : ""}
+          </p>
+          {line && <span className="src">{line}</span>}
+        </>
+      )}
+    </div>
+  );
+}
 
 type Props = {
   active?: boolean;
@@ -26,7 +131,6 @@ export default function UnderstoodScene({ active = true, world, onWorld, onAddMa
   const [factDraft, setFactDraft] = useState("");
   const [readingBasics, setReadingBasics] = useState(false);
   const [basicsFailure, setBasicsFailure] = useState("");
-
   /** The server's message when it has one, so a budget stop reads as one. */
   const readBasics = async () => {
     if (readingBasics) return;
@@ -279,6 +383,7 @@ export default function UnderstoodScene({ active = true, world, onWorld, onAddMa
                   </div>
                 ),
               )}
+              <StyleCard world={world} onWorld={onWorld} />
             </div>
           ) : (
             <div className="facts">
@@ -291,6 +396,7 @@ export default function UnderstoodScene({ active = true, world, onWorld, onAddMa
                 {readingBasics ? "Reading the basics…" : "Read the story's basics"}
               </button>
               {basicsFailure && <p className="status">{basicsFailure}</p>}
+              <StyleCard world={world} onWorld={onWorld} />
             </div>
           )}
           {world.gaps.map((gap) => (
