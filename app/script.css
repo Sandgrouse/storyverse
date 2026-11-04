@@ -245,6 +245,65 @@
   transform: translateY(-1px);
 }
 
+/* Helper choosers: one popover anchored to each insert button. */
+.script-helper {
+  position: relative;
+}
+
+.script-chip.on {
+  background: var(--ink);
+  color: var(--sheet);
+  border-color: var(--ink);
+}
+
+.script-chip.sm {
+  padding: 5px 11px;
+  font-size: 12px;
+}
+
+.script-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 7;
+  min-width: 240px;
+  max-width: 330px;
+  max-height: 320px;
+  overflow: auto;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: var(--lift);
+  padding: 14px;
+}
+
+.script-poplabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--clay);
+  margin: 10px 0 2px;
+}
+
+.script-poplabel:first-child {
+  margin-top: 0;
+}
+
+.script-popinput {
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  padding: 7px 10px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.script-pop .script-row {
+  margin-top: 8px;
+}
+
 /* @ mention menu, pinned to the caret inside the paper page. */
 .script-mentions {
   position: absolute;

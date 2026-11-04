@@ -14,9 +14,9 @@ import {
   REWRITE_JSON_SCHEMA,
   REWRITE_SCHEMA_NAME,
   RewriteModelOutputSchema,
-  SHEET_VIEW_IDS,
   SheetViewRequestSchema,
   fitsRequestLimit,
+  isSupportedSheetView,
   sheetPrompt,
 } from "@/lib/art";
 
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   const { view, character, referenceImage, previousResponseId, styleImage } =
     parsed.data;
   let { description } = parsed.data;
-  if (!SHEET_VIEW_IDS.includes(view as (typeof SHEET_VIEW_IDS)[number])) {
+  if (!isSupportedSheetView(view)) {
     return errorResponse(400, "VALIDATION_ERROR", "Unknown sheet view.");
   }
 

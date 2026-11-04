@@ -5,19 +5,42 @@ import { __resetBudgetMemory } from "@/lib/budget";
 import { planAgentFiles } from "@/lib/package";
 import { mergeWorldAssets } from "@/lib/projects";
 import {
+  ACTION_STARTERS,
+  CHARACTER_CUE_SUFFIXES,
   COPY_DRAFT_INSTRUCTIONS,
+  DESIGN_BLOCK_HEADINGS,
+  DESIGN_CAMERAS,
+  DESIGN_CONTROLS,
   DESIGN_DRAFT_INSTRUCTIONS,
+  DESIGN_GAME_TYPES,
   DESIGN_HEADINGS,
+  DESIGN_MECHANICS,
+  DESIGN_PROGRESSION,
+  DESIGN_SESSION_LENGTHS,
+  SCENE_PREFIXES,
+  SCENE_TIMES,
   applyInsertAtCaret,
   applyScriptReplacement,
+  composeActionLine,
+  composeCameraBlock,
+  composeCharacterCue,
+  composeControlsBlock,
+  composeDialogueBlock,
+  composeGameTypeBlock,
+  composeGoalBlock,
+  composeMechanicsBlock,
+  composeProgressionBlock,
+  composeSceneHeading,
   draftInstructionsForForm,
   filterMentions,
   formatMentionName,
   formForKind,
   highlightSegments,
   initialScriptText,
+  insertDesignBlock,
   insertMentionAtCaret,
   insertSnippet,
+  joinDesignChoices,
   mentionCandidates,
   mentionQueryBeforeCaret,
   scriptCheckInput,
@@ -656,6 +679,211 @@ describe("insert bar formatting", () => {
   it("replaces the selection", () => {
     const next = applyInsertAtCaret("Keep this.", 0, 4, insertSnippet("dialogue"));
     expect(next.text).toBe("\tDialogue.\n this.");
+  });
+});
+
+describe("scene heading composition", () => {
+  it("offers INT. and EXT. with every time of day", () => {
+    expect(SCENE_PREFIXES).toEqual(["INT.", "EXT."]);
+    expect(SCENE_TIMES).toEqual([
+      "DAY",
+      "NIGHT",
+      "DAWN",
+      "DUSK",
+      "LATER",
+      "CONTINUOUS",
+    ]);
+  });
+
+  it("composes the chosen heading, uppercasing the place", () => {
+    expect(composeSceneHeading("EXT.", "The stream", "NIGHT")).toBe(
+      "EXT. THE STREAM - NIGHT",
+    );
+    expect(composeSceneHeading("INT.", "Ada's hut", "DAWN")).toBe(
+      "INT. ADA'S HUT - DAWN",
+    );
+  });
+
+  it("falls back to placeholders when nothing is picked", () => {
+    expect(composeSceneHeading("", "", "")).toBe("INT. LOCATION - DAY");
+  });
+
+  it("lands on its own line through the caret insert", () => {
+    const snippet = `${composeSceneHeading("EXT.", "The stream", "NIGHT")}\n`;
+    const next = applyInsertAtCaret("ADA waits.", 10, 10, snippet);
+    expect(next.text).toBe("ADA waits.\nEXT. THE STREAM - NIGHT\n");
+  });
+});
+
+describe("character and dialogue composition", () => {
+  it("offers plain, voice-over and off-screen cues", () => {
+    expect(CHARACTER_CUE_SUFFIXES).toEqual(["", "(V.O.)", "(O.S.)"]);
+  });
+
+  it("uppercases the cue and appends the chosen suffix", () => {
+    expect(composeCharacterCue("Ada", "")).toBe("ADA");
+    expect(composeCharacterCue("Ada", "(V.O.)")).toBe("ADA (V.O.)");
+    expect(composeCharacterCue("Anukili Ugama", "(O.S.)")).toBe(
+      "ANUKILI UGAMA (O.S.)",
+    );
+  });
+
+  it("composes the cue with an optional parenthetical and a typing line", () => {
+    expect(composeDialogueBlock("Ada", "")).toBe("ADA\n\t");
+    expect(composeDialogueBlock("Ada", "softly")).toBe("ADA\n(softly)\n\t");
+  });
+
+  it("lands the caret on the dialogue line ready to type", () => {
+    const snippet = composeDialogueBlock("Ada", "softly");
+    const next = applyInsertAtCaret("", 0, 0, snippet);
+    expect(next.text).toBe("ADA\n(softly)\n\t");
+    expect(next.caret).toBe(next.text.length);
+  });
+
+  it("composes an action line or a blank one", () => {
+    expect(ACTION_STARTERS.length).toBeGreaterThan(0);
+    expect(composeActionLine("The stream ripples.")).toBe(
+      "The stream ripples.\n",
+    );
+    expect(composeActionLine("")).toBe("\n");
+  });
+});
+
+describe("design helper blocks", () => {
+  const context = {
+    partTitle: "The Crossing",
+    characterNames: ["Ada", "Enyinnia"],
+    locationNames: ["The stream"],
+  };
+
+  it("lists every option the helper bar offers", () => {
+    expect(DESIGN_GAME_TYPES).toEqual([
+      "Endless runner",
+      "Platformer",
+      "Top-down action",
+      "Action RPG",
+      "Strategy",
+      "Puzzle",
+      "Roguelike",
+      "Survival",
+      "Visual novel",
+      "Rhythm",
+      "Hunt and chase",
+      "Other",
+    ]);
+    expect(DESIGN_CAMERAS).toEqual([
+      "2D side-scroll",
+      "Top-down",
+      "Isometric",
+      "Third-person 3D",
+      "First-person 3D",
+    ]);
+    expect(DESIGN_MECHANICS).toEqual([
+      "Movement",
+      "Jump",
+      "Dash",
+      "Melee combat",
+      "Ranged combat",
+      "Stealth",
+      "Crafting",
+      "Gathering",
+      "Dialogue choices",
+      "Puzzles",
+      "Timing",
+      "Building",
+      "Resource management",
+    ]);
+    expect(DESIGN_SESSION_LENGTHS).toEqual([
+      "5 minutes",
+      "30 minutes",
+      "2 hours",
+      "campaign",
+    ]);
+    expect(DESIGN_CONTROLS).toEqual(["Keyboard and mouse", "Gamepad", "Touch"]);
+    expect(DESIGN_PROGRESSION).toEqual([
+      "Levels",
+      "Unlockable abilities",
+      "Story chapters",
+      "Score only",
+    ]);
+  });
+
+  it("composes a readable game-type block with the story's real names", () => {
+    const block = composeGameTypeBlock("Hunt and chase", context);
+    expect(block).toBe(
+      "Game type: Hunt and chase. The player tracks a creature through The stream. Starring Ada and Enyinnia.",
+    );
+  });
+
+  it("composes camera, mechanics, goal, controls and progression blocks", () => {
+    expect(composeCameraBlock("Top-down")).toBe(
+      "Camera and view: Top-down. The game is seen from above.",
+    );
+    expect(composeMechanicsBlock(["Jump", "Dash"])).toBe(
+      "Core mechanics: Jump and Dash.",
+    );
+    expect(joinDesignChoices(["Movement", "Jump", "Dash"])).toBe(
+      "Movement, Jump and Dash",
+    );
+    expect(
+      composeGoalBlock({
+        win: "reach the far bank",
+        lose: "the current takes Ada",
+        session: "5 minutes",
+      }),
+    ).toBe(
+      "Goal and ending: Win by reach the far bank. Lose when the current takes Ada. A session lasts 5 minutes.",
+    );
+    expect(composeControlsBlock(["Touch"])).toBe("Controls: Touch.");
+    expect(composeProgressionBlock(["Levels", "Story chapters"])).toBe(
+      "Progression: Levels and Story chapters.",
+    );
+  });
+
+  it("places each block under its own heading", () => {
+    expect(DESIGN_BLOCK_HEADINGS.gameType).toBe("Core idea");
+    const doc = "Core idea\nAn old draft.\n\nWhat the player does\nRun.\n";
+    const block = composeMechanicsBlock(["Stealth"]);
+    const next = insertDesignBlock(doc, "What the player does", block);
+    expect(next.text).toBe(
+      "Core idea\nAn old draft.\n\nWhat the player does\nRun.\n\nCore mechanics: Stealth.\n",
+    );
+    expect(next.text.indexOf("Core idea")).toBeLessThan(
+      next.text.indexOf("What the player does"),
+    );
+  });
+
+  it("creates a missing heading instead of duplicating one", () => {
+    const doc = "Core idea\nAn old draft.\n";
+    const first = insertDesignBlock(
+      doc,
+      "What the player wants",
+      composeGoalBlock({ win: "reach the far bank", session: "5 minutes" }),
+    );
+    expect(first.text).toContain("What the player wants");
+    const second = insertDesignBlock(
+      first.text,
+      "What the player wants",
+      composeProgressionBlock(["Levels"]),
+    );
+    const count = second.text
+      .split("\n")
+      .filter((line) => line.trim() === "What the player wants").length;
+    expect(count).toBe(1);
+    expect(second.text).toContain("Win by reach the far bank.");
+    expect(second.text).toContain("Progression: Levels.");
+  });
+
+  it("starts an empty document with the heading and block", () => {
+    const next = insertDesignBlock(
+      "",
+      "Core idea",
+      composeGameTypeBlock("Puzzle", context),
+    );
+    expect(next.text).toBe(
+      "Core idea\nGame type: Puzzle. The player solves through The stream. Starring Ada and Enyinnia.\n",
+    );
+    expect(next.caret).toBe(next.text.trimEnd().length);
   });
 });
 

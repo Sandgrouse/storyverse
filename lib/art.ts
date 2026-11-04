@@ -29,6 +29,86 @@ export type SheetViewId = (typeof SHEET_VIEWS)[number]["id"];
 
 export const SHEET_VIEW_IDS = SHEET_VIEWS.map((view) => view.id);
 
+/** Extra "More poses" chips on the Characters page. Plain data only. */
+export const EXTRA_POSES = [
+  { id: "sitting", label: "Sitting", line: "Sitting, relaxed and facing the viewer." },
+  { id: "running", label: "Running", line: "Running fast, mid-stride." },
+  {
+    id: "fighting-stance",
+    label: "Fighting stance",
+    line: "In a fighting stance, ready and alert.",
+  },
+  { id: "looking-back", label: "Looking back", line: "Looking back over one shoulder." },
+  { id: "arms-raised", label: "Arms raised", line: "Standing with both arms raised." },
+  {
+    id: "close-up-face",
+    label: "Close-up face",
+    line: "Close-up portrait of the face only.",
+  },
+] as const;
+
+export type ExtraPoseId = (typeof EXTRA_POSES)[number]["id"];
+
+export const EXTRA_POSE_IDS = EXTRA_POSES.map((pose) => pose.id);
+
+export const EXTRA_POSE_LABELS = EXTRA_POSES.map((pose) => pose.label);
+
+/** Every view the sheet grid knows by name, base views first. */
+export const ALL_KNOWN_VIEW_IDS: string[] = [...SHEET_VIEW_IDS, ...EXTRA_POSE_IDS];
+
+/**
+ * Turn free text from the "More poses" box into a sheet view id.
+ * Lowercase, joined with dashes, safe for storage and image names.
+ * Pure, so the drawer and tests share it.
+ */
+export function poseIdFor(label: string): string {
+  const slug = label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return slug;
+}
+
+/** Human label for a custom pose id: dashes back to spaces. */
+export function poseLabelFor(viewId: string): string {
+  const known =
+    SHEET_VIEWS.find((v) => v.id === viewId)?.label ??
+    EXTRA_POSES.find((p) => p.id === viewId)?.label;
+  if (known) return known;
+  const words = viewId.replace(/-/g, " ").trim();
+  if (!words) return viewId;
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * Order sheet entries for the grid: known views first in their
+ * canonical order (base sheet, then the pose chips), then any custom
+ * views in the order they were made. Pure, so the drawer and tests
+ * share it.
+ */
+export function orderedSheetViews<T extends { view: string }>(sheet: T[]): T[] {
+  const order = new Map<string, number>(
+    ALL_KNOWN_VIEW_IDS.map((id, i) => [id, i]),
+  );
+  return [...sheet].sort((a, b) => {
+    const ai = order.has(a.view) ? (order.get(a.view) as number) : null;
+    const bi = order.has(b.view) ? (order.get(b.view) as number) : null;
+    if (ai !== null && bi !== null) return ai - bi;
+    if (ai !== null) return -1;
+    if (bi !== null) return 1;
+    return 0;
+  });
+}
+
+/** True when the sheet-view route may draw this view. */
+export function isSupportedSheetView(view: string): boolean {
+  if (!view || view.length > 60) return false;
+  if (ALL_KNOWN_VIEW_IDS.includes(view)) return true;
+  return /^[a-z0-9-]+$/.test(view);
+}
+
 export const SHEET_SUFFIX =
   "Keep the exact same character from the reference: same face, build, skin, hair, clothing, beads and carried items, in the same art style. Full body, centered, on a plain dark background. Do not draw any text, letters, labels, captions, numbers, logos or watermarks anywhere in the image.";
 
@@ -127,7 +207,11 @@ export const BlockedResponseSchema = z.object({
 });
 
 export function sheetViewLine(view: string): string {
-  return SHEET_VIEWS.find((v) => v.id === view)?.line ?? view;
+  return (
+    SHEET_VIEWS.find((v) => v.id === view)?.line ??
+    EXTRA_POSES.find((p) => p.id === view)?.line ??
+    poseLabelFor(view)
+  );
 }
 
 /**

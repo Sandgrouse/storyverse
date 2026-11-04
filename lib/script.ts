@@ -492,6 +492,323 @@ export function insertMentionAtCaret(
 export type InsertKind = "scene" | "character" | "action" | "dialogue";
 
 /**
+ * Scene-heading chooser options. The location list comes from the
+ * project's places; the creator may also type a new one. Pure data.
+ */
+export const SCENE_PREFIXES = ["INT.", "EXT."] as const;
+
+export type ScenePrefix = (typeof SCENE_PREFIXES)[number];
+
+export const SCENE_TIMES = [
+  "DAY",
+  "NIGHT",
+  "DAWN",
+  "DUSK",
+  "LATER",
+  "CONTINUOUS",
+] as const;
+
+export type SceneTime = (typeof SCENE_TIMES)[number];
+
+/**
+ * One screenplay scene heading, e.g. `EXT. THE STREAM - NIGHT`.
+ * The location reads uppercase; a blank location stays a placeholder.
+ * Pure, so the insert bar and tests share it.
+ */
+export function composeSceneHeading(
+  prefix: string,
+  location: string,
+  time: string,
+): string {
+  const head = prefix.trim() || "INT.";
+  const place = location.trim().toUpperCase() || "LOCATION";
+  const when = time.trim() || "DAY";
+  return `${head} ${place} - ${when}`;
+}
+
+/** Cue suffixes for a character voice: plain, voice-over, off-screen. */
+export const CHARACTER_CUE_SUFFIXES = ["", "(V.O.)", "(O.S.)"] as const;
+
+/**
+ * A character cue in capitals, e.g. `ADA (V.O.)`. Pure, so the insert
+ * bar and tests share it.
+ */
+export function composeCharacterCue(name: string, suffix = ""): string {
+  const cue = name.trim().toUpperCase() || "CHARACTER";
+  const tail = suffix.trim();
+  return tail ? `${cue} ${tail}` : cue;
+}
+
+/**
+ * A cue plus a dialogue line ready to type: the caret lands after the
+ * trailing tab when this is dropped at the caret. Pure.
+ */
+export function composeDialogueBlock(
+  speaker: string,
+  parenthetical = "",
+): string {
+  const cue = composeCharacterCue(speaker);
+  const aside = parenthetical.trim();
+  return aside ? `${cue}\n(${aside})\n\t` : `${cue}\n\t`;
+}
+
+/**
+ * Short action-line starters for a blank moment. Plain description,
+ * never a placeholder the creator must delete.
+ */
+export const ACTION_STARTERS = [
+  "Dawn light fills the room.",
+  "Footsteps approach.",
+  "The stream ripples.",
+  "A door creaks open.",
+  "Silence settles.",
+] as const;
+
+/**
+ * One action line, or a blank line when no starter is picked. Pure.
+ */
+export function composeActionLine(starter = ""): string {
+  const line = starter.trim();
+  return line ? `${line}\n` : "\n";
+}
+
+/**
+ * Design-form helper options for the game design document. Plain data
+ * so the helper bar and tests share them.
+ */
+export const DESIGN_GAME_TYPES = [
+  "Endless runner",
+  "Platformer",
+  "Top-down action",
+  "Action RPG",
+  "Strategy",
+  "Puzzle",
+  "Roguelike",
+  "Survival",
+  "Visual novel",
+  "Rhythm",
+  "Hunt and chase",
+  "Other",
+] as const;
+
+export const DESIGN_CAMERAS = [
+  "2D side-scroll",
+  "Top-down",
+  "Isometric",
+  "Third-person 3D",
+  "First-person 3D",
+] as const;
+
+export const DESIGN_MECHANICS = [
+  "Movement",
+  "Jump",
+  "Dash",
+  "Melee combat",
+  "Ranged combat",
+  "Stealth",
+  "Crafting",
+  "Gathering",
+  "Dialogue choices",
+  "Puzzles",
+  "Timing",
+  "Building",
+  "Resource management",
+] as const;
+
+export const DESIGN_SESSION_LENGTHS = [
+  "5 minutes",
+  "30 minutes",
+  "2 hours",
+  "campaign",
+] as const;
+
+export const DESIGN_CONTROLS = [
+  "Keyboard and mouse",
+  "Gamepad",
+  "Touch",
+] as const;
+
+export const DESIGN_PROGRESSION = [
+  "Levels",
+  "Unlockable abilities",
+  "Story chapters",
+  "Score only",
+] as const;
+
+/** Which design heading each helper block belongs under. */
+export const DESIGN_BLOCK_HEADINGS = {
+  gameType: "Core idea",
+  camera: "What the player does",
+  mechanics: "What the player does",
+  goal: "What the player wants",
+  controls: "Notes for building in Godot",
+  progression: "Levels and places",
+} as const;
+
+export type DesignBlockKind = keyof typeof DESIGN_BLOCK_HEADINGS;
+
+/** Real story names a design block may mention. All optional. */
+export type DesignStoryContext = {
+  partTitle?: string;
+  partSummary?: string;
+  characterNames?: string[];
+  locationNames?: string[];
+};
+
+function designPlace(context: DesignStoryContext): string {
+  const place = (context.locationNames ?? []).find((n) => n.trim());
+  if (place) return place.trim();
+  if (context.partTitle?.trim()) return context.partTitle.trim();
+  return "the story's world";
+}
+
+function designCast(context: DesignStoryContext): string {
+  const names = (context.characterNames ?? []).filter((n) => n.trim());
+  if (names.length === 0) return "";
+  if (names.length === 1) return ` Starring ${names[0].trim()}.`;
+  const last = names[names.length - 1].trim();
+  const rest = names
+    .slice(0, -1)
+    .map((n) => n.trim())
+    .join(", ");
+  return ` Starring ${rest} and ${last}.`;
+}
+
+/** Join a multi-select list the way the document reads it. */
+export function joinDesignChoices(choices: string[]): string {
+  const clean = choices.map((c) => c.trim()).filter((c) => c.length > 0);
+  if (clean.length === 0) return "";
+  if (clean.length === 1) return clean[0];
+  const last = clean[clean.length - 1];
+  return `${clean.slice(0, -1).join(", ")} and ${last}`;
+}
+
+const GAME_TYPE_VERBS: Record<string, string> = {
+  "Endless runner": "The player keeps moving forward",
+  Platformer: "The player jumps across",
+  "Top-down action": "The player fights across",
+  "Action RPG": "The player quests across",
+  Strategy: "The player outplans rivals across",
+  Puzzle: "The player solves through",
+  Roguelike: "The player runs again and again through",
+  Survival: "The player holds out in",
+  "Visual novel": "The player reads and chooses through",
+  Rhythm: "The player moves in time through",
+  "Hunt and chase": "The player tracks a creature through",
+  Other: "The player explores",
+};
+
+/**
+ * A game-type block a coding agent can read, e.g.
+ * `Game type: Hunt and chase. The player tracks a creature through ...`.
+ * Pure.
+ */
+export function composeGameTypeBlock(
+  choice: string,
+  context: DesignStoryContext = {},
+): string {
+  const kind = choice.trim() || "Other";
+  const verb = GAME_TYPE_VERBS[kind] ?? "The player explores";
+  return `Game type: ${kind}. ${verb} ${designPlace(context)}.${designCast(context)}`;
+}
+
+const CAMERA_NOTES: Record<string, string> = {
+  "2D side-scroll": "The game scrolls left to right.",
+  "Top-down": "The game is seen from above.",
+  Isometric: "The game uses an angled view from above.",
+  "Third-person 3D": "The camera follows behind the player.",
+  "First-person 3D": "The player sees through the character's eyes.",
+};
+
+/** A camera block, e.g. `Camera and view: Top-down. ...`. Pure. */
+export function composeCameraBlock(choice: string): string {
+  const kind = choice.trim() || "Top-down";
+  const note = CAMERA_NOTES[kind] ?? "Everything is staged for this view.";
+  return `Camera and view: ${kind}. ${note}`;
+}
+
+/** A mechanics block from a multi-select, e.g. `Core mechanics: Jump and Dash.`. Pure. */
+export function composeMechanicsBlock(choices: string[]): string {
+  const list = joinDesignChoices(choices) || "Movement";
+  return `Core mechanics: ${list}.`;
+}
+
+export type DesignGoal = {
+  win?: string;
+  lose?: string;
+  session?: string;
+};
+
+/** A goal block from a win condition, a lose condition and a length. Pure. */
+export function composeGoalBlock(goal: DesignGoal): string {
+  const parts: string[] = [];
+  if (goal.win?.trim()) parts.push(`Win by ${goal.win.trim()}.`);
+  if (goal.lose?.trim()) parts.push(`Lose when ${goal.lose.trim()}.`);
+  if (goal.session?.trim()) parts.push(`A session lasts ${goal.session.trim()}.`);
+  if (parts.length === 0) parts.push("Win and lose conditions are not set yet.");
+  return `Goal and ending: ${parts.join(" ")}`;
+}
+
+/** A controls block from a multi-select. Pure. */
+export function composeControlsBlock(choices: string[]): string {
+  const list = joinDesignChoices(choices) || "Keyboard and mouse";
+  return `Controls: ${list}.`;
+}
+
+/** A progression block from a multi-select. Pure. */
+export function composeProgressionBlock(choices: string[]): string {
+  const list = joinDesignChoices(choices) || "Levels";
+  return `Progression: ${list}.`;
+}
+
+/**
+ * Drop a design block under its heading, creating the heading when it
+ * is missing. A present heading is never duplicated: the block joins
+ * the end of its section, before the next heading. Pure. Returns the
+ * caret just after the inserted block.
+ */
+export function insertDesignBlock(
+  text: string,
+  heading: string,
+  block: string,
+): { text: string; caret: number } {
+  const clean = block.trim();
+  const known = new Set<string>(DESIGN_HEADINGS as readonly string[]);
+  const lines = text.split("\n");
+  const at = lines.findIndex((line) => line.trim() === heading);
+  if (at === -1) {
+    const prefix =
+      text.length === 0
+        ? ""
+        : text.endsWith("\n\n")
+          ? ""
+          : text.endsWith("\n")
+            ? "\n"
+            : "\n\n";
+    const next = `${text}${prefix}${heading}\n${clean}\n`;
+    return { text: next, caret: next.indexOf(clean) + clean.length };
+  }
+  let end = lines.length;
+  for (let i = at + 1; i < lines.length; i += 1) {
+    if (known.has(lines[i].trim())) {
+      end = i;
+      break;
+    }
+  }
+  const before = lines.slice(0, end);
+  while (before.length > at + 1 && before[before.length - 1].trim() === "") {
+    before.pop();
+  }
+  before.push("", clean);
+  const after = lines.slice(end);
+  const next =
+    after.length > 0
+      ? [...before, "", ...after].join("\n")
+      : [...before, ""].join("\n");
+  return { text: next, caret: next.indexOf(clean) + clean.length };
+}
+
+/**
  * One correctly formatted screenplay line to drop at the caret.
  * Scene headings open the place and time, character cues read
  * uppercase, dialogue sits indented. Pure.
