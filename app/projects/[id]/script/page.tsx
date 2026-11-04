@@ -6,22 +6,44 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { MissingStory, useProject } from "@/components/projects/ProjectContext";
 import {
+  ACTION_STARTERS,
+  CHARACTER_CUE_SUFFIXES,
+  DESIGN_BLOCK_HEADINGS,
+  DESIGN_CAMERAS,
+  DESIGN_CONTROLS,
+  DESIGN_GAME_TYPES,
+  DESIGN_MECHANICS,
+  DESIGN_PROGRESSION,
+  DESIGN_SESSION_LENGTHS,
+  SCENE_PREFIXES,
+  SCENE_TIMES,
   ScriptCheckResponseSchema,
   applyInsertAtCaret,
   applyScriptReplacement,
+  composeActionLine,
+  composeCameraBlock,
+  composeCharacterCue,
+  composeControlsBlock,
+  composeDialogueBlock,
+  composeGameTypeBlock,
+  composeGoalBlock,
+  composeMechanicsBlock,
+  composeProgressionBlock,
+  composeSceneHeading,
   filterMentions,
   formatMentionName,
   formForKind,
   highlightSegments,
   highlightTerms,
   initialScriptText,
+  insertDesignBlock,
   insertMentionAtCaret,
-  insertSnippet,
   mentionCandidates,
   mentionQueryBeforeCaret,
   scriptForScene,
   upsertScript,
-  type InsertKind,
+  type DesignBlockKind,
+  type DesignStoryContext,
   type MentionCandidate,
   type ScriptIssue,
 } from "@/lib/script";
@@ -30,11 +52,22 @@ import { channelColorByIndex, stripImageData } from "@/lib/story";
 
 const SAVE_DELAY_MS = 600;
 
-const INSERT_BUTTONS: Array<{ kind: InsertKind; label: string }> = [
+const SCRIPT_HELPERS = [
   { kind: "scene", label: "Scene heading" },
   { kind: "character", label: "Character" },
   { kind: "action", label: "Action" },
   { kind: "dialogue", label: "Dialogue" },
+] as const;
+
+type ScriptHelperKind = (typeof SCRIPT_HELPERS)[number]["kind"];
+
+const DESIGN_HELPERS: Array<{ kind: DesignBlockKind; label: string }> = [
+  { kind: "gameType", label: "Game type" },
+  { kind: "camera", label: "Camera and view" },
+  { kind: "mechanics", label: "Core mechanics" },
+  { kind: "goal", label: "Goal and ending" },
+  { kind: "controls", label: "Controls" },
+  { kind: "progression", label: "Progression" },
 ];
 
 /**
@@ -102,6 +135,435 @@ async function responseMessage(
   return typeof error?.message === "string" && error.message.length > 0
     ? error.message
     : fallback;
+}
+
+/**
+ * One helper button with its chooser popover. The popover anchors to
+ * the button, takes focus when it opens, closes on Escape and returns
+ * focus to the button. Only keyboard and buttons: no pointer-only
+ * behavior.
+ */
+function HelperButton({
+  label,
+  open,
+  onToggle,
+  onClose,
+  children,
+}: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(false);
+
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      panelRef.current
+        ?.querySelector<HTMLElement>("button, input, select, textarea")
+        ?.focus();
+    }
+    if (!open && wasOpen.current) {
+      btnRef.current?.focus();
+    }
+    wasOpen.current = open;
+  }, [open ]);
+
+  return (
+    <div className="script-helper">
+      <button
+        ref={btnRef}
+        type="button"
+        className={`script-chip${open ? " on" : ""}`}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={onToggle}
+      >
+        {label}
+      </button>
+      {open ? (
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-label={label}
+          className="script-pop"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              onClose();
+            }
+          }}
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PopLabel({ children }: { children: React.ReactNode }) {
+  return <div className="script-poplabel">{children}</div>;
+}
+
+function SceneHeadingChooser({
+  places,
+  onPick,
+}: {
+  places: string[];
+  onPick: (snippet: string) => void;
+}) {
+  const [prefix, setPrefix] = useState<string>(SCENE_PREFIXES[0]);
+  const [picked, setPicked] = useState<string>(places[0] ?? "");
+  const [typed, setTyped] = useState("");
+  const [time, setTime] = useState<string>(SCENE_TIMES[0]);
+  const location = typed.trim() || picked;
+  return (
+    <div>
+      <PopLabel>Interior or exterior</PopLabel>
+      <div className="script-row" role="group" aria-label="Interior or exterior">
+        {SCENE_PREFIXES.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={`script-chip sm${item === prefix ? " on" : ""}`}
+            aria-pressed={item === prefix}
+            onClick={() => setPrefix(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      <PopLabel>Location</PopLabel>
+      {places.length > 0 ? (
+        <div className="script-row" role="group" aria-label="Location">
+          {places.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className={`script-chip sm${name === picked && !typed.trim() ? " on" : ""}`}
+              aria-pressed={name === picked && !typed.trim()}
+              onClick={() => {
+                setPicked(name);
+                setTyped("");
+              }}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <input
+        type="text"
+        className="script-popinput"
+        aria-label="Or type a location"
+        placeholder="Or type a location"
+        value={typed}
+        onChange={(e) => setTyped(e.target.value)}
+      />
+      <PopLabel>Time</PopLabel>
+      <div className="script-row" role="group" aria-label="Time">
+        {SCENE_TIMES.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={`script-chip sm${item === time ? " on" : ""}`}
+            aria-pressed={item === time}
+            onClick={() => setTime(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      <div className="script-row">
+        <button
+          type="button"
+          className="pill sm"
+          onClick={() => onPick(`${composeSceneHeading(prefix, location, time)}\n`)}
+        >
+          Insert heading
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CharacterChooser({
+  names,
+  onPick,
+}: {
+  names: string[];
+  onPick: (snippet: string) => void;
+}) {
+  const [name, setName] = useState(names[0] ?? "");
+  const [suffix, setSuffix] = useState("");
+  return (
+    <div>
+      <PopLabel>Character</PopLabel>
+      {names.length > 0 ? (
+        <div className="script-row" role="group" aria-label="Character">
+          {names.map((candidate) => (
+            <button
+              key={candidate}
+              type="button"
+              className={`script-chip sm${candidate === name ? " on" : ""}`}
+              aria-pressed={candidate === name}
+              onClick={() => setName(candidate)}
+            >
+              {candidate}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="script-note">No characters yet.</p>
+      )}
+      <PopLabel>Voice tag</PopLabel>
+      <div className="script-row" role="group" aria-label="Voice tag">
+        {CHARACTER_CUE_SUFFIXES.map((item) => (
+          <button
+            key={item || "plain"}
+            type="button"
+            className={`script-chip sm${item === suffix ? " on" : ""}`}
+            aria-pressed={item === suffix}
+            onClick={() => setSuffix(item)}
+          >
+            {item || "Plain"}
+          </button>
+        ))}
+      </div>
+      <div className="script-row">
+        <button
+          type="button"
+          className="pill sm"
+          onClick={() => onPick(`${composeCharacterCue(name, suffix)}\n`)}
+        >
+          Insert cue
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DialogueChooser({
+  names,
+  onPick,
+}: {
+  names: string[];
+  onPick: (snippet: string) => void;
+}) {
+  const [speaker, setSpeaker] = useState(names[0] ?? "");
+  const [aside, setAside] = useState("");
+  return (
+    <div>
+      <PopLabel>Speaker</PopLabel>
+      {names.length > 0 ? (
+        <div className="script-row" role="group" aria-label="Speaker">
+          {names.map((candidate) => (
+            <button
+              key={candidate}
+              type="button"
+              className={`script-chip sm${candidate === speaker ? " on" : ""}`}
+              aria-pressed={candidate === speaker}
+              onClick={() => setSpeaker(candidate)}
+            >
+              {candidate}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="script-note">No characters yet.</p>
+      )}
+      <PopLabel>Parenthetical (optional)</PopLabel>
+      <input
+        type="text"
+        className="script-popinput"
+        aria-label="Parenthetical"
+        placeholder="e.g. softly"
+        value={aside}
+        onChange={(e) => setAside(e.target.value)}
+      />
+      <div className="script-row">
+        <button
+          type="button"
+          className="pill sm"
+          onClick={() => onPick(composeDialogueBlock(speaker, aside))}
+        >
+          Insert dialogue
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ActionChooser({ onPick }: { onPick: (snippet: string) => void }) {
+  const [starter, setStarter] = useState("");
+  return (
+    <div>
+      <PopLabel>Start with (optional)</PopLabel>
+      <div className="script-row" role="group" aria-label="Action starter">
+        <button
+          type="button"
+          className={`script-chip sm${starter === "" ? " on" : ""}`}
+          aria-pressed={starter === ""}
+          onClick={() => setStarter("")}
+        >
+          Blank line
+        </button>
+        {ACTION_STARTERS.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={`script-chip sm${item === starter ? " on" : ""}`}
+            aria-pressed={item === starter}
+            onClick={() => setStarter(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      <div className="script-row">
+        <button
+          type="button"
+          className="pill sm"
+          onClick={() => onPick(composeActionLine(starter))}
+        >
+          Insert action
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SingleChooser({
+  options,
+  initial,
+  action,
+  onConfirm,
+}: {
+  options: readonly string[];
+  initial: string;
+  action: string;
+  onConfirm: (choice: string) => void;
+}) {
+  const [choice, setChoice] = useState(initial);
+  return (
+    <div>
+      <div className="script-row" role="group" aria-label={action}>
+        {options.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={`script-chip sm${item === choice ? " on" : ""}`}
+            aria-pressed={item === choice}
+            onClick={() => setChoice(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      <div className="script-row">
+        <button type="button" className="pill sm" onClick={() => onConfirm(choice)}>
+          {action}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MultiChooser({
+  options,
+  action,
+  onConfirm,
+}: {
+  options: readonly string[];
+  action: string;
+  onConfirm: (choices: string[]) => void;
+}) {
+  const [picked, setPicked] = useState<string[]>([]);
+  const toggle = (item: string) =>
+    setPicked((prev) =>
+      prev.includes(item) ? prev.filter((entry) => entry !== item) : [...prev, item],
+    );
+  return (
+    <div>
+      <div className="script-row" role="group" aria-label={action}>
+        {options.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={`script-chip sm${picked.includes(item) ? " on" : ""}`}
+            aria-pressed={picked.includes(item)}
+            onClick={() => toggle(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      <div className="script-row">
+        <button
+          type="button"
+          className="pill sm"
+          disabled={picked.length === 0}
+          onClick={() => onConfirm(picked)}
+        >
+          {action}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GoalChooser({ onConfirm }: { onConfirm: (goal: { win: string; lose: string; session: string }) => void }) {
+  const [win, setWin] = useState("");
+  const [lose, setLose] = useState("");
+  const [session, setSession] = useState("");
+  return (
+    <div>
+      <PopLabel>Win condition</PopLabel>
+      <input
+        type="text"
+        className="script-popinput"
+        aria-label="Win condition"
+        placeholder="e.g. reach the far bank"
+        value={win}
+        onChange={(e) => setWin(e.target.value)}
+      />
+      <PopLabel>Lose condition</PopLabel>
+      <input
+        type="text"
+        className="script-popinput"
+        aria-label="Lose condition"
+        placeholder="e.g. the current takes Ada"
+        value={lose}
+        onChange={(e) => setLose(e.target.value)}
+      />
+      <PopLabel>Session length</PopLabel>
+      <div className="script-row" role="group" aria-label="Session length">
+        {DESIGN_SESSION_LENGTHS.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={`script-chip sm${item === session ? " on" : ""}`}
+            aria-pressed={item === session}
+            onClick={() => setSession((prev) => (prev === item ? "" : item))}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      <div className="script-row">
+        <button
+          type="button"
+          className="pill sm"
+          onClick={() => onConfirm({ win, lose, session })}
+        >
+          Insert goal
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** The paper page: a textarea over a mirrored highlight backdrop. */
@@ -263,19 +725,52 @@ function ScriptEditor({
     }
   };
 
-  const doInsert = (kind: InsertKind) => {
+  const [helper, setHelper] = useState<string | null>(null);
+  const helperAt = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  const openHelper = (kind: string) => {
     const area = areaRef.current;
-    const start = area ? area.selectionStart : text.length;
-    const end = area ? area.selectionEnd : text.length;
-    const next = applyInsertAtCaret(text, start, end, insertSnippet(kind));
-    setText(next.text);
-    setMention(null);
+    helperAt.current = area
+      ? { start: area.selectionStart, end: area.selectionEnd }
+      : { start: text.length, end: text.length };
+    setHelper((prev) => (prev === kind ? null : kind));
+  };
+
+  const focusAfterInsert = (caret: number) => {
     requestAnimationFrame(() => {
+      const area = areaRef.current;
       if (!area) return;
       area.focus();
-      area.setSelectionRange(next.caret, next.caret);
+      area.setSelectionRange(caret, caret);
     });
   };
+
+  const pickSnippet = (snippet: string) => {
+    const { start, end } = helperAt.current;
+    const next = applyInsertAtCaret(text, start, end, snippet);
+    setText(next.text);
+    setMention(null);
+    setHelper(null);
+    focusAfterInsert(next.caret);
+  };
+
+  const pickDesignBlock = (heading: string, block: string) => {
+    const next = insertDesignBlock(text, heading, block);
+    setText(next.text);
+    setMention(null);
+    setHelper(null);
+    focusAfterInsert(next.caret);
+  };
+
+  const designContext: DesignStoryContext = useMemo(() => {
+    const part = world.parts.find((entry) => entry.id === partId);
+    return {
+      partTitle: part?.title,
+      partSummary: part?.summary,
+      characterNames: world.characters.map((c) => c.name),
+      locationNames: world.locations.map((l) => l.name),
+    };
+  }, [world, partId]);
 
   const runDraft = async (
     mode: "draft" | "rewrite",
@@ -392,14 +887,114 @@ function ScriptEditor({
       <main className="script-desk">
         {form === "script" ? (
           <div className="script-insert" role="toolbar" aria-label="Insert a line">
-            {INSERT_BUTTONS.map((button) => (
-              <button
+            {SCRIPT_HELPERS.map((button) => (
+              <HelperButton
                 key={button.kind}
-                className="script-chip"
-                onClick={() => doInsert(button.kind)}
+                label={button.label}
+                open={helper === button.kind}
+                onToggle={() => openHelper(button.kind)}
+                onClose={() => setHelper(null)}
               >
-                {button.label}
-              </button>
+                {button.kind === "scene" ? (
+                  <SceneHeadingChooser
+                    places={designContext.locationNames ?? []}
+                    onPick={pickSnippet}
+                  />
+                ) : button.kind === "character" ? (
+                  <CharacterChooser
+                    names={designContext.characterNames ?? []}
+                    onPick={pickSnippet}
+                  />
+                ) : button.kind === "dialogue" ? (
+                  <DialogueChooser
+                    names={designContext.characterNames ?? []}
+                    onPick={pickSnippet}
+                  />
+                ) : (
+                  <ActionChooser onPick={pickSnippet} />
+                )}
+              </HelperButton>
+            ))}
+          </div>
+        ) : null}
+        {form === "design" ? (
+          <div className="script-insert" role="toolbar" aria-label="Insert a design block">
+            {DESIGN_HELPERS.map((button) => (
+              <HelperButton
+                key={button.kind}
+                label={button.label}
+                open={helper === button.kind}
+                onToggle={() => openHelper(button.kind)}
+                onClose={() => setHelper(null)}
+              >
+                {button.kind === "gameType" ? (
+                  <SingleChooser
+                    options={DESIGN_GAME_TYPES}
+                    initial="Hunt and chase"
+                    action="Insert game type"
+                    onConfirm={(choice) =>
+                      pickDesignBlock(
+                        DESIGN_BLOCK_HEADINGS.gameType,
+                        composeGameTypeBlock(choice, designContext),
+                      )
+                    }
+                  />
+                ) : button.kind === "camera" ? (
+                  <SingleChooser
+                    options={DESIGN_CAMERAS}
+                    initial={DESIGN_CAMERAS[0]}
+                    action="Insert camera"
+                    onConfirm={(choice) =>
+                      pickDesignBlock(
+                        DESIGN_BLOCK_HEADINGS.camera,
+                        composeCameraBlock(choice),
+                      )
+                    }
+                  />
+                ) : button.kind === "mechanics" ? (
+                  <MultiChooser
+                    options={DESIGN_MECHANICS}
+                    action="Insert mechanics"
+                    onConfirm={(choices) =>
+                      pickDesignBlock(
+                        DESIGN_BLOCK_HEADINGS.mechanics,
+                        composeMechanicsBlock(choices),
+                      )
+                    }
+                  />
+                ) : button.kind === "goal" ? (
+                  <GoalChooser
+                    onConfirm={(goal) =>
+                      pickDesignBlock(
+                        DESIGN_BLOCK_HEADINGS.goal,
+                        composeGoalBlock(goal),
+                      )
+                    }
+                  />
+                ) : button.kind === "controls" ? (
+                  <MultiChooser
+                    options={DESIGN_CONTROLS}
+                    action="Insert controls"
+                    onConfirm={(choices) =>
+                      pickDesignBlock(
+                        DESIGN_BLOCK_HEADINGS.controls,
+                        composeControlsBlock(choices),
+                      )
+                    }
+                  />
+                ) : (
+                  <MultiChooser
+                    options={DESIGN_PROGRESSION}
+                    action="Insert progression"
+                    onConfirm={(choices) =>
+                      pickDesignBlock(
+                        DESIGN_BLOCK_HEADINGS.progression,
+                        composeProgressionBlock(choices),
+                      )
+                    }
+                  />
+                )}
+              </HelperButton>
             ))}
           </div>
         ) : null}

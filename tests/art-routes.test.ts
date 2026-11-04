@@ -109,7 +109,7 @@ describe("POST /api/art/sheet-view", () => {
   });
 
   it("sends no reference without one and rejects unknown views", async () => {
-    const fetchMock = mockModels([okImage()], "unused");
+    const fetchMock = mockModels([okImage(), okImage()], "unused");
     const res = await sheetPOST(
       post("http://localhost/api/art/sheet-view", {
         view: "front",
@@ -120,9 +120,18 @@ describe("POST /api/art/sheet-view", () => {
     const [call] = imageCalls(fetchMock);
     expect(call.input[0].content).toHaveLength(1);
 
+    // Extra poses ride the same route with the same likeness anchoring.
+    const pose = await sheetPOST(
+      post("http://localhost/api/art/sheet-view", {
+        view: "sitting",
+        character: CHARACTER,
+      }),
+    );
+    expect(pose.status).toBe(200);
+
     const bad = await sheetPOST(
       post("http://localhost/api/art/sheet-view", {
-        view: "upside-down",
+        view: "upside down!",
         character: CHARACTER,
       }),
     );

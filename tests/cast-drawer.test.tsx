@@ -54,8 +54,8 @@ describe("CastDrawer reload", () => {
     );
     expect(html).toContain("sheet-front-marker");
     expect(html).toContain("sheet-left-marker");
-    // Only the four views without images say so; the stored two render.
-    expect(html.match(/No image yet/g)).toHaveLength(4);
+    // Only the four views without images offer to make them.
+    expect(html.match(/Make this view/g)).toHaveLength(4);
   });
 
   it("shows cutouts from the world, not local state", () => {
@@ -72,7 +72,7 @@ describe("CastDrawer reload", () => {
       <CastDrawer world={emptyWorld()} open onClose={noop} onWorld={noop} />,
     );
     expect(html.length).toBeGreaterThan(0);
-    expect(html).toContain("No image yet");
+    expect(html).toContain("Sheet views");
   });
 });
 
@@ -220,6 +220,75 @@ describe("CastDrawer one at a time", () => {
     }
     // Narrow screens get a select with every character.
     expect(thirty).toContain("Choose a character");
+  });
+});
+
+describe("CastDrawer views grid", () => {
+  it("shows each base view with its cutout action or a make pill", () => {
+    const noop = () => {};
+    const html = renderToString(
+      <CastDrawer world={worldWithSheet()} open onClose={noop} onWorld={noop} />,
+    );
+    for (const label of ["Front", "Left", "Right", "Back", "Walking", "Crouching"]) {
+      expect(html).toContain(label);
+    }
+    // Left already has a cutout, front can be cut out.
+    expect(html).toContain("cutout-left-marker");
+    expect(html).toContain("Cut out");
+  });
+
+  it("offers the pose chips and a free text box below the sheet actions", () => {
+    const noop = () => {};
+    const html = renderToString(
+      <CastDrawer world={worldWithSheet()} open onClose={noop} onWorld={noop} />,
+    );
+    expect(html).toContain("Generate full sheet");
+    expect(html).toContain("Cut out all");
+    expect(html).toContain("More poses");
+    for (const chip of [
+      "Sitting",
+      "Running",
+      "Fighting stance",
+      "Looking back",
+      "Arms raised",
+      "Close-up face",
+    ]) {
+      expect(html).toContain(chip);
+    }
+    expect(html).toContain("Describe another pose");
+    expect(html).toContain("Make this pose");
+  });
+
+  it("puts custom views last in the grid", () => {
+    const noop = () => {};
+    const base = worldWithSheet();
+    const world: World = {
+      ...base,
+      characters: base.characters.map((c) =>
+        c.id === "ada"
+          ? {
+              ...c,
+              sheet: [...c.sheet, { view: "dancing-joyfully", imagePath: "dancing-marker" }],
+            }
+          : c,
+      ),
+    };
+    const html = renderToString(
+      <CastDrawer world={world} open onClose={noop} onWorld={noop} />,
+    );
+    expect(html).toContain("dancing-marker");
+    expect(html).toContain("Dancing joyfully");
+    expect(html.indexOf("Walking")).toBeLessThan(html.indexOf("Dancing joyfully"));
+  });
+
+  it("lays voice and custom voice side by side", () => {
+    const noop = () => {};
+    const html = renderToString(
+      <CastDrawer world={worldWithSheet()} open onClose={noop} onWorld={noop} />,
+    );
+    expect(html).toContain("voicerow");
+    expect(html).toContain("Voice");
+    expect(html).toContain("Custom voice");
   });
 });
 

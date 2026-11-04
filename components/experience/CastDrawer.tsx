@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Character, World } from "@/lib/world/schemas";
-import { SHEET_VIEWS } from "@/lib/art";
+import {
+  EXTRA_POSES,
+  SHEET_VIEWS,
+  orderedSheetViews,
+  poseIdFor,
+  poseLabelFor,
+} from "@/lib/art";
 import {
   filterCharacters,
   resolveCharacterId,
@@ -571,6 +577,7 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
   const [cutouts, setCutouts] = useState<Record<string, CutoutState>>({});
   const [running, setRunning] = useState(false);
   const [cuttingAll, setCuttingAll] = useState(false);
+  const [poseText, setPoseText] = useState("");
   const runRef = useRef(0);
   const respIds = useRef<Record<string, string>>({});
 
@@ -581,6 +588,7 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     setCutouts({});
     setRunning(false);
     setCuttingAll(false);
+    setPoseText("");
     runRef.current += 1;
   }, [selected?.id]);
 
@@ -650,11 +658,19 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     const style = reference ? undefined : await styleImageFor(world);
     if (runRef.current !== run) return;
 
-    // Start clean; each view fills its slot as it arrives.
+    // Start clean, but keep extra poses already made; each base
+    // view fills its slot as it arrives.
     current = {
       ...current,
       characters: current.characters.map((c) =>
-        c.id === character.id ? { ...c, sheet: [] } : c,
+        c.id === character.id
+          ? {
+              ...c,
+              sheet: c.sheet.filter(
+                (v) => !SHEET_VIEWS.some((base) => base.id === v.view),
+              ),
+            }
+          : c,
       ),
     };
     onWorld(current);
@@ -767,8 +783,8 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     setRunning(false);
     setSlots((prev) => {
       const next = { ...prev };
-      for (const view of SHEET_VIEWS) {
-        if (next[view.id]?.kind === "working") next[view.id] = { kind: "idle" };
+      for (const key of Object.keys(next)) {
+        if (next[key]?.kind === "working") next[key] = { kind: "idle" };
       }
       return next;
     });
@@ -789,6 +805,41 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     }
     return map;
   }, [selected]);
+
+  /**
+   * Every tile in the views grid, in grid order: the base six views,
+   * then extra poses already made (or still drawing). Pure order comes
+   * from orderedSheetViews so the grid and tests share it.
+   */
+  const tileIds = useMemo(() => {
+    const base = new Set<string>(SHEET_VIEWS.map((view) => view.id));
+    const ids: string[] = [...base];
+    const push = (view: string) => {
+      if (!base.has(view) && !ids.includes(view)) ids.push(view);
+    };
+    for (const view of selected?.sheet ?? []) push(view.view);
+    for (const [view, state] of Object.entries(slots)) {
+      if (state.kind !== "idle") push(view);
+    }
+    return orderedSheetViews(ids.map((view) => ({ view }))).map(
+      (entry) => entry.view,
+    );
+  }, [selected, slots]);
+
+  const labelForTile = (viewId: string): string => poseLabelFor(viewId);
+
+  /** Generate one extra pose view through the sheet-view route. */
+  const makePose = async (character: Character, viewId: string) => {
+    if (!viewId || running || cutting) return;
+    await retryView(character, viewId);
+  };
+
+  const makeCustomPose = async (character: Character) => {
+    const viewId = poseIdFor(poseText);
+    if (!viewId) return;
+    setPoseText("");
+    await makePose(character, viewId);
+  };
 
   const applyCutout = (
     base: World,
@@ -880,12 +931,17 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
     setCuttingAll(true);
     try {
       let current: World = world;
-      for (const view of SHEET_VIEWS) {
+      const views = orderedSheetViews(
+        (current.characters.find((c) => c.id === character.id)?.sheet ?? []).filter(
+          (v) => v.imagePath,
+        ),
+      );
+      for (const view of views) {
         const entry = current.characters
           .find((c) => c.id === character.id)
-          ?.sheet.find((v) => v.view === view.id);
+          ?.sheet.find((v) => v.view === view.view);
         if (!entry?.imagePath) continue;
-        current = await runCutout(current, character, view.id, entry.imagePath);
+        current = await runCutout(current, character, view.view, entry.imagePath);
       }
     } finally {
       setCuttingAll(false);
@@ -1007,6 +1063,117 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
             <p role="status">No characters yet.</p>
           )}
         </div>
+        <div className="castviews" aria-label="Sheet views">
+            {tileIds.map((viewId) => {
+              const image = sheetByView.get(viewId);
+              const label = labelForTile(viewId);
+              const state = slots[viewId] ?? { kind: "idle" as const };
+              const cutout = cutoutByView.get(viewId);
+              const cutoutState = cutouts[viewId] ?? { kind: "idle" as const };
+              return (
+                <div key={viewId} className="slot">
+                  <div
+                    className={`slotimg${state.kind === "working" ? " busy" : ""}${!image && state.kind === "idle" ? " empty" : ""}`}
+                    style={
+                      image ? { backgroundImage: `url(${image})` } : undefined
+                    }
+                    role={image ? "img" : undefined}
+                    aria-label={image ? `${selected?.name ?? "Character"} ${label}` : undefined}
+                  >
+                    {!image && state.kind === "working" && <span>Drawing…</span>}
+                    {!image && state.kind === "idle" && <span>{label}</span>}
+                    {!image && state.kind === "error" && (
+                      <span className="slotmsg">{state.message}</span>
+                    )}
+                    {!image && state.kind === "blocked" && (
+                      <span className="slotmsg">{state.message}</span>
+                    )}
+                  </div>
+                  <small>{label}</small>
+                  {selected && !image && state.kind === "idle" && (
+                    <button
+                      type="button"
+                      className="pill light sm castmake"
+                      onClick={() => selected && void makePose(selected, viewId)}
+                      disabled={running || cutting}
+                      tabIndex={open ? 0 : -1}
+                    >
+                      Make this view
+                    </button>
+                  )}
+                  {(state.kind === "error" || state.kind === "blocked") && (
+                    <button
+                      type="button"
+                      className="quiet"
+                      onClick={() => selected && void retryView(selected, viewId)}
+                      disabled={running || cutting}
+                      tabIndex={open ? 0 : -1}
+                    >
+                      Retry
+                    </button>
+                  )}
+                  {state.kind === "blocked" && (
+                    <textarea
+                      aria-label={`Describe the ${label} view`}
+                      value={drafts[viewId] ?? state.description}
+                      onChange={(e) =>
+                        setDrafts((prev) => ({ ...prev, [viewId]: e.target.value }))
+                      }
+                      rows={3}
+                      tabIndex={open ? 0 : -1}
+                    />
+                  )}
+                  {image && cutout && (
+                    <div
+                      className="slotimg"
+                      style={{
+                        backgroundImage: `url(${cutout}), conic-gradient(#d9d3c5 0 25%, #f5f2ea 0 50%, #d9d3c5 0 75%, #f5f2ea 0)`,
+                        backgroundSize: "contain, 14px 14px",
+                        backgroundRepeat: "no-repeat, repeat",
+                        backgroundPosition: "center",
+                      }}
+                      role="img"
+                      aria-label={`${selected?.name ?? "Character"} ${label} cutout`}
+                    />
+                  )}
+                  {image && !cutout && cutoutState.kind === "working" && (
+                    <div className="slotimg busy">
+                      <span>Cutting…</span>
+                    </div>
+                  )}
+                  {image && !cutout && cutoutState.kind === "error" && (
+                    <span className="slotmsg">{cutoutState.message}</span>
+                  )}
+                  {image && !cutout && cutoutState.kind !== "working" && (
+                    <button
+                      type="button"
+                      className="quiet"
+                      onClick={() =>
+                        selected && void runCutout(world, selected, viewId, image)
+                      }
+                      disabled={running || cutting}
+                      tabIndex={open ? 0 : -1}
+                    >
+                      {cutoutState.kind === "error" ? "Retry cutout" : "Cut out"}
+                    </button>
+                  )}
+                  {image && cutout && (
+                    <button
+                      type="button"
+                      className="quiet"
+                      onClick={() =>
+                        selected && void runCutout(world, selected, viewId, image)
+                      }
+                      disabled={running || cutting}
+                      tabIndex={open ? 0 : -1}
+                    >
+                      Cut out again
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
       </div>
       <div className="sheetwrap">
         <div className="sheethead">
@@ -1032,7 +1199,7 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
                 Generate full sheet
               </button>
             ))}
-          {selected && SHEET_VIEWS.some((view) => sheetByView.get(view.id)) && (
+          {selected && selected.sheet.some((view) => view.imagePath) && (
             <button
               type="button"
               className="quiet"
@@ -1044,122 +1211,68 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
             </button>
           )}
         </div>
-        <div className="sheetgrid">
-          {SHEET_VIEWS.map((view) => {
-            const image = sheetByView.get(view.id);
-            const state = slots[view.id] ?? { kind: "idle" as const };
-            const cutout = cutoutByView.get(view.id);
-            const cutoutState = cutouts[view.id] ?? { kind: "idle" as const };
-            return (
-              <div key={view.id} className="slot">
-                <div
-                  className={`slotimg${state.kind === "working" ? " busy" : ""}`}
-                  style={
-                    image ? { backgroundImage: `url(${image})` } : undefined
-                  }
-                  role={image ? "img" : undefined}
-                  aria-label={image ? `${selected?.name} ${view.label}` : undefined}
+        {selected && (
+          <div className="posewrap">
+            <span className="kicker">More poses</span>
+            <div className="poserow" role="group" aria-label="More poses">
+              {EXTRA_POSES.map((pose) => (
+                <button
+                  key={pose.id}
+                  type="button"
+                  className="posechip"
+                  onClick={() => selected && void makePose(selected, pose.id)}
+                  disabled={running || cutting}
+                  tabIndex={open ? 0 : -1}
                 >
-                  {!image && state.kind === "working" && <span>Drawing…</span>}
-                  {!image && state.kind === "idle" && <span>No image yet</span>}
-                  {!image && state.kind === "error" && (
-                    <span className="slotmsg">{state.message}</span>
-                  )}
-                  {!image && state.kind === "blocked" && (
-                    <span className="slotmsg">{state.message}</span>
-                  )}
-                </div>
-                <small>{view.label}</small>
-                {(state.kind === "error" || state.kind === "blocked") && (
-                  <button
-                    type="button"
-                    className="quiet"
-                    onClick={() => selected && void retryView(selected, view.id)}
-                    disabled={running || cutting}
-                    tabIndex={open ? 0 : -1}
-                  >
-                    Retry
-                  </button>
-                )}
-                {state.kind === "blocked" && (
-                  <textarea
-                    aria-label={`Describe the ${view.label} view`}
-                    value={drafts[view.id] ?? state.description}
-                    onChange={(e) =>
-                      setDrafts((prev) => ({ ...prev, [view.id]: e.target.value }))
-                    }
-                    rows={3}
-                    tabIndex={open ? 0 : -1}
-                  />
-                )}
-                {image && cutout && (
-                  <div
-                    className="slotimg"
-                    style={{
-                      backgroundImage: `url(${cutout}), conic-gradient(#d9d3c5 0 25%, #f5f2ea 0 50%, #d9d3c5 0 75%, #f5f2ea 0)`,
-                      backgroundSize: "contain, 14px 14px",
-                      backgroundRepeat: "no-repeat, repeat",
-                      backgroundPosition: "center",
-                    }}
-                    role="img"
-                    aria-label={`${selected?.name} ${view.label} cutout`}
-                  />
-                )}
-                {image && !cutout && cutoutState.kind === "working" && (
-                  <div className="slotimg busy">
-                    <span>Cutting…</span>
-                  </div>
-                )}
-                {image && !cutout && cutoutState.kind === "error" && (
-                  <span className="slotmsg">{cutoutState.message}</span>
-                )}
-                {image && selected && !cutout && cutoutState.kind !== "working" && (
-                  <button
-                    type="button"
-                    className="quiet"
-                    onClick={() =>
-                      void runCutout(world, selected, view.id, image)
-                    }
-                    disabled={running || cutting}
-                    tabIndex={open ? 0 : -1}
-                  >
-                    {cutoutState.kind === "error" ? "Retry cutout" : "Cut out"}
-                  </button>
-                )}
-                {image && cutout && selected && (
-                  <button
-                    type="button"
-                    className="quiet"
-                    onClick={() =>
-                      void runCutout(world, selected, view.id, image)
-                    }
-                    disabled={running || cutting}
-                    tabIndex={open ? 0 : -1}
-                  >
-                    Cut out again
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  {pose.label}
+                </button>
+              ))}
+            </div>
+            <div className="poserow">
+              <input
+                type="text"
+                className="castsearch posebox"
+                aria-label="Describe another pose"
+                placeholder="Another pose, e.g. dancing"
+                value={poseText}
+                onChange={(e) => setPoseText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (selected) void makeCustomPose(selected);
+                  }
+                }}
+                tabIndex={open ? 0 : -1}
+              />
+              <button
+                type="button"
+                className="pill light sm"
+                onClick={() => selected && void makeCustomPose(selected)}
+                disabled={!poseIdFor(poseText) || running || cutting}
+                tabIndex={open ? 0 : -1}
+              >
+                Make this pose
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       {selected && (
-        <VoiceSection
-          key={selected.id}
-          world={world}
-          open={open}
-          character={selected}
-          onWorld={onWorld}
-        />
-      )}
-      {selected && (
-        <CustomVoice
-          key={`custom-${selected.id}`}
-          world={world}
-          character={selected}
-          onWorld={onWorld}
-        />
+        <div className="voicerow">
+          <VoiceSection
+            key={selected.id}
+            world={world}
+            open={open}
+            character={selected}
+            onWorld={onWorld}
+          />
+          <CustomVoice
+            key={`custom-${selected.id}`}
+            world={world}
+            character={selected}
+            onWorld={onWorld}
+          />
+        </div>
       )}
     </div>
   );
