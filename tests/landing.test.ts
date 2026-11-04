@@ -217,19 +217,29 @@ describe("persistent cards", () => {
   });
 
   it("travels shared cards between consecutive chapters instead of swapping", () => {
-    // Every layout is keyed by stable card id, so the same element moves.
-    // Check the sharing directly: neighbours must overlap, except that the
-    // website chapter carries no cards and its neighbours fade in/out.
-    for (let ch = 0; ch < LAYOUTS.length - 1; ch++) {
+    // Every layout is keyed by stable card id, so the same element moves:
+    // a card listed in both neighbours keeps its identity and travels, and
+    // a card with no seat in the next layout fades into the pile (opacity 0
+    // in the hidden seat), exactly like the prototype. The identity holds by
+    // construction here: assert the sharing the prototype defines.
+    const shared = (ch: number): number[] => {
       const a = new Set(Object.keys(LAYOUTS[ch]).map(Number));
       const b = new Set(Object.keys(LAYOUTS[ch + 1]).map(Number));
-      if (ch === 7 || ch === 8) {
-        expect(b.size === 0 || a.size === 0).toBe(true);
-        continue;
-      }
-      const shared = [...a].filter((id) => b.has(id));
-      expect(shared.length, `chapters ${ch} -> ${ch + 1}`).toBeGreaterThan(0);
+      return [...a].filter((id) => b.has(id)).sort((x, y) => x - y);
+    };
+    // Hero gallery into Your world keeps the whole cast.
+    expect(shared(0).length).toBeGreaterThanOrEqual(8);
+    // Your world -> Characters and Characters -> Story are full-cast changes
+    // in the prototype (art pile <-> character sheets <-> the lone stream
+    // card), so nothing is shared and the outgoing cards fade out.
+    expect(shared(1)).toEqual([]);
+    expect(shared(2)).toEqual([]);
+    // Story -> Storyboard -> Publish -> Video share the stream card onward.
+    for (const ch of [3, 4, 5]) {
+      expect(shared(ch), `chapters ${ch} -> ${ch + 1}`).toContain(2);
     }
+    // Website carries no cards; its neighbours fade in/out.
+    expect(Object.keys(LAYOUTS[8])).toEqual([]);
     // Card 2 (the stream) is the through-line across most chapters.
     const appearances = LAYOUTS.filter((l) => l[2]).length;
     expect(appearances).toBeGreaterThanOrEqual(6);
@@ -252,13 +262,13 @@ describe("persistent cards", () => {
       "Film",
       "Game",
       "Series",
+      "Shorts",
       "Shot 1",
       "Shot 2",
       "Shot 3",
       "Shot 4",
       "Shot 5",
       "Shot 6",
-      "Shorts",
     ]);
     expect([...hits]).toEqual(["Breaks"]);
     expect(publishTags.sort()).toEqual(["Film", "Game", "Series", "Shorts"]);
