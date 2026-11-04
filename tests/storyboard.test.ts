@@ -16,6 +16,7 @@ import {
   STORYBOARD_PLAN_FAILED_MESSAGE,
   STORYBOARD_PLAN_INSTRUCTIONS,
   STORYBOARD_PLAN_JSON_SCHEMA,
+  boardReferenceIds,
   moveFrame,
   planToStoryboard,
   sanitizePlannedFrames,
@@ -545,6 +546,37 @@ describe("storyboard storage", () => {
     );
     expect(kept).toHaveLength(1);
     expect(kept[0]!.title).toBe("Newer");
+  });
+});
+
+describe("storyboard shared references", () => {
+  function boardWith(characterIds: string[][]) {
+    const world = makeWorld();
+    return planToStoryboard({
+      channelId: "series",
+      partId: "part-1",
+      title: "Arrival",
+      frames: toPlannedFrames(
+        sanitizePlannedFrames(
+          characterIds.map((ids, i) => frame(`Frame ${i + 1}`, { characterIds: ids })),
+        ),
+        world,
+        "series",
+      ),
+    });
+  }
+
+  it("keeps the same character ids on every frame, in order", () => {
+    const board = boardWith([["ada", "anukili-ugama"], ["anukili-ugama"], []]);
+    expect(boardReferenceIds(board, ["ada"])).toEqual([
+      "ada",
+      "anukili-ugama",
+    ]);
+  });
+
+  it("falls back to the part's cast when the board names no one", () => {
+    expect(boardReferenceIds(undefined, ["ada"])).toEqual(["ada"]);
+    expect(boardReferenceIds(boardWith([[]]), ["ada"])).toEqual(["ada"]);
   });
 });
 

@@ -19,6 +19,7 @@ import {
   stripImageData,
 } from "@/lib/story";
 import { ShortSchema, type Short, type ShortShot, type World } from "@/lib/world/schemas";
+import { storyboardForScene } from "@/lib/storyboard";
 import {
   EDIT_SHOT_MAX_SEC,
   EDIT_SHOT_MIN_SEC,
@@ -32,6 +33,7 @@ import {
   scenesByChannel,
   shortForScene,
   shotStartFrames,
+  shotsFromStoryboard,
   totalFrames,
   totalSeconds,
   upsertShort,
@@ -211,6 +213,9 @@ function VideoPageInner() {
   const [redraw, setRedraw] = useState<RedrawState>({ kind: "idle" });
   const [speak, setSpeak] = useState<SpeakState>({ kind: "idle" });
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [cutChoice, setCutChoice] = useState<"board" | "art" | null>(null);
+  const [boardVoices, setBoardVoices] = useState(true);
+  const [boardConfirm, setBoardConfirm] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -282,6 +287,13 @@ function VideoPageInner() {
   };
   const short = shortForScene(world, channelId, partId) ?? null;
   const shots = short?.shots ?? [];
+  const board = storyboardForScene(world, channelId, partId) ?? null;
+  const boardFrames = board?.frames ?? [];
+  const sketchedCount = boardFrames.filter(
+    (frame) => (frame.imagePath ?? "").length > 0,
+  ).length;
+  const hasBoardCut = sketchedCount > 0;
+  const cutSource = cutChoice ?? (hasBoardCut ? "board" : "art");
   const selected = shots.find((shot) => shot.id === selectedId) ?? shots[0] ?? null;
   const selectedIndex = selected ? shots.indexOf(selected) : -1;
   const starts = shotStartFrames(shots);
@@ -402,6 +414,56 @@ function VideoPageInner() {
       return;
     }
     void runPlan(source);
+  };
+
+  /**
+   * Cut straight from the storyboard: one shot per sketched frame, in
+   * order, with no model call. Frames without a picture are skipped.
+   */
+  const runBoardCut = () => {
+    const live = worldRef.current;
+    if (!live || !board || !part) return;
+    const planned = shotsFromStoryboard(board.frames, {
+      voices: boardVoices,
+    });
+    if (planned.length === 0) return;
+    const known = new Set(live.characters.map((c) => c.id));
+    const title =
+      board.title.trim().length > 0 ? board.title : part.title;
+    const cut: Short = {
+      id: `${channelId}::${partId}`,
+      channelId,
+      partId,
+      title,
+      aspect: short?.aspect ?? "16:9",
+      shots: planned.map((shot, index) => ({
+        id: `shot-${index + 1}`,
+        imagePath: shot.imagePath,
+        caption: shot.caption,
+        durationSec: shot.durationSec,
+        motion: shot.motion,
+        ...(shot.voice && known.has(shot.voice.characterId)
+          ? {
+              voice: {
+                characterId: shot.voice.characterId,
+                lineId: "",
+                text: shot.voice.text,
+              },
+            }
+          : {}),
+      })),
+    };
+    updateWorld(upsertShort(live, cut));
+    setSelectedId(cut.shots[0]?.id ?? null);
+    setBoardConfirm(false);
+  };
+
+  const onBoardCutClick = () => {
+    if (short && short.shots.length > 0) {
+      setBoardConfirm(true);
+      return;
+    }
+    runBoardCut();
   };
 
   const redrawShot = async (description?: string) => {
@@ -677,6 +739,79 @@ function VideoPageInner() {
         ))}
       </aside>
       <div className="video-stage">
+        <div className="video-cutbar">
+          <div className="seg" role="group" aria-label="Cut source">
+            <button
+              className={cutSource === "board" ? "on" : ""}
+              disabled={!hasBoardCut}
+              onClick={() => {
+                setCutChoice("board");
+                setBoardConfirm(false);
+              }}
+            >
+              Cut from the storyboard
+            </button>
+            <button
+              className={cutSource === "art" ? "on" : ""}
+              onClick={() => {
+                setCutChoice("art");
+                setBoardConfirm(false);
+              }}
+            >
+              Cut from my story&apos;s art
+            </button>
+          </div>
+          {cutSource === "board" && hasBoardCut ? (
+            <div className="video-row">
+              <span className="video-note" role="status">
+                {sketchedCount} of {boardFrames.length} frames
+              </span>
+              <label className="video-note">
+                <input
+                  type="checkbox"
+                  checked={boardVoices}
+                  onChange={(e) => setBoardVoices(e.target.checked)}
+                />{" "}
+                Voices
+              </label>
+              <button className="pill sm" onClick={onBoardCutClick}>
+                Cut from the storyboard
+              </button>
+            </div>
+          ) : (
+            <p className="video-note">
+              Plan the cut from the project&apos;s art below.
+              {hasBoardCut ? null : (
+                <>
+                  {" "}
+                  A storyboard gives a better cut.{" "}
+                  <Link
+                    href={`/projects/${params.id}/storyboard?channel=${encodeURIComponent(channelId)}&part=${encodeURIComponent(partId)}`}
+                  >
+                    Plan one in Storyboard
+                  </Link>
+                  .
+                </>
+              )}
+            </p>
+          )}
+          {boardConfirm ? (
+            <div className="video-flag">
+              <b>Replace this cut?</b>
+              <div className="video-row">
+                <button className="pill sm" onClick={runBoardCut}>
+                  Replace it
+                </button>
+                <button
+                  className="quiet"
+                  onClick={() => setBoardConfirm(false)}
+                >
+                  Keep my cut
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
         <div className="video-framewrap" ref={frameRef}>
           {shots.length > 0 && short ? (
             <div

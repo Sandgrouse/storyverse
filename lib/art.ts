@@ -118,7 +118,7 @@ export const SCENE_SUFFIX =
   "Keep each character exactly as in their reference. Do not draw any text, letters, logos or watermarks.";
 
 export const SKETCH_SUFFIX =
-  "Loose pencil storyboard drawing, black and grey with no colour, simple shading and clear composition. Do not draw any text, letters, logos or watermarks.";
+  "Black and white pencil storyboard frame, graphite on paper, no colour at all, simple shading and clear composition. The reference images are for likeness only: draw every character as pencil, keeping each character's face, build and clothing as in the reference. Do not draw any text, letters, logos or watermarks anywhere in the image.";
 
 export const REWRITE_INSTRUCTIONS =
   "Rewrite this image description so it passes a content filter. Keep the same people, place and moment. Describe it through composition, distance, light and aftermath, with no violence, gore or distress shown directly.";
