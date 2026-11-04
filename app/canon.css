@@ -1,0 +1,609 @@
+/* The book: contents, a scrollable page and the characters/places panel. */
+
+.canonbook {
+  display: flex;
+  gap: 26px;
+  align-items: stretch;
+  padding: 96px 34px 26px;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.canon-toc {
+  width: 210px;
+  flex: none;
+  overflow: auto;
+  max-height: calc(100vh - 122px);
+}
+
+.canon-toc h4 {
+  margin: 0 0 10px;
+  font: 400 13px var(--sans);
+  color: var(--soft);
+}
+
+.canon-tocselect {
+  display: none;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--sheet);
+  color: var(--ink);
+  font: 400 15px var(--sans);
+}
+
+.canon-toclist button {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font: 400 17px/1.2 var(--serif);
+  box-sizing: border-box;
+}
+
+.canon-toclist button i {
+  font: 500 12px var(--sans);
+  color: var(--soft);
+  width: 18px;
+  padding-top: 3px;
+  font-style: normal;
+}
+
+.canon-toclist button:hover {
+  background: rgba(31, 27, 22, 0.06);
+}
+
+.canon-toclist button.on {
+  background: var(--sheet);
+  box-shadow: 0 1px 0 var(--rule);
+}
+
+.canon-prog {
+  height: 3px;
+  border-radius: 3px;
+  background: var(--rule);
+  margin: 18px 10px 0;
+  overflow: hidden;
+}
+
+.canon-prog b {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--clay);
+}
+
+.canon-book {
+  flex: 1;
+  min-width: 0;
+  min-height: calc(100vh - 122px);
+  background: var(--sheet);
+  border-radius: 6px;
+  box-shadow: var(--lift);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.canon-book::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  background: linear-gradient(90deg, rgba(50, 35, 15, 0.14), transparent);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.canon-pagescroll {
+  flex: 1;
+  overflow: auto;
+  padding: 46px 8% 60px 9%;
+  scroll-behavior: smooth;
+}
+
+.canon-cover .canon-kicker,
+.canon-kicker {
+  font-size: 13px;
+  color: var(--soft);
+  margin-bottom: 10px;
+}
+
+.canon-cover h1 {
+  font: 300 clamp(40px, 4.4vw, 64px)/1.02 var(--serif);
+  letter-spacing: -0.016em;
+}
+
+.canon-log {
+  font: 300 20px/1.45 var(--serif);
+  color: #4b4439;
+  margin: 16px 0 20px;
+  max-width: 34em;
+}
+
+.canon-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.canon-chips span {
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: rgba(31, 27, 22, 0.07);
+  font-size: 13px;
+}
+
+.canon-chap {
+  margin-top: 46px;
+  padding-top: 30px;
+  border-top: 1px solid var(--rule);
+}
+
+.canon-chap small {
+  display: block;
+  font: 400 13px var(--sans);
+  color: var(--soft);
+  margin-bottom: 6px;
+}
+
+.canon-chap h2 {
+  font: 300 34px/1.1 var(--serif);
+  margin-bottom: 6px;
+}
+
+.canon-sum {
+  font: italic 300 18px/1.4 var(--serif);
+  color: var(--soft);
+  margin-bottom: 16px;
+}
+
+.canon-body {
+  font: 400 19px/1.75 var(--serif);
+  max-width: 34em;
+}
+
+.canon-body mark {
+  background: rgba(214, 150, 40, 0.28);
+  border-radius: 3px;
+  padding: 0 2px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.canon-body mark.canon-place {
+  background: rgba(44, 127, 147, 0.22);
+}
+
+.canon-side {
+  width: 340px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100vh - 122px);
+}
+
+.canon-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.canon-tabs button {
+  all: unset;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 14px;
+  color: var(--soft);
+}
+
+.canon-tabs button.on {
+  background: var(--ink);
+  color: var(--sheet);
+}
+
+.canon-cards {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 6px 14px 2px;
+}
+
+.canon-cc {
+  background: var(--sheet);
+  border-radius: 12px;
+  box-shadow: 0 1px 0 var(--rule);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.canon-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.canon-th {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: #ddd center/cover;
+  flex: none;
+}
+
+.canon-row b {
+  font: 400 19px var(--serif);
+}
+
+.canon-row small {
+  display: block;
+  color: var(--soft);
+  font-size: 12.5px;
+}
+
+.canon-more {
+  display: none;
+}
+
+.canon-cc.open {
+  box-shadow: var(--lift);
+}
+
+.canon-cc.open .canon-more {
+  display: block;
+}
+
+.canon-big {
+  height: 230px;
+  background: #ddd center top/cover;
+}
+
+.canon-nm {
+  display: none;
+  padding: 14px 16px 0;
+  font: 400 24px var(--serif);
+}
+
+.canon-cc.open .canon-nm {
+  display: block;
+}
+
+.canon-cc.open .canon-row {
+  display: none;
+}
+
+.canon-t {
+  padding: 14px 16px 16px;
+  font: 300 17px/1.45 var(--serif);
+  color: #4b4439;
+}
+
+.canon-appears {
+  display: block;
+  margin-top: 10px;
+  font: 500 12px var(--sans);
+  color: var(--clay);
+}
+
+.canon-openwrap {
+  display: block;
+  margin-top: 10px;
+}
+
+.canon-openlink {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 99px;
+  background: var(--ink);
+  color: var(--sheet);
+  font: 500 13px var(--sans);
+}
+
+@media (max-width: 1000px) {
+  .canonbook {
+    flex-direction: column;
+    overflow: auto;
+  }
+
+  .canon-toc,
+  .canon-side {
+    width: auto;
+    max-height: none;
+  }
+
+  .canon-tocselect {
+    display: block;
+  }
+
+  .canon-toclist,
+  .canon-prog {
+    display: none;
+  }
+
+  .canon-book {
+    min-height: 70vh;
+  }
+}
+
+/* Story basics: the facts grid from tab 2. */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.fact {
+  background: var(--sheet);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 0 var(--rule);
+  position: relative;
+}
+
+.fact small {
+  display: flex;
+  justify-content: space-between;
+  color: var(--soft);
+  font-size: 12.5px;
+  margin-bottom: 4px;
+}
+
+.fact p {
+  font: 400 18px/1.3 var(--serif);
+}
+
+.fact.wide {
+  grid-column: 1 / -1;
+}
+
+.fact .src {
+  font-size: 11.5px;
+  color: var(--soft);
+  opacity: 0.85;
+}
+
+.fact.miss {
+  background: transparent;
+  border: 1.5px dashed rgba(31, 27, 22, 0.25);
+  box-shadow: none;
+}
+
+.fact.miss p {
+  color: var(--soft);
+  font-size: 16px;
+}
+
+.fact.miss button {
+  all: unset;
+  cursor: pointer;
+  color: var(--clay);
+  font-size: 13px;
+  margin-top: 6px;
+  display: block;
+}
+
+.fact .edit {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  opacity: 0;
+  font-size: 12px;
+  color: var(--soft);
+}
+
+.fact:hover .edit,
+.fact:focus-within .edit {
+  opacity: 1;
+}
+
+/* Channels page: cards sit below the subtitle, never over it. */
+
+.chanwrap {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 110px 34px 0;
+  text-align: center;
+}
+
+.chanwrap .sub {
+  font: 300 20px/1.4 var(--serif);
+  color: #4b4439;
+  max-width: 34em;
+  margin: 6px auto 28px;
+}
+
+.chanrow {
+  display: flex;
+  gap: 22px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.chancard {
+  width: 292px;
+  height: 360px;
+  border-radius: 14px;
+  color: #fff;
+  text-align: left;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: #555 center/cover;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--lift);
+}
+
+.chancard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 30%, rgba(0, 0, 0, 0.78));
+}
+
+.chancard > * {
+  position: relative;
+}
+
+.chancard small {
+  font: 500 12px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.chancard h3 {
+  font: 400 28px/1.1 var(--serif);
+  margin: 4px 0 8px;
+}
+
+.chancard p {
+  font: 300 16px/1.35 var(--serif);
+  opacity: 0.95;
+}
+
+.chancard .sec {
+  margin-top: 12px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.17);
+  backdrop-filter: blur(4px);
+  font: 400 13px/1.35 var(--sans);
+}
+
+.chancard .sec b {
+  display: block;
+  font-weight: 600;
+  font-size: 11.5px;
+  opacity: 0.85;
+  margin-bottom: 2px;
+}
+
+.chanadd {
+  width: 180px;
+  height: 360px;
+  border: 1.5px dashed rgba(31, 27, 22, 0.28);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--soft);
+  cursor: pointer;
+}
+
+.chanadd:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.chanadd b {
+  font: 300 36px var(--serif);
+}
+
+/* Scene notes drawer cards from tab 4. */
+
+.notewhat {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  flex: 1;
+  align-content: start;
+  margin-top: 18px;
+}
+
+.notew {
+  background: var(--sheet);
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 0 var(--rule);
+}
+
+.notew b {
+  display: block;
+  font: 400 21px var(--serif);
+  margin-bottom: 4px;
+}
+
+.notew p {
+  color: var(--soft);
+  font-size: 14px;
+}
+
+.notew ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+}
+
+.notew .sk {
+  height: 8px;
+  border-radius: 5px;
+  background: rgba(31, 27, 22, 0.08);
+  margin-top: 9px;
+}
+
+.notew .sk:nth-child(n + 4) {
+  width: 62%;
+}
+
+/* Foot bar over the finished reading page: back, status, continue. */
+
+.canon-foot {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 34px;
+  background: rgba(239, 232, 219, 0.92);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--rule);
+}
+
+.canon-status {
+  color: var(--soft);
+  font: 300 15px var(--serif);
+}
+
+/* Canon link beside the Scene notes button, matching the side buttons. */
+
+.side a.sidebtn {
+  display: block;
+  width: 100%;
+  padding: 8px 2px;
+  font-size: 11.5px;
+  color: var(--soft);
+  line-height: 1.2;
+  text-align: center;
+}
+
+.side a.sidebtn:hover {
+  color: var(--clay);
+}

@@ -146,9 +146,36 @@ export function availableArtPaths(world: World): string[] {
 }
 
 /**
+ * The storyboard's frames as plain text guidance, if this scene has
+ * a board: one line per frame with its framing, action and spoken
+ * line. Frames carry no secrets, only the scene's own staging.
+ */
+export function storyboardGuidance(
+  world: World,
+  channelId: string,
+  partId: string,
+): string[] {
+  const board = (world.storyboards ?? []).find(
+    (entry) => entry.channelId === channelId && entry.partId === partId,
+  );
+  const frames = board?.frames ?? [];
+  if (frames.length === 0) return [];
+  return frames.map((frame, index) => {
+    const said =
+      frame.dialogue && frame.dialogue.trim().length > 0
+        ? ` Says: "${frame.dialogue.trim()}".`
+        : "";
+    const action =
+      frame.action.trim().length > 0 ? frame.action.trim() : "No action noted.";
+    return `Frame ${index + 1} (${frame.framing}): ${action}.${said}`;
+  });
+}
+
+/**
  * Plan prompt: the channel, the part, the saved script when there is
- * one (otherwise this channel's beats here), the numbered art list,
- * and only the secrets this channel may know.
+ * one (otherwise this channel's beats here), the storyboard frames as
+ * guidance when there is a board, the numbered art list, and only the
+ * secrets this channel may know.
  */
 export function videoPlanInput(
   world: World,
@@ -180,6 +207,10 @@ export function videoPlanInput(
         lines.push(`- ${beat.title} (${beat.unitLabel}): ${beat.content}`);
       }
     }
+  }
+  const guidance = storyboardGuidance(world, channelId, partId);
+  if (guidance.length > 0) {
+    lines.push("", "Storyboard guidance (follow these frames):", ...guidance);
   }
   lines.push("", "Available art (return the exact path):");
   const art = availableArtPaths(world);
@@ -316,6 +347,21 @@ export function toPlannedShots(
           }
         : {}),
     };
+  });
+}
+
+/**
+ * The video page's left list: every channel that has at least one
+ * beat, with that channel's beats in story order. Channels with no
+ * beats are left out. Pure, so the page and tests share it.
+ */
+export function scenesByChannel(
+  world: World,
+): Array<{ channel: World["channels"][number]; beats: World["beats"] }> {
+  const beats = [...world.beats].sort((a, b) => a.order - b.order);
+  return world.channels.flatMap((channel) => {
+    const here = beats.filter((beat) => beat.channelId === channel.id);
+    return here.length > 0 ? [{ channel, beats: here }] : [];
   });
 }
 

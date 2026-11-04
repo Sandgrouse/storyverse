@@ -20,10 +20,12 @@ import {
   moveShot,
   planToShort,
   sanitizePlannedShots,
+  scenesByChannel,
   shortForScene,
   shotFrames,
   shotObjectPosition,
   shotStartFrames,
+  storyboardGuidance,
   toPlannedShots,
   totalFrames,
   totalSeconds,
@@ -458,6 +460,104 @@ describe("video plan validation and art fallback", () => {
       }),
     );
     expect(res.status).toBe(503);
+  });
+});
+
+describe("video scene list", () => {
+  it("lists every channel with beats under its own name, in story order", () => {
+    const world = makeWorld();
+    const groups = scenesByChannel(world);
+    expect(groups.map((g) => g.channel.name)).toEqual(["Shorts"]);
+    expect(groups[0]?.beats.map((b) => b.unitLabel)).toEqual(["Short 1"]);
+  });
+
+  it("leaves out channels with no beats", () => {
+    const world = WorldSchema.parse({
+      ...makeWorld(),
+      channels: [
+        ...makeWorld().channels,
+        { id: "press", name: "Press", kind: "press", title: "The Press" },
+      ],
+    });
+    expect(scenesByChannel(world).map((g) => g.channel.id)).toEqual(["shorts"]);
+  });
+});
+
+function boardedWorld(): World {
+  const world = makeWorld();
+  return WorldSchema.parse({
+    ...world,
+    storyboards: [
+      {
+        id: "shorts::part-1",
+        channelId: "shorts",
+        partId: "part-1",
+        title: "Beginnings",
+        frames: [
+          {
+            id: "frame-1",
+            framing: "wide",
+            action: "Ada reaches the water",
+            dialogue: "I am here.",
+            characterIds: ["ada"],
+          },
+          {
+            id: "frame-2",
+            framing: "close",
+            action: "The water rises",
+            characterIds: ["ada"],
+          },
+        ],
+      },
+    ],
+  });
+}
+
+describe("storyboard guidance", () => {
+  it("turns each frame into guidance text", () => {
+    const lines = storyboardGuidance(boardedWorld(), "shorts", "part-1");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("wide");
+    expect(lines[0]).toContain("Ada reaches the water");
+    expect(lines[0]).toContain("I am here.");
+    expect(lines[1]).toContain("close");
+  });
+
+  it("stays empty when the scene has no board", () => {
+    expect(storyboardGuidance(makeWorld(), "shorts", "part-1")).toEqual([]);
+    expect(storyboardGuidance(boardedWorld(), "game", "part-1")).toEqual([]);
+  });
+
+  it("guides the plan prompt when a board exists", () => {
+    const input = videoPlanInput(boardedWorld(), "shorts", "part-1");
+    expect(input).toContain("Storyboard guidance");
+    expect(input).toContain("Ada reaches the water");
+  });
+
+  it("keeps the knowledge rule with a board on the scene", async () => {
+    const fetchMock = mockModel(
+      JSON.stringify({
+        title: "Arrival",
+        shots: [shot("One", 4), shot("Two", 4), shot("Three", 4), shot("Four", 4)],
+      }),
+    );
+    const res = await planPOST(
+      post("/api/video/plan", {
+        world: boardedWorld(),
+        channelId: "shorts",
+        partId: "part-1",
+      }),
+    );
+    expect(res.status).toBe(200);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(init.body as string) as { input: string };
+    expect(body.input).toContain("Ada reaches the water");
+    expect(body.input).toContain("SERIES_MARKER");
+    expect(body.input).not.toContain("GAME_MARKER");
+    expect(body.input).not.toContain("GAME_CHANNEL_SECRET");
   });
 });
 

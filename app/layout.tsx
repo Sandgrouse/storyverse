@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import "./characters.css";
 import "./package.css";
+import "./canon.css";
 
 const serif = localFont({
   src: [

@@ -349,8 +349,11 @@ export function mergeWorldAssets(oldWorld: World, nextWorld: World): World {
   }
   const nextPronunciations = nextWorld.pronunciations ?? [];
   const oldPronunciations = oldWorld.pronunciations ?? [];
+  const nextFacts = nextWorld.facts ?? [];
+  const oldFacts = oldWorld.facts ?? [];
   return {
     ...nextWorld,
+    facts: nextFacts.length > 0 ? nextFacts : oldFacts,
     pronunciations:
       nextPronunciations.length > 0 ? nextPronunciations : oldPronunciations,
     scripts: [...scriptsByKey.values()],
@@ -386,6 +389,7 @@ export function mergeWorldAssets(oldWorld: World, nextWorld: World): World {
       if (!old) return part;
       return {
         ...part,
+        text: part.text ? part.text : (old.text ?? ""),
         imagePath: part.imagePath ? part.imagePath : old.imagePath,
         imagePosition: part.imagePosition
           ? part.imagePosition

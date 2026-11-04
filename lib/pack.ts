@@ -56,7 +56,7 @@ export type PackRequest = z.infer<typeof PackRequestSchema>;
 
 /** Plain message when the server has no key to write with. */
 export const PACK_NO_KEY_MESSAGE =
-  "Story packs are not available on this server.";
+  "Scene notes are not available on this server.";
 
 /** The script form each channel kind asks for. */
 export function scriptFormForKind(kind: string): string {
