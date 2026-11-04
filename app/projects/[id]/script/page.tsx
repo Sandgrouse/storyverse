@@ -7,18 +7,68 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { MissingStory, useProject } from "@/components/projects/ProjectContext";
 import {
   ScriptCheckResponseSchema,
+  applyInsertAtCaret,
   applyScriptReplacement,
+  filterMentions,
+  formatMentionName,
+  formForKind,
   highlightSegments,
   highlightTerms,
   initialScriptText,
+  insertMentionAtCaret,
+  insertSnippet,
+  mentionCandidates,
+  mentionQueryBeforeCaret,
   scriptForScene,
   upsertScript,
+  type InsertKind,
+  type MentionCandidate,
   type ScriptIssue,
 } from "@/lib/script";
 import type { World } from "@/lib/world/schemas";
 import { channelColorByIndex, stripImageData } from "@/lib/story";
 
 const SAVE_DELAY_MS = 600;
+
+const INSERT_BUTTONS: Array<{ kind: InsertKind; label: string }> = [
+  { kind: "scene", label: "Scene heading" },
+  { kind: "character", label: "Character" },
+  { kind: "action", label: "Action" },
+  { kind: "dialogue", label: "Dialogue" },
+];
+
+/**
+ * Caret position inside the textarea, measured with a hidden mirror
+ * that copies the text metrics, so the @ menu opens where the
+ * creator is typing. Relative to the textarea's top-left padding box.
+ */
+function caretOffset(
+  area: HTMLTextAreaElement,
+  caret: number,
+): { top: number; left: number } {
+  const style = window.getComputedStyle(area);
+  const mirror = document.createElement("div");
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.wordWrap = "break-word";
+  mirror.style.overflowWrap = "break-word";
+  mirror.style.width = `${area.clientWidth}px`;
+  mirror.style.font = style.font;
+  mirror.style.padding = style.padding;
+  mirror.style.border = "0";
+  mirror.style.lineHeight = style.lineHeight;
+  mirror.style.letterSpacing = style.letterSpacing;
+  mirror.textContent = area.value.slice(0, caret);
+  const marker = document.createElement("span");
+  marker.textContent = "\u200b";
+  mirror.appendChild(marker);
+  document.body.appendChild(mirror);
+  const top = marker.offsetTop + Number.parseFloat(style.lineHeight || "0");
+  const left = marker.offsetLeft;
+  mirror.remove();
+  return { top: top - area.scrollTop, left: left - area.scrollLeft };
+}
 
 const KIND_LABEL: Record<ScriptIssue["kind"], string> = {
   contradiction: "Contradicts the canon.",
@@ -87,8 +137,21 @@ function ScriptEditor({
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [mention, setMention] = useState<{
+    query: string;
+    active: number;
+  } | null>(null);
+  const [mentionAt, setMentionAt] = useState({ top: 0, left: 0 });
 
   const beat = world.beats.find((b) => b.id === beatId);
+  const form = formForKind(
+    world.channels.find((c) => c.id === channelId)?.kind ?? "series",
+  );
+  const candidates = useMemo(() => mentionCandidates(world), [world]);
+  const matches = useMemo(
+    () => (mention ? filterMentions(candidates, mention.query) : []),
+    [mention, candidates],
+  );
   const terms = useMemo(() => highlightTerms(world), [world]);
   const strongQuotes = useMemo(
     () => issues.map((issue) => issue.quote),
@@ -133,6 +196,85 @@ function ScriptEditor({
     if (!area) return null;
     if (area.selectionStart === area.selectionEnd) return null;
     return { start: area.selectionStart, end: area.selectionEnd };
+  };
+
+  const refreshMention = (value: string, caret: number) => {
+    const query = mentionQueryBeforeCaret(value, caret);
+    if (query === null) {
+      setMention(null);
+      return;
+    }
+    setMention((prev) => ({ query, active: prev ? prev.active : 0 }));
+    const area = areaRef.current;
+    if (area) {
+      try {
+        setMentionAt(caretOffset(area, caret));
+      } catch {
+        // The menu stays where it was; typing still filters it.
+      }
+    }
+  };
+
+  const pickMention = (candidate: MentionCandidate) => {
+    const area = areaRef.current;
+    const caret = area ? area.selectionStart : text.length;
+    const next = insertMentionAtCaret(
+      text,
+      caret,
+      formatMentionName(candidate, form),
+    );
+    setText(next.text);
+    setMention(null);
+    requestAnimationFrame(() => {
+      if (!area) return;
+      area.focus();
+      area.setSelectionRange(next.caret, next.caret);
+    });
+  };
+
+  const onTextKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!mention || matches.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setMention((prev) =>
+        prev
+          ? { query: prev.query, active: (prev.active + 1) % matches.length }
+          : prev,
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setMention((prev) =>
+        prev
+          ? {
+              query: prev.query,
+              active: (prev.active - 1 + matches.length) % matches.length,
+            }
+          : prev,
+      );
+    } else if (e.key === "Enter") {
+      const picked = matches[Math.min(mention.active, matches.length - 1)];
+      if (picked) {
+        e.preventDefault();
+        pickMention(picked);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setMention(null);
+    }
+  };
+
+  const doInsert = (kind: InsertKind) => {
+    const area = areaRef.current;
+    const start = area ? area.selectionStart : text.length;
+    const end = area ? area.selectionEnd : text.length;
+    const next = applyInsertAtCaret(text, start, end, insertSnippet(kind));
+    setText(next.text);
+    setMention(null);
+    requestAnimationFrame(() => {
+      if (!area) return;
+      area.focus();
+      area.setSelectionRange(next.caret, next.caret);
+    });
   };
 
   const runDraft = async (
@@ -248,6 +390,19 @@ function ScriptEditor({
   return (
     <>
       <main className="script-desk">
+        {form === "script" ? (
+          <div className="script-insert" role="toolbar" aria-label="Insert a line">
+            {INSERT_BUTTONS.map((button) => (
+              <button
+                key={button.kind}
+                className="script-chip"
+                onClick={() => doInsert(button.kind)}
+              >
+                {button.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="script-page">
           <div
             className="script-backdrop"
@@ -267,10 +422,26 @@ function ScriptEditor({
           <textarea
             ref={areaRef}
             className="script-area"
-            aria-label="Scene script"
-            placeholder="Write this scene, or ask Muse to draft it."
+            aria-label={
+              form === "design"
+                ? "Game design document"
+                : form === "copy"
+                  ? "Page copy"
+                  : "Scene script"
+            }
+            placeholder={
+              form === "design"
+                ? "Write the design, or ask Muse to draft it. Type @ for names."
+                : form === "copy"
+                  ? "Write the copy, or ask Muse to draft it. Type @ for names."
+                  : "Write this scene, or ask Muse to draft it. Type @ for names."
+            }
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              refreshMention(e.target.value, e.target.selectionStart);
+            }}
+            onKeyDown={onTextKeyDown}
             onSelect={(e) =>
               setSel(
                 e.currentTarget.selectionStart === e.currentTarget.selectionEnd
@@ -284,6 +455,37 @@ function ScriptEditor({
             onScroll={syncScroll}
             spellCheck={false}
           />
+          {mention && matches.length > 0 ? (
+            <div
+              className="script-mentions"
+              role="listbox"
+              aria-label="Mention a name"
+              style={{ top: mentionAt.top, left: mentionAt.left }}
+            >
+              {matches
+                .slice(0, 8)
+                .map((candidate, index) => (
+                  <button
+                    key={`${candidate.kind}:${candidate.name}`}
+                    role="option"
+                    aria-selected={index === Math.min(mention.active, 7)}
+                    className={
+                      index === Math.min(mention.active, 7)
+                        ? "script-mention on"
+                        : "script-mention"
+                    }
+                    onMouseDown={(e) => {
+                      // Pick before the textarea loses focus.
+                      e.preventDefault();
+                      pickMention(candidate);
+                    }}
+                  >
+                    <span>{candidate.name}</span>
+                    <i>{candidate.kind}</i>
+                  </button>
+                ))}
+            </div>
+          ) : null}
         </div>
       </main>
       <aside className="script-tools">
@@ -299,7 +501,13 @@ function ScriptEditor({
               onClick={onDraftClick}
               disabled={draft.kind === "working"}
             >
-              {draft.kind === "working" ? "Drafting…" : "Draft this scene"}
+              {draft.kind === "working"
+                ? "Drafting…"
+                : form === "design"
+                  ? "Draft the design"
+                  : form === "copy"
+                    ? "Draft the copy"
+                    : "Draft this scene"}
             </button>
             <button
               className="pill light sm"
@@ -342,7 +550,13 @@ function ScriptEditor({
               onClick={() => void runCheck()}
               disabled={check.kind === "working"}
             >
-              {check.kind === "working" ? "Checking…" : "Check this script"}
+              {check.kind === "working"
+                ? "Checking…"
+                : form === "design"
+                  ? "Check this design"
+                  : form === "copy"
+                    ? "Check this copy"
+                    : "Check this script"}
             </button>
           </div>
           {check.kind === "error" ? (
@@ -422,22 +636,36 @@ function ScriptEditor({
             );
           })}
         </div>
-        <div className="script-tool">
-          <Link
-            className="pill"
-            style={{ width: "100%" }}
-            href={`/projects/${projectId}/storyboard?channel=${encodeURIComponent(channelId)}&part=${encodeURIComponent(partId)}`}
-          >
-            Make a storyboard
-          </Link>
-          <Link
-            className="pill light"
-            style={{ width: "100%", marginTop: 8 }}
-            href={`/projects/${projectId}/video?channel=${encodeURIComponent(channelId)}&part=${encodeURIComponent(partId)}`}
-          >
-            Turn this into a short
-          </Link>
-        </div>
+        {form === "copy" ? null : (
+          <div className="script-tool">
+            {form === "design" ? (
+              <Link
+                className="pill"
+                style={{ width: "100%" }}
+                href={`/projects/${projectId}/package`}
+              >
+                Open the agent package
+              </Link>
+            ) : (
+              <>
+                <Link
+                  className="pill"
+                  style={{ width: "100%" }}
+                  href={`/projects/${projectId}/storyboard?channel=${encodeURIComponent(channelId)}&part=${encodeURIComponent(partId)}`}
+                >
+                  Make a storyboard
+                </Link>
+                <Link
+                  className="pill light"
+                  style={{ width: "100%", marginTop: 8 }}
+                  href={`/projects/${projectId}/video?channel=${encodeURIComponent(channelId)}&part=${encodeURIComponent(partId)}`}
+                >
+                  Make a video
+                </Link>
+              </>
+            )}
+          </div>
+        )}
       </aside>
     </>
   );

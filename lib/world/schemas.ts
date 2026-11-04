@@ -157,6 +157,7 @@ export const ScriptEntrySchema = z.object({
   partId: z.string(),
   text: z.string(),
   updatedAt: z.number().int(),
+  form: z.enum(["script", "design", "copy"]).default("script"),
 });
 
 export const StoryboardFramingSchema = z.enum([

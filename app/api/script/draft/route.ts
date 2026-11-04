@@ -3,12 +3,13 @@ import { MAX_BODY_BYTES, budgetMessage, checkBudget } from "@/lib/budget";
 import { MetaApiError, completeJson } from "@/lib/meta/client";
 import { channelsForPart } from "@/lib/pack";
 import {
-  DRAFT_INSTRUCTIONS,
   DRAFT_JSON_SCHEMA,
   DRAFT_SCHEMA_NAME,
   SCRIPT_DRAFT_NO_KEY_MESSAGE,
   ScriptDraftModelOutputSchema,
   ScriptDraftRequestSchema,
+  draftInstructionsForForm,
+  formForKind,
   scriptDraftInput,
 } from "@/lib/script";
 import { stripImageData } from "@/lib/story";
@@ -90,12 +91,16 @@ export async function POST(req: Request) {
   }
 
   try {
+    // The form comes from the channel's kind on the server, never from
+    // the client, so a forged request cannot change what Muse writes.
+    const form = formForKind(channel.kind);
+    const instructions = draftInstructionsForForm(form);
     const model = await completeJson(
       {
         instructions:
           mode === "rewrite"
-            ? `${DRAFT_INSTRUCTIONS} Return only the replacement for the selection, in the same form.`
-            : DRAFT_INSTRUCTIONS,
+            ? `${instructions} Return only the replacement for the selection, in the same form.`
+            : instructions,
         input: scriptDraftInput(world, channelId, partId, {
           text,
           selection,
