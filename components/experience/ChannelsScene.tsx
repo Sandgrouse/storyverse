@@ -3,7 +3,7 @@
 import type { Secret, World } from "@/lib/world/schemas";
 
 type Props = {
-  active: boolean;
+  active?: boolean;
   world: World;
   onWorld: (world: World) => void;
   onOpen: () => void;
@@ -17,7 +17,7 @@ function secretForChannel(
 }
 
 export default function ChannelsScene({
-  active,
+  active = true,
   world,
   onWorld,
   onOpen,
@@ -47,8 +47,7 @@ export default function ChannelsScene({
 
   return (
     <section className={`scene${active ? " on" : ""}`} id="channels">
-      <div className="logo">Storyverse</div>
-      <div className="top" style={{ top: "7vh" }}>
+      <div className="top" style={{ top: "max(7vh, 96px)" }}>
         <h1 className="big" style={{ fontSize: "clamp(32px, 3.8vw, 54px)" }}>
           Give each screen its own secret.
         </h1>

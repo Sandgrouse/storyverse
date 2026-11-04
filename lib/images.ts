@@ -68,7 +68,7 @@ export async function postArtRoute(
 }
 
 /**
- * Generated images are too large for sessionStorage. They live here:
+ * Generated images are too large for localStorage. They live here:
  * keyed by world and image name in IndexedDB, with an in-memory mirror
  * so the app keeps working when IndexedDB fails. The world holds tiny
  * `idb:<name>` refs; data URLs only live in memory and this store.

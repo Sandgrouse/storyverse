@@ -1,23 +1,29 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { World } from "@/lib/world/schemas";
 import { ReadModelOutputSchema, type ReadModelOutput } from "@/lib/read";
 import { buildWorld } from "@/lib/story";
 import { toPlanBeats, toPlanChannels, toPlanSecrets } from "@/lib/plan";
-import type { ClientFile } from "./Experience";
+import type { ClientFile } from "@/components/projects/DraftContext";
 
 function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 type Props = {
-  active: boolean;
   files: ClientFile[];
-  idea: string;
+  idea?: string;
   seed: World;
   sample: boolean;
-  onFiles: (files: ClientFile[]) => void;
+  /** Merge instruction for the add-material read. Kept in the same route. */
+  instruction?: string;
+  /** Extra text files sent with the read, e.g. current-story.txt. */
+  extraTextFiles?: Array<{ name: string; text: string }>;
+  backHref?: string;
+  onLabels?: (files: ClientFile[]) => void;
+  /** Called only when the user presses "See what I found". */
   onDone: (world: World, sample: boolean) => void;
 };
 
@@ -40,24 +46,30 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
 }
 
 export default function ReadingScene({
-  active,
   files,
-  idea,
+  idea = "",
   seed,
   sample,
-  onFiles,
+  instruction,
+  extraTextFiles,
+  backHref,
+  onLabels,
   onDone,
 }: Props) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [status, setStatus] = useState("Reading your files");
   const [canon, setCanon] = useState<ReadModelOutput | null>(null);
+  const [result, setResult] = useState<{ world: World; sample: boolean } | null>(
+    null,
+  );
   const [failure, setFailure] = useState("");
   const [isSample, setIsSample] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const runId = useRef(0);
-  const doneRef = useRef(false);
   const filesRef = useRef(files);
   filesRef.current = files;
+  const onLabelsRef = useRef(onLabels);
+  onLabelsRef.current = onLabels;
 
   const imageForFile = useMemo(() => {
     const map = new Map<string, string>();
@@ -117,24 +129,18 @@ export default function ReadingScene({
   const fileNames = useMemo(() => files.map((f) => f.name), [files]);
 
   useEffect(() => {
-    if (!active || doneRef.current) return;
     const id = runId.current + 1;
     runId.current = id;
-    doneRef.current = true;
     setFailure("");
     setCanon(null);
+    setResult(null);
 
     if (sample) {
       setIsSample(true);
       setPhase("showing");
-      setStatus("Sample");
-      const t = window.setTimeout(() => {
-        if (runId.current !== id) return;
-        setPhase("idle");
-        doneRef.current = false;
-        onDone(seed, true);
-      }, 3000);
-      return () => window.clearTimeout(t);
+      setStatus("Finished reading");
+      setResult({ world: seed, sample: true });
+      return;
     }
 
     let cancelled = false;
@@ -142,12 +148,21 @@ export default function ReadingScene({
     setStatus("Reading your files");
 
     const run = async () => {
-      const sendFiles = filesRef.current.map((file) => ({
-        name: file.name,
-        type: file.type,
-        ...(file.sendText !== undefined ? { text: file.sendText } : {}),
-        ...(file.sendDataUrl !== undefined ? { dataUrl: file.sendDataUrl } : {}),
-      }));
+      const sendFiles = [
+        ...filesRef.current.map((file) => ({
+          name: file.name,
+          type: file.type,
+          ...(file.sendText !== undefined ? { text: file.sendText } : {}),
+          ...(file.sendDataUrl !== undefined
+            ? { dataUrl: file.sendDataUrl }
+            : {}),
+        })),
+        ...(extraTextFiles ?? []).map((file) => ({
+          name: file.name,
+          type: "text/plain",
+          text: file.text,
+        })),
+      ];
       let readJson: unknown;
       try {
         const res = await fetch("/api/read", {
@@ -156,6 +171,7 @@ export default function ReadingScene({
           body: JSON.stringify({
             files: sendFiles,
             ...(idea.trim() ? { idea: idea.trim() } : {}),
+            ...(instruction ? { instruction } : {}),
           }),
         });
         if (!res.ok) {
@@ -170,7 +186,6 @@ export default function ReadingScene({
         setFailure(
           e instanceof Error ? e.message : "I could not read those files. Try again.",
         );
-        doneRef.current = false;
         return;
       }
       if (cancelled || runId.current !== id) return;
@@ -179,30 +194,22 @@ export default function ReadingScene({
         const world = record as unknown as World;
         setIsSample(true);
         setPhase("showing");
-        setStatus("Sample");
-        const t = window.setTimeout(() => {
-          if (runId.current !== id) return;
-          setPhase("idle");
-          doneRef.current = false;
-          onDone(world, true);
-        }, 3000);
-        void t;
+        setStatus("Finished reading");
+        setResult({ world, sample: true });
         return;
       }
       const parsed = ReadModelOutputSchema.safeParse(readJson);
       if (!parsed.success) {
         setPhase("error");
         setFailure("I could not read those files. Try again.");
-        doneRef.current = false;
         return;
       }
       const canonValue = parsed.data;
-      const canonAt = Date.now();
       setCanon(canonValue);
       setPhase("planning");
       setStatus("Finding the people and places");
       const labels = new Map(canonValue.files.map((f) => [f.file, f]));
-      onFiles(
+      onLabelsRef.current?.(
         filesRef.current.map((file) => {
           const meta = labels.get(file.name);
           if (!meta) return file;
@@ -233,7 +240,6 @@ export default function ReadingScene({
         setFailure(
           e instanceof Error ? e.message : "I could not plan the channels. Try again.",
         );
-        doneRef.current = false;
         return;
       }
       if (cancelled || runId.current !== id) return;
@@ -241,14 +247,8 @@ export default function ReadingScene({
       if (planRecord.sample === true) {
         const world = planJson as unknown as World;
         setPhase("showing");
-        setStatus("Sample");
-        const wait = Math.max(0, 3000 - (Date.now() - canonAt));
-        window.setTimeout(() => {
-          if (runId.current !== id) return;
-          setPhase("idle");
-          doneRef.current = false;
-          onDone(world, true);
-        }, wait);
+        setStatus("Finished reading");
+        setResult({ world, sample: true });
         return;
       }
       const channelsRaw = (planRecord as { channels?: unknown }).channels;
@@ -270,21 +270,17 @@ export default function ReadingScene({
         return found?.displayUrl ?? found?.sendDataUrl ?? "";
       });
       setPhase("showing");
-      const wait = Math.max(0, 3000 - (Date.now() - canonAt));
-      window.setTimeout(() => {
-        if (runId.current !== id) return;
-        setPhase("idle");
-        doneRef.current = false;
-        onDone(world, false);
-      }, wait);
+      setStatus("Finished reading");
+      setResult({ world, sample: false });
     };
 
     void run();
+    // Leaving while a read is running cancels it.
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, sample, retryKey]);
+  }, [sample, retryKey]);
 
   const litThrough =
     hits.length === 0 || (!canon && !sample)
@@ -294,9 +290,20 @@ export default function ReadingScene({
 
   const showPassage = canon || sample;
   const busts = characters.slice(0, 4);
+  const finished = phase === "showing" && result !== null;
+  const failed = phase === "error";
+
+  const retry = () => {
+    setFailure("");
+    setCanon(null);
+    setResult(null);
+    setStatus("Reading your files");
+    setPhase("reading");
+    setRetryKey((k) => k + 1);
+  };
 
   return (
-    <section className={`scene${active ? " on" : ""}`} id="reading">
+    <section className="scene on" id="reading">
       <article className="leaf" aria-label="The story being read">
         {!showPassage && (
           <span>
@@ -345,24 +352,8 @@ export default function ReadingScene({
           ))}
       </div>
       <p className="status">
-        {phase === "error" ? (
-          <>
-            {failure}{" "}
-            <button
-              type="button"
-              className="quiet"
-              onClick={() => {
-                doneRef.current = false;
-                setFailure("");
-                setCanon(null);
-                setStatus("Reading your files");
-                setPhase("reading");
-                setRetryKey((k) => k + 1);
-              }}
-            >
-              Retry
-            </button>
-          </>
+        {failed ? (
+          <>{failure}</>
         ) : (
           <>
             {isSample || sample ? "Sample · " : ""}
@@ -370,6 +361,32 @@ export default function ReadingScene({
           </>
         )}
       </p>
+      <div className="foot">
+        <span>
+          {failed && backHref ? (
+            <Link className="quiet" href={backHref}>
+              Back
+            </Link>
+          ) : null}
+        </span>
+        {failed ? (
+          <button type="button" className="pill" onClick={retry}>
+            Try again
+          </button>
+        ) : finished && result ? (
+          <button
+            type="button"
+            className="pill"
+            onClick={() => onDone(result.world, result.sample)}
+          >
+            See what I found
+          </button>
+        ) : (
+          <button type="button" className="pill" disabled>
+            See what I found
+          </button>
+        )}
+      </div>
     </section>
   );
 }
