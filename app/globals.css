@@ -1766,10 +1766,14 @@ p {
   display: block;
   user-select: none;
 }
+/* Tag badges: siblings of the clipped .land-outer, parked at the stage
+   origin. The scroll engine positions each one with transform only, 10px
+   inside its card's computed top-left, so no ancestor clips it and no scale
+   ever stretches it. */
 .land-flag {
   position: absolute;
-  left: 10px;
-  top: 10px;
+  left: 0;
+  top: 0;
   padding: 3px 9px;
   border-radius: 99px;
   background: var(--ink);
@@ -1777,6 +1781,9 @@ p {
   font-size: 11px;
   font-weight: 500;
   opacity: 0;
+  visibility: hidden;
+  will-change: transform, opacity;
+  z-index: 3;
 }
 .land-flag.hit {
   background: var(--clay);

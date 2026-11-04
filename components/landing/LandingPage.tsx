@@ -228,6 +228,7 @@ export default function LandingPage() {
   // visibility, z-index and classes change only when their state flips.
   const vis = useRef({
     card: new Map<number, boolean>(),
+    flag: new Map<number, boolean>(),
     copy: new Map<number, boolean>(),
     extra: new Map<number, boolean>(),
     cap: false,
@@ -466,7 +467,10 @@ export default function LandingPage() {
             }
             if (card.id === 6) film = { cx, cy, w, h };
             if (card.id === 3) thumb = { cx, cy, w, h };
-            // Tag labels near the chapter rest, as in the prototype.
+            // Tag labels near the chapter rest, as in the prototype. Flags
+            // are siblings of the clipped outer and track the card's
+            // computed rect with transform only, so the counter-scale can
+            // never push them outside the visible card.
             const flag = flagEls.current.get(card.id);
             if (flag) {
               const { text: tag, hit } = cardTag(ri, card.id);
@@ -477,7 +481,13 @@ export default function LandingPage() {
                 flag.classList.toggle("hit", hit);
                 flag.classList.toggle("shot", !hit && tag !== "");
               }
-              flag.style.opacity = tag && near ? "1" : "0";
+              gsap.set(flag, { x: cx - w / 2 + 10, y: cy - h / 2 + 10 });
+              const fShown = Boolean(tag) && near && o >= 0.01;
+              flag.style.opacity = fShown ? "1" : "0";
+              if ((v.flag.get(card.id) ?? true) !== fShown) {
+                v.flag.set(card.id, fShown);
+                flag.style.visibility = fShown ? "visible" : "hidden";
+              }
             }
             // Publish secret banners ride their card but show at rest.
             const secret = secretEls.current.get(card.id);
@@ -748,14 +758,21 @@ export default function LandingPage() {
                 if (el) counterEls.current.set(card.id, el);
                 else counterEls.current.delete(card.id);
               }}
-              flagRef={(el) => {
-                if (el) flagEls.current.set(card.id, el);
-                else flagEls.current.delete(card.id);
-              }}
               secretRef={(el) => {
                 if (el) secretEls.current.set(card.id, el);
                 else secretEls.current.delete(card.id);
               }}
+            />
+          ))}
+          {CARDS.map((card) => (
+            <span
+              key={`flag-${card.id}`}
+              ref={(el) => {
+                if (el) flagEls.current.set(card.id, el);
+                else flagEls.current.delete(card.id);
+              }}
+              className="land-flag"
+              aria-hidden="true"
             />
           ))}
           {CHAPTERS.map((chapter, ch) =>

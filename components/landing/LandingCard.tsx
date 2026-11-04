@@ -11,25 +11,26 @@ import { pointerRatio, tiltBack, tiltTo, useFinePointer } from "./effects";
  * - outer: scroll engine (x, y, scaleX/Y, rotation, rotationY, opacity)
  * - mid: pointer parallax and hero float
  * - counter: inverse scale (1/scaleX, 1/scaleY) so the picture never stretches
- * - inner: hover lift and tilt, plus the tag badge
+ * - inner: hover lift and tilt
  *
  * The outer clips (overflow hidden), so as it morphs from portrait to wide
- * the picture is cropped, never distorted. The tag badge and secret banner
- * ride on the outer and settle exact at every chapter rest.
+ * the picture is cropped, never distorted. Tag badges cannot live in here:
+ * the counter-scale pushes the inner's top-left outside the clipped window,
+ * so they render as siblings of the outer (see LandingPage) and track the
+ * card's computed rect with transform only. The secret banner rides on the
+ * outer and settles exact at the publish rest.
  */
 export default function LandingCard({
   card,
   secret,
   outerRef,
   counterRef,
-  flagRef,
   secretRef,
 }: {
   card: CardDef;
   secret?: { channel: string; text: string; tint: string };
   outerRef?: (el: HTMLDivElement | null) => void;
   counterRef?: (el: HTMLDivElement | null) => void;
-  flagRef?: (el: HTMLSpanElement | null) => void;
   secretRef?: (el: HTMLDivElement | null) => void;
 }) {
   const fine = useFinePointer();
@@ -66,7 +67,6 @@ export default function LandingCard({
               decoding="async"
               draggable={false}
             />
-            <span ref={flagRef} className="land-flag" />
           </div>
         </div>
       </div>
