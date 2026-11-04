@@ -390,6 +390,88 @@ export const CHANGE_LINE = "Enyinyi told them how to kill him.";
 export const VIDEO_CAPTION =
   "One night they run across the Omabala to escape him.";
 
+/**
+ * The Video chapter ("Turn scenes into shorts") is a real looping mini-cut
+ * while the chapter is on screen. The big film card (card 6) cross-fades
+ * through the four thumbnail cards' pictures in order, the matching
+ * thumbnail is outlined as the current shot, and the caption follows.
+ */
+export const VIDEO_CAPTIONS: string[] = [
+  "One night they run across the Omabala to escape him.",
+  "He finds them.",
+  "And they run back across the river to endure him again.",
+  "Owl's droppings blind him.",
+];
+
+/**
+ * The four thumbnail cards of the video layout (chapter 6), left to right
+ * as seated in LAYOUTS[6]: pots, storm, stream, firelight.
+ */
+export const VIDEO_SHOT_CARD_IDS: number[] = [3, 7, 2, 4];
+
+/** Seconds each shot holds before the cut. */
+export const VIDEO_SHOT_SECONDS = 3;
+
+/** Full loop: every shot once, in order. The playhead runs this long. */
+export const VIDEO_LOOP_SECONDS =
+  VIDEO_SHOT_SECONDS * VIDEO_SHOT_CARD_IDS.length;
+
+/** Shot index showing at `elapsedSec` into the loop (loops forever). */
+export function videoShotIndexAt(elapsedSec: number): number {
+  const n = VIDEO_SHOT_CARD_IDS.length;
+  const t =
+    ((elapsedSec % VIDEO_LOOP_SECONDS) + VIDEO_LOOP_SECONDS) %
+    VIDEO_LOOP_SECONDS;
+  return Math.min(n - 1, Math.floor(t / VIDEO_SHOT_SECONDS));
+}
+
+/**
+ * The mini-cut plays once the chapter's rest is reached and pauses when it
+ * leaves. `s` is the fractional chapter position (VIDEO_IDX at rest).
+ */
+export function videoPlayingAt(s: number, videoIdx: number): boolean {
+  return Math.round(s) === videoIdx && nearRest(s);
+}
+
+// ---------------------------------------------------------------------------
+// First-paint cover. The landing holds a quiet full-screen cover (paper
+// colour, the Storyverse logo) until fonts, the hero images and the GSAP
+// setup are ready, then fades it out. A timeout cap keeps it from sticking.
+// ---------------------------------------------------------------------------
+
+/** Cover fade-out length. With reduced motion there is no fade (0ms). */
+export const LANDING_COVER_FADE_MS = 400;
+
+/** The cover never sticks longer than this, however slow the assets are. */
+export const LANDING_COVER_TIMEOUT_MS = 3000;
+
+export type LandingCoverStatus = {
+  fontsReady: boolean;
+  heroImagesReady: boolean;
+  gsapReady: boolean;
+  /** Milliseconds since the cover mounted. */
+  elapsedMs: number;
+};
+
+/** Hide the cover once everything is ready, or once the cap elapses. */
+export function landingCoverDone(status: LandingCoverStatus): boolean {
+  if (status.elapsedMs >= LANDING_COVER_TIMEOUT_MS) return true;
+  return status.fontsReady && status.heroImagesReady && status.gsapReady;
+}
+
+/** Fade length for the cover: instant with reduced motion. */
+export function landingCoverFadeMs(reducedMotion: boolean): number {
+  return reducedMotion ? 0 : LANDING_COVER_FADE_MS;
+}
+
+/** Hero gallery card ids (the ring layout), whose images gate the cover. */
+const HERO_CARD_IDS = [0, 7, 2, 5, 3, 1, 4, 6];
+
+/** Every hero image the cover waits for. */
+export const HERO_IMAGES: string[] = HERO_CARD_IDS.map(
+  (id) => CARDS.find((card) => card.id === id)!.src,
+);
+
 export const BROWSER_URL = "your-story.storyverse";
 export const BROWSER_TITLE = "Anukili Ugama";
 export const BROWSER_SUB =

@@ -2,8 +2,18 @@
 
 import Image from "next/image";
 import type { PointerEvent } from "react";
-import type { CardDef } from "@/lib/landing";
+import {
+  CARDS,
+  VIDEO_CAPTIONS,
+  VIDEO_SHOT_CARD_IDS,
+  type CardDef,
+} from "@/lib/landing";
 import { pointerRatio, tiltBack, tiltTo, useFinePointer } from "./effects";
+
+/** Pictures the film card cross-fades through, in shot order. */
+const FILM_SHOTS: CardDef[] = VIDEO_SHOT_CARD_IDS.map(
+  (id) => CARDS.find((card) => card.id === id)!,
+);
 
 /**
  * One persistent landing card. Four nested layers so effects never fight
@@ -57,16 +67,40 @@ export default function LandingCard({
             onPointerMove={fine ? onMove : undefined}
             onPointerLeave={fine ? onLeave : undefined}
           >
-            <Image
-              src={card.src}
-              alt={card.alt}
-              fill
-              sizes="(max-width: 900px) 100vw, 800px"
-              quality={75}
-              loading="eager"
-              decoding="async"
-              draggable={false}
-            />
+            {card.id === 6 ? (
+              <div className="land-film">
+                {FILM_SHOTS.map((shot, index) => (
+                  <div
+                    key={shot.id}
+                    className="land-shot"
+                    data-shot={index}
+                    data-caption={VIDEO_CAPTIONS[index]}
+                  >
+                    <Image
+                      src={shot.src}
+                      alt={index === 0 ? card.alt : ""}
+                      fill
+                      sizes="(max-width: 900px) 100vw, 800px"
+                      quality={75}
+                      loading="eager"
+                      decoding="async"
+                      draggable={false}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Image
+                src={card.src}
+                alt={card.alt}
+                fill
+                sizes="(max-width: 900px) 100vw, 800px"
+                quality={75}
+                loading="eager"
+                decoding="async"
+                draggable={false}
+              />
+            )}
           </div>
         </div>
       </div>

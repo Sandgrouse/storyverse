@@ -8,5 +8,13 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return <LandingPage />;
+  return (
+    <>
+      {/* Without JS the cover (rendered for first paint) would stick: drop it. */}
+      <noscript>
+        <style>{".land-cover{display:none}"}</style>
+      </noscript>
+      <LandingPage />
+    </>
+  );
 }
