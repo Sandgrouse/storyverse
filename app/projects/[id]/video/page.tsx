@@ -423,6 +423,8 @@ function VideoPageInner() {
         part: { id: part.id, title: part.title, summary: part.summary },
         characters,
         references,
+        stylePreset: base.visualStyle?.preset ?? "",
+        styleNotes: base.visualStyle?.notes ?? "",
       };
       if (styleImage) payload.styleImage = styleImage;
       if (description) payload.description = description;

@@ -12,6 +12,7 @@ import {
   formForKind,
   scriptDraftInput,
 } from "@/lib/script";
+import { visualStyleLine } from "@/lib/style";
 import { stripImageData } from "@/lib/story";
 
 export const maxDuration = 60;
@@ -95,17 +96,21 @@ export async function POST(req: Request) {
     // the client, so a forged request cannot change what Muse writes.
     const form = formForKind(channel.kind);
     const instructions = draftInstructionsForForm(form);
+    let input = scriptDraftInput(world, channelId, partId, {
+      text,
+      selection,
+      instruction,
+    });
+    // The project's visual style, in one line, when one is set.
+    const styleLine = visualStyleLine(world.visualStyle);
+    if (styleLine.length > 0) input += `\n${styleLine}`;
     const model = await completeJson(
       {
         instructions:
           mode === "rewrite"
             ? `${instructions} Return only the replacement for the selection, in the same form.`
             : instructions,
-        input: scriptDraftInput(world, channelId, partId, {
-          text,
-          selection,
-          instruction,
-        }),
+        input,
         schemaName: DRAFT_SCHEMA_NAME,
         jsonSchema: DRAFT_JSON_SCHEMA,
       },

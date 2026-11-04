@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { ReadModelOutput } from "@/lib/read";
 
 export const PLAN_INSTRUCTIONS =
   "You plan how one story spreads across channels. Propose three channels unless the material names others. Give each channel its own piece of the story, so that each holds at least one secret the others don't, and fans must follow several to get the whole truth. Every channel must hold at least one secret. A secret's knownThrough lists the ids of the channels in this same response. name is one plain word for the format, such as Series, Game or Shorts. title is the name of the work. Every part must appear in at least one channel. Beat content is two to four sentences. Invented secrets are additions: keep them consistent with the canon, and never change a name or an established detail. An invented secret is a suggestion for the creator. Never answer a question the material deliberately leaves open if it is listed as a gap: leave it open and make that the secret. A pitch is under 15 words. A secret is under 15 words.";
@@ -117,6 +116,8 @@ export const PlanCanonSchema = z.object({
 export const PlanRequestSchema = z.object({
   canon: PlanCanonSchema,
 });
+
+export type PlanCanon = z.infer<typeof PlanCanonSchema>;
 
 function nonEmptyIds(ids: string[]): [string, ...string[]] {
   return (ids.length > 0 ? ids : ["no-ids"]) as [string, ...string[]];
@@ -237,7 +238,7 @@ export function toPlanSecrets(
 }
 
 /** Readable canon text for the planning model. */
-export function planModelInput(canon: ReadModelOutput): string {
+export function planModelInput(canon: PlanCanon): string {
   const lines: string[] = [];
   lines.push(`Canon: ${canon.title}`);
   lines.push(`Logline: ${canon.logline}`);
@@ -283,7 +284,7 @@ export function planModelInput(canon: ReadModelOutput): string {
  * in this same response, so it is never an enum: it is validated against
  * the returned channels instead.
  */
-export function planModelJsonSchema(canon: ReadModelOutput): Record<string, unknown> {
+export function planModelJsonSchema(canon: PlanCanon): Record<string, unknown> {
   const partIds = canon.parts.map((part) => part.id);
   const characterIds = canon.characters.map((character) => character.id);
   const partIdSchema =

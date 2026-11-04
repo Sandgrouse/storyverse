@@ -7,6 +7,7 @@ import {
   IDEA_ADDITION,
   READ_INSTRUCTIONS,
   ReadModelOutputSchema,
+  VISUAL_STYLE_INSTRUCTIONS,
   buildReadContent,
   buildReadInput,
   sanitizeArtFiles,
@@ -166,7 +167,9 @@ describe("POST /api/read", () => {
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(init.headers).toMatchObject({ Authorization: "Bearer test-key" });
     const body = JSON.parse(init.body as string);
-    expect(body.instructions).toBe(READ_INSTRUCTIONS);
+    expect(body.instructions).toBe(
+      `${READ_INSTRUCTIONS} ${VISUAL_STYLE_INSTRUCTIONS}`,
+    );
     expect(body.input[0].role).toBe("user");
     const content = body.input[0].content as Array<Record<string, unknown>>;
     expect(content.map((part) => part.type)).toEqual([

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { stylePromptText } from "@/lib/style";
+import type { VisualStyle } from "@/lib/world/schemas";
 
 /**
  * Shared image-route shapes and prompt builders. Pure: no key, no fetch,
@@ -82,6 +84,10 @@ export const SheetViewRequestSchema = z.object({
   previousResponseId: z.string().min(1).optional(),
   styleImage: z.string().min(1).optional(),
   description: z.string().min(1).max(2000).optional(),
+  /** The project's visual style preset, when one is set. */
+  stylePreset: z.string().default(""),
+  /** The project's visual style notes, in the owner's words. */
+  styleNotes: z.string().default(""),
 });
 
 export const SheetViewResponseSchema = z.object({
@@ -113,6 +119,10 @@ export const SceneArtRequestSchema = z.object({
   description: z.string().min(1).max(2000).optional(),
   style: z.enum(["sketch"]).optional(),
   framing: z.string().min(1).max(40).optional(),
+  /** The project's visual style preset, when one is set. */
+  stylePreset: z.string().default(""),
+  /** The project's visual style notes, in the owner's words. */
+  styleNotes: z.string().default(""),
 });
 
 export const SceneArtResponseSchema = z.object({
@@ -131,6 +141,15 @@ export function sheetViewLine(view: string): string {
 }
 
 /**
+ * Append the visual style's phrase and notes, only when a style is set.
+ * With no style the prompt is exactly as before.
+ */
+export function withVisualStyle(base: string, style?: VisualStyle): string {
+  const text = stylePromptText(style);
+  return text.length > 0 ? `${base} ${text}` : base;
+}
+
+/**
  * One sheet prompt. The reference image carries the likeness; with no
  * reference the canon text carries it instead. A description override
  * replaces the character text when the creator rewrote a blocked prompt.
@@ -139,9 +158,10 @@ export function sheetPrompt(
   view: string,
   character: { name: string; canon: string },
   description?: string,
+  style?: VisualStyle,
 ): string {
   const who = description ?? `Character: ${character.name}. ${character.canon}`;
-  return `${who} ${sheetViewLine(view)} ${SHEET_SUFFIX}`;
+  return withVisualStyle(`${who} ${sheetViewLine(view)} ${SHEET_SUFFIX}`, style);
 }
 
 function referenceNames(
@@ -167,6 +187,7 @@ export function scenePrompt(request: {
   referenceCount: number;
   change?: string;
   description?: string;
+  style?: VisualStyle;
 }): string {
   const scene =
     request.description ?? `Scene: ${request.part.title}. ${request.part.summary}`;
@@ -175,7 +196,10 @@ export function scenePrompt(request: {
       ? ` ${referenceNames(request.characters, request.referenceCount)}`
       : "";
   const change = request.change ? ` New story detail: ${request.change}` : "";
-  return `${scene}${cast}${change} ${SCENE_SUFFIX}`;
+  return withVisualStyle(
+    `${scene}${cast}${change} ${SCENE_SUFFIX}`,
+    request.style,
+  );
 }
 
 /**

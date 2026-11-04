@@ -81,6 +81,20 @@ export const ReadGapSchema = z.object({
   question: z.string().min(1),
 });
 
+export const ReadVisualStyleSchema = z.object({
+  /** One preset name; null reads as empty, like the other model text. */
+  preset: optionalText(),
+  notes: optionalText(),
+});
+
+/**
+ * Extra instruction for the read route: suggest the project's visual
+ * style. The model looks at any provided art first, otherwise follows
+ * what the text implies. The owner can change it on the Understood page.
+ */
+export const VISUAL_STYLE_INSTRUCTIONS =
+  "Also suggest this story's visual style for its art, video and game: pick exactly one preset from Painterly 2D, Anime, Comic book, Stop-motion, Low-poly 3D, Pixel art, Photoreal, Watercolour or Custom, and add one line of notes on the palette and mood. Look at any provided art first and follow it; when there is no art, follow what the text implies. Leave the preset empty only when nothing suggests a look.";
+
 export const ReadModelOutputSchema = z.object({
   title: z.string().min(1),
   logline: optionalText(),
@@ -90,6 +104,7 @@ export const ReadModelOutputSchema = z.object({
   parts: z.array(ReadPartSchema).default([]),
   facts: z.array(ReadFactSchema).default([]),
   gaps: z.array(ReadGapSchema).default([]),
+  visualStyle: ReadVisualStyleSchema.default({ preset: "", notes: "" }),
 });
 
 export type ReadModelOutput = z.infer<typeof ReadModelOutputSchema>;
@@ -283,6 +298,15 @@ export function readModelJsonSchema(): Record<string, unknown> {
           additionalProperties: false,
         },
       },
+      visualStyle: {
+        type: "object",
+        properties: {
+          preset: { type: "string" },
+          notes: optional,
+        },
+        required: ["preset", "notes"],
+        additionalProperties: false,
+      },
     },
     required: [
       "title",
@@ -293,6 +317,7 @@ export function readModelJsonSchema(): Record<string, unknown> {
       "parts",
       "facts",
       "gaps",
+      "visualStyle",
     ],
     additionalProperties: false,
   };
