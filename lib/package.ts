@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import { packToMarkdown } from "@/lib/pack";
+import { hasFullSheet } from "@/lib/readiness";
 import type { Storyboard, World } from "@/lib/world/schemas";
 
 /**
@@ -26,7 +27,22 @@ export type PackageFileType =
   | "script"
   | "storyboard"
   | "storyboard-sketch"
-  | "pack";
+  | "pack"
+  | "studio-rules"
+  | "studio-project"
+  | "studio-readme"
+  | "studio-notice"
+  | "game-concept"
+  | "narrative"
+  | "character-doc"
+  | "art-bible"
+  | "entities"
+  | "story-doc"
+  | "engine-reference"
+  | "stage"
+  | "gitkeep"
+  | "agents-readme"
+  | "setup-script";
 
 export type PackageFile = {
   /** Path inside the ZIP, starting with `<story>-<channel>/`. */
@@ -273,25 +289,37 @@ export function dataUrlToBytes(
   }
 }
 
+/**
+ * One image file, or null when there is nothing to put in it. An image
+ * the owner has not made yet is unfinished work, not a missing file:
+ * it is left out of the file list entirely (the dashboard's "Not made
+ * yet" list reports it) instead of becoming a `missing: true` entry
+ * with a warning line. This was the "N expected files are missing"
+ * cause: every ungenerated sheet view, cutout, scene artwork, sketch
+ * and voice line used to report as a missing file.
+ */
 function imageEntry(
   root: string,
   path: string,
   type: PackageFileType,
   dataUrl: string | undefined,
   extra: { character?: string; part?: string },
-): PackageFile {
+): PackageFile | null {
   const decoded = dataUrl ? dataUrlToBytes(dataUrl) : null;
-  if (!decoded) {
-    return { path: `${root}/${path}`, type, ...extra, suggested: false, missing: true };
-  }
+  if (!decoded) return null;
   return {
-    path: `${root}/${path}`,
+    path: root ? `${root}/${path}` : path,
     type,
     ...extra,
     suggested: false,
     missing: false,
     content: decoded.bytes,
   };
+}
+
+/** Push a file unless it is null (nothing made yet). */
+function pushFile(files: PackageFile[], file: PackageFile | null): void {
+  if (file) files.push(file);
 }
 
 /**
@@ -303,6 +331,7 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
   const root = packageRoot(world, channelId);
   const channel = channelOf(world, channelId);
   if (!channel) return [];
+  if (channel.kind === "game") return planGameFiles(world, channelId);
   const files: PackageFile[] = [];
 
   const brief = agentBrief(filtered, channelId);
@@ -347,12 +376,14 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
     });
     const source = world.characters.find((c) => c.id === character.id);
     for (const view of source?.sheet ?? []) {
-      files.push(
+      pushFile(
+        files,
         imageEntry(root, `characters/${character.id}/sheet/${view.view}.webp`, "sheet", view.imagePath, {
           character: character.id,
         }),
       );
-      files.push(
+      pushFile(
+        files,
         imageEntry(
           root,
           `characters/${character.id}/cutouts/${view.view}.png`,
@@ -374,13 +405,14 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
       });
       for (const line of voiceLines) {
         const decoded = line.audioPath ? dataUrlToBytes(line.audioPath) : null;
+        if (!decoded) continue;
         files.push({
           path: `${root}/characters/${character.id}/voice/${line.id}.mp3`,
           type: "voice-audio",
           character: character.id,
           suggested: false,
-          missing: !decoded,
-          ...(decoded ? { content: decoded.bytes } : {}),
+          missing: false,
+          content: decoded.bytes,
         });
       }
     }
@@ -389,7 +421,8 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
   const covered = new Set(filtered.beats.map((beat) => beat.partId));
   for (const part of [...filtered.parts].sort((a, b) => a.order - b.order)) {
     if (!covered.has(part.id)) continue;
-    files.push(
+    pushFile(
+      files,
       imageEntry(root, `scenes/${part.id}/art.webp`, "scene-art", part.imagePath, {
         part: part.id,
       }),
@@ -411,14 +444,6 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
         suggested: true,
         missing: false,
         content: packToMarkdown(filtered, pack),
-      });
-    } else {
-      files.push({
-        path: `${root}/packs/${part.id}.md`,
-        type: "pack",
-        part: part.id,
-        suggested: true,
-        missing: true,
       });
     }
   }
@@ -445,7 +470,8 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
       content: storyboardJson(board),
     });
     for (const frame of board.frames) {
-      files.push(
+      pushFile(
+        files,
         imageEntry(
           root,
           `scenes/${board.partId}/storyboard/${frame.id}.webp`,
@@ -502,8 +528,564 @@ export async function buildAgentZip(
   const zip = new JSZip();
   for (const file of files) {
     if (file.missing || file.content === undefined) continue;
-    zip.file(file.path, file.content);
+    zip.file(
+      file.path,
+      file.content,
+      file.path.endsWith("setup-studio.sh")
+        ? { unixPermissions: 0o100755 }
+        : undefined,
+    );
   }
-  const blob = await zip.generateAsync({ type: "blob" });
+  // UNIX platform so executable bits survive the round trip.
+  const blob = await zip.generateAsync({ type: "blob", platform: "UNIX" });
   return { blob, files };
+}
+
+/** Byte size of a planned file, for the dashboard's folder tree. */
+export function fileSizeOf(file: PackageFile): number {
+  if (file.content === undefined) return 0;
+  if (typeof file.content === "string") {
+    return new TextEncoder().encode(file.content).length;
+  }
+  return file.content.byteLength;
+}
+
+/** Short human size: `412 B`, `3.2 KB`, `1.1 MB`. */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+export const STUDIO_TEMPLATE_URL =
+  "https://github.com/Donchitos/Claude-Code-Game-Studios";
+
+/** Minimal YAML escaping for names and descriptions we generate. */
+function yamlString(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ")}"`;
+}
+
+function gameOf(world: World, channelId: string) {
+  return world.channels.find((c) => c.id === channelId);
+}
+
+/**
+ * Project rules for Muse Code: the game's name, engine, language, the
+ * secret rule (this game may know only its own secret), real names
+ * only, and pointers to design/, docs/ and production/.
+ */
+export function gameAgentsMd(filtered: World, channelId: string): string {
+  const channel = gameOf(filtered, channelId);
+  const secrets = learnableSecrets(filtered);
+  const lines = [
+    `# ${channel?.title || channel?.name || channelId} — agent rules (Muse Code)`,
+    ``,
+    `You are building the game channel of "${filtered.title}". Build only from the files in this package, in Godot 4 with GDScript.`,
+    ``,
+    `- Game: ${channel?.title || channel?.name || channelId}`,
+    `- Engine: Godot 4`,
+    `- Language: GDScript`,
+    `- Secrets: this game may know only its own secret.`,
+  ];
+  if (secrets.length === 0) {
+    lines.push(`- Nothing hidden yet: everything the player meets is on the surface.`);
+  } else {
+    lines.push(`- The player may learn:`);
+    for (const secret of secrets) lines.push(`  - ${secret}`);
+  }
+  lines.push(
+    ``,
+    `Use real names only: never rename anyone or change an established detail.`,
+    `Everything else in the wider story is deliberately absent from this package. Do not invent it, import it, or hint at it.`,
+    ``,
+    `Work from \`design/\` (what the game is), \`docs/\` (how each scene plays), and \`production/\` (what is made and what is next).`,
+    ``,
+  );
+  return lines.join("\n");
+}
+
+/** Machine-readable project pointer: schema, engine, names. */
+export function gameProjectYaml(filtered: World, channelId: string): string {
+  const channel = gameOf(filtered, channelId);
+  return [
+    `schema_version: 1`,
+    `engine: godot`,
+    `project: ${yamlString(filtered.title)}`,
+    `channel: ${yamlString(channelId)}`,
+    `channel_title: ${yamlString(channel?.title || channel?.name || channelId)}`,
+    ``,
+  ].join("\n");
+}
+
+/** What this package is and how to open it. */
+export function gameReadmeMd(filtered: World, channelId: string): string {
+  const channel = gameOf(filtered, channelId);
+  return [
+    `# ${filtered.title} — ${channel?.title || channel?.name || channelId} game package`,
+    ``,
+    `An agent package: everything a coding agent needs to build the game channel of "${filtered.title}" in Godot 4 with GDScript. It holds only this channel's secret.`,
+    ``,
+    `## Opening it`,
+    ``,
+    `Step 1. Unzip this package and open the folder.`,
+    `Step 2. Run \`sh scripts/setup-studio.sh\` from the package root to fetch the studio template's shared files.`,
+    `Step 3. Hand the folder to Muse Code and point it at AGENTS.md.`,
+    ``,
+    `See STUDIO-NOTICE.md for the template this layout follows.`,
+    ``,
+  ].join("\n");
+}
+
+/**
+ * The game-design script entry for this channel when the owner has
+ * written one (the earliest part's), otherwise a concept built from
+ * the canon.
+ */
+export function gameConceptMd(filtered: World, channelId: string): string {
+  const channel = gameOf(filtered, channelId);
+  const scripts = filtered.scripts
+    .filter((script) => script.channelId === channelId)
+    .sort((a, b) => {
+      const orderOf = (partId: string) =>
+        filtered.parts.find((p) => p.id === partId)?.order ?? 0;
+      return orderOf(a.partId) - orderOf(b.partId);
+    });
+  const saved = scripts[0];
+  if (saved) {
+    const part = filtered.parts.find((p) => p.id === saved.partId);
+    return [
+      `# Game concept — ${channel?.title || channel?.name || channelId}`,
+      ``,
+      `Saved game-design script (${part?.title ?? saved.partId}), written for this channel:`,
+      ``,
+      saved.text,
+      ``,
+    ].join("\n");
+  }
+  const lines = [
+    `# Game concept — ${channel?.title || channel?.name || channelId}`,
+    ``,
+    `Concept built from the canon (no game-design script written yet):`,
+    ``,
+    filtered.premise,
+    ``,
+    `## Parts`,
+    ``,
+  ];
+  for (const part of [...filtered.parts].sort((a, b) => a.order - b.order)) {
+    lines.push(`- Part ${part.order} (${part.title}): ${part.summary}`);
+  }
+  lines.push(
+    ``,
+    `## Cast`,
+    ``,
+  );
+  for (const character of filtered.characters) {
+    lines.push(`- ${character.name}: ${character.canon}`);
+  }
+  lines.push(``);
+  return lines.join("\n");
+}
+
+/** The story as parts, with this channel's beats under each. */
+export function gameStoryMd(filtered: World, channelId: string): string {
+  const lines = [`# Story — ${filtered.title}`, ``, filtered.premise, ``];
+  for (const part of [...filtered.parts].sort((a, b) => a.order - b.order)) {
+    lines.push(`## Part ${part.order}: ${part.title}`, ``, part.summary, ``);
+    if (part.excerpt) lines.push(`> ${part.excerpt}`, ``);
+    const beats = filtered.beats
+      .filter((beat) => beat.partId === part.id)
+      .sort((a, b) => a.order - b.order);
+    if (beats.length > 0) {
+      for (const beat of beats) {
+        lines.push(`- ${beat.unitLabel}: ${beat.title} — ${beat.content}`);
+      }
+      lines.push(``);
+    }
+  }
+  return lines.join("\n");
+}
+
+/** One character file: canon text, voice, and saved lines. */
+export function gameCharacterMd(character: {
+  id: string;
+  name: string;
+  canon: string;
+  voice?: { name: string };
+  lines?: Array<{ text: string }>;
+}): string {
+  const lines = [`# ${character.name}`, ``, character.canon, ``, `## Voice`, ``];
+  lines.push(character.voice ? character.voice.name : `No voice yet.`, ``);
+  lines.push(`## Lines`, ``);
+  if (character.lines && character.lines.length > 0) {
+    for (const line of character.lines) lines.push(`- ${line.text}`);
+  } else {
+    lines.push(`No recorded lines yet.`);
+  }
+  lines.push(``);
+  return lines.join("\n");
+}
+
+/**
+ * Art direction: the palette from the project's part tints, the style
+ * notes, and the character sheets and scene art on file.
+ */
+export function gameArtBibleMd(
+  filtered: World,
+  assets: { sheets: string[]; scenes: string[] },
+): string {
+  const tints = [...new Set(filtered.parts.map((p) => p.tint).filter(Boolean))];
+  const lines = [
+    `# Art bible — ${filtered.title}`,
+    ``,
+    `## Palette`,
+    ``,
+  ];
+  if (tints.length === 0) {
+    lines.push(`No palette set yet.`, ``);
+  } else {
+    for (const tint of tints) lines.push(`- ${tint}`);
+    lines.push(``);
+  }
+  lines.push(
+    `## Style notes`,
+    ``,
+    `Characters stay on-model: same face, build, clothing and carried items in every view. Scenes keep each character exactly as in their reference, with no text, letters, logos or watermarks.`,
+    ``,
+    `## Character sheets`,
+    ``,
+  );
+  if (assets.sheets.length === 0) {
+    lines.push(`No sheets made yet.`, ``);
+  } else {
+    for (const path of assets.sheets) lines.push(`- ${path}`);
+    lines.push(``);
+  }
+  lines.push(`## Scene art`, ``);
+  if (assets.scenes.length === 0) {
+    lines.push(`No scene art made yet.`, ``);
+  } else {
+    for (const path of assets.scenes) lines.push(`- ${path}`);
+    lines.push(``);
+  }
+  return lines.join("\n");
+}
+
+/** Characters and places registry both Muse Code and Godot can read. */
+export function gameEntitiesYaml(filtered: World): string {
+  const lines = [`characters:`];
+  for (const character of filtered.characters) {
+    lines.push(
+      `  - id: ${yamlString(character.id)}`,
+      `    name: ${yamlString(character.name)}`,
+    );
+  }
+  lines.push(`places:`);
+  for (const location of filtered.locations) {
+    lines.push(
+      `  - id: ${yamlString(location.id)}`,
+      `    name: ${yamlString(location.name)}`,
+      `    description: ${yamlString(location.description)}`,
+    );
+  }
+  lines.push(``);
+  return lines.join("\n");
+}
+
+/** Where the engine reference comes from: the studio template. */
+export function gameEngineReferenceMd(): string {
+  return [
+    `# Godot engine reference`,
+    ``,
+    `The full Godot reference ships with the Claude Code Game Studios template, fetched by \`scripts/setup-studio.sh\`.`,
+    ``,
+    `Online copy: ${STUDIO_TEMPLATE_URL}`,
+    ``,
+  ].join("\n");
+}
+
+/** What the studio's agents are and how they install. */
+export function gameAgentsReadmeMd(): string {
+  return [
+    `# Studio agents`,
+    ``,
+    `The studio's agents and skills are not vendored here. They install through \`scripts/setup-studio.sh\`, which copies the template's \`.claude/\` directory into \`.agents/\` (renamed for Muse Code) without overwriting this package's files.`,
+    ``,
+    `Run once from the package root:`,
+    ``,
+    `    sh scripts/setup-studio.sh`,
+    ``,
+  ].join("\n");
+}
+
+/**
+ * Fetch the template, rename it for Muse Code, copy without
+ * overwriting. Text replacements never touch LICENSE.
+ */
+export function gameSetupScript(): string {
+  return [
+    `#!/usr/bin/env bash`,
+    `# Install the Claude Code Game Studios template's shared files into`,
+    `# this package, renamed for Muse Code. Run from the package root:`,
+    `#`,
+    `#     sh scripts/setup-studio.sh`,
+    `set -euo pipefail`,
+    ``,
+    `if ! command -v git >/dev/null 2>&1; then`,
+    `  echo "setup-studio.sh: git is required but was not found. Install git, then run again." >&2`,
+    `  exit 1`,
+    `fi`,
+    ``,
+    `TEMPLATE_URL="${STUDIO_TEMPLATE_URL}.git"`,
+    `WORK="$(mktemp -d)"`,
+    `trap 'rm -rf "$WORK"' EXIT INT TERM`,
+    ``,
+    `echo "setup-studio.sh: cloning $TEMPLATE_URL ..."`,
+    `git clone --depth 1 "$TEMPLATE_URL" "$WORK/template"`,
+    ``,
+    `cd "$WORK/template"`,
+    `RENAMED=0`,
+    `while IFS= read -r CLAUDE_FILE; do`,
+    `  [ -n "$CLAUDE_FILE" ] || continue`,
+    `  mv "$CLAUDE_FILE" "$(dirname "$CLAUDE_FILE")/AGENTS.md"`,
+    `  echo "setup-studio.sh: renamed $CLAUDE_FILE to AGENTS.md"`,
+    `  RENAMED=$((RENAMED + 1))`,
+    `done <<EOF`,
+    `$(find . -name 'CLAUDE.md' | sort)`,
+    `EOF`,
+    `echo "setup-studio.sh: renamed $RENAMED CLAUDE.md file(s) to AGENTS.md"`,
+    ``,
+    `CHANGED=0`,
+    `while IFS= read -r TEXT_FILE; do`,
+    `  [ -n "$TEXT_FILE" ] || continue`,
+    `  case "$TEXT_FILE" in *LICENSE*) continue;; esac`,
+    `  if grep -Iq 'Claude' "$TEXT_FILE"; then`,
+    `    sed 's/Claude Code/Muse Code/g; s/Claude/Muse/g' "$TEXT_FILE" > "$TEXT_FILE.muse"`,
+    `    mv "$TEXT_FILE.muse" "$TEXT_FILE"`,
+    `    CHANGED=$((CHANGED + 1))`,
+    `  fi`,
+    `done <<EOF`,
+    `$(find . -type f | sort)`,
+    `EOF`,
+    `echo "setup-studio.sh: replaced Claude names with Muse in $CHANGED text file(s), never in LICENSE"`,
+    ``,
+    `cd - >/dev/null`,
+    `if [ -d "$WORK/template/.claude" ]; then`,
+    `  mkdir -p .agents`,
+    `  cp -Rn "$WORK/template/.claude/." .agents/`,
+    `  echo "setup-studio.sh: installed the studio agents into .agents/ (from the template's .claude/)"`,
+    `fi`,
+    `tar -cf - -C "$WORK/template" --exclude=.git --exclude=.claude . | tar -xkf - -C .`,
+    `echo "setup-studio.sh: copied the template's other files without overwriting this package"`,
+    `echo "setup-studio.sh: done. The studio agents and skills are ready under .agents/"`,
+    ``,
+  ].join("\n");
+}
+
+/** Template credit, MIT license note, and the Muse Code caveat. */
+export function gameStudioNoticeMd(): string {
+  return [
+    `# Studio template notice`,
+    ``,
+    `This game package follows the open-source "Claude Code Game Studios" template (${STUDIO_TEMPLATE_URL}), MIT license.`,
+    ``,
+    `Copyright notice and license text: See LICENSE in the template, copied by setup-studio.sh.`,
+    ``,
+    `The renamed agents and skills under \`.agents/\` have not been tested with Muse Code.`,
+    ``,
+  ].join("\n");
+}
+
+/** production/stage.md: Concept, plus what is made and not made yet. */
+export function gameStageMd(
+  made: string[],
+  notMade: string[],
+): string {
+  const lines = [`# Stage: Concept`, ``];
+  lines.push(`## Made`, ``);
+  if (made.length === 0) {
+    lines.push(`- Nothing yet.`, ``);
+  } else {
+    for (const item of made) lines.push(`- ${item}`);
+    lines.push(``);
+  }
+  lines.push(`## Not made yet`, ``);
+  if (notMade.length === 0) {
+    lines.push(`- Everything planned is made.`, ``);
+  } else {
+    for (const item of notMade) lines.push(`- ${item}`);
+    lines.push(``);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Game channel ZIP layout, following the open-source "Claude Code Game
+ * Studios" template with Claude renamed to Muse (CLAUDE.md becomes
+ * AGENTS.md, .claude/ becomes .agents/). Files sit at the ZIP root.
+ * The channel secret rule applies to all of it: every file is built
+ * from the filtered world, which holds only this channel's secret.
+ */
+export function planGameFiles(world: World, channelId: string): PackageFile[] {
+  const filtered = channelWorld(world, channelId);
+  const channel = channelOf(world, channelId);
+  if (!channel) return [];
+  const files: PackageFile[] = [];
+  const text = (
+    path: string,
+    type: PackageFileType,
+    content: string,
+    extra?: { character?: string; part?: string },
+  ): void => {
+    files.push({
+      path,
+      type,
+      ...extra,
+      suggested: false,
+      missing: false,
+      content,
+    });
+  };
+
+  text("AGENTS.md", "studio-rules", gameAgentsMd(filtered, channelId));
+  text("project.yaml", "studio-project", gameProjectYaml(filtered, channelId));
+  text("README.md", "studio-readme", gameReadmeMd(filtered, channelId));
+  text("STUDIO-NOTICE.md", "studio-notice", gameStudioNoticeMd());
+  text(
+    "design/gdd/game-concept.md",
+    "game-concept",
+    gameConceptMd(filtered, channelId),
+  );
+  text(
+    "design/narrative/story.md",
+    "narrative",
+    gameStoryMd(filtered, channelId),
+  );
+  for (const character of filtered.characters) {
+    text(
+      `design/characters/${character.id}.md`,
+      "character-doc",
+      gameCharacterMd(character),
+      { character: character.id },
+    );
+  }
+  const covered = new Set(filtered.beats.map((beat) => beat.partId));
+  const sheetAssets: string[] = [];
+  const sceneAssets: string[] = [];
+  for (const character of filtered.characters) {
+    const source = world.characters.find((c) => c.id === character.id);
+    for (const view of source?.sheet ?? []) {
+      const sheetPath = `assets/characters/${character.id}/sheet/${view.view}.webp`;
+      const before = files.length;
+      pushFile(
+        files,
+        imageEntry("", sheetPath, "sheet", view.imagePath, {
+          character: character.id,
+        }),
+      );
+      if (files.length > before) sheetAssets.push(sheetPath);
+      pushFile(
+        files,
+        imageEntry("", `assets/characters/${character.id}/cutouts/${view.view}.png`, "cutout", view.cutoutPath, {
+          character: character.id,
+        }),
+      );
+    }
+    const voiceLines = source?.lines ?? [];
+    if (source && (source.voice || voiceLines.length > 0)) {
+      text(
+        `assets/characters/${character.id}/voice.json`,
+        "voice",
+        voiceIndexJson(source),
+        { character: character.id },
+      );
+      for (const line of voiceLines) {
+        const decoded = line.audioPath ? dataUrlToBytes(line.audioPath) : null;
+        if (!decoded) continue;
+        files.push({
+          path: `assets/characters/${character.id}/voice/${line.id}.mp3`,
+          type: "voice-audio",
+          character: character.id,
+          suggested: false,
+          missing: false,
+          content: decoded.bytes,
+        });
+      }
+    }
+  }
+  text(
+    "design/registry/entities.yaml",
+    "entities",
+    gameEntitiesYaml(filtered),
+  );
+  const scripted = new Set<string>();
+  for (const part of [...filtered.parts].sort((a, b) => a.order - b.order)) {
+    if (!covered.has(part.id)) continue;
+    text(
+      `docs/story/${part.id}/brief.md`,
+      "scene-brief",
+      sceneBrief(filtered, channelId, part.id),
+      { part: part.id },
+    );
+    const script = filtered.scripts.find((s) => s.partId === part.id);
+    if (script) {
+      text(`docs/story/${part.id}/script.txt`, "script", script.text, {
+        part: part.id,
+      });
+      scripted.add(part.id);
+    }
+    const artPath = `assets/scenes/${part.id}/art.webp`;
+    const before = files.length;
+    pushFile(
+      files,
+      imageEntry("", artPath, "scene-art", part.imagePath, { part: part.id }),
+    );
+    if (files.length > before) sceneAssets.push(artPath);
+  }
+  // Scripts ship even for parts this channel does not cover: the owner
+  // wrote them, so they are made work, not missing files.
+  for (const script of filtered.scripts) {
+    if (scripted.has(script.partId)) continue;
+    text(`docs/story/${script.partId}/script.txt`, "script", script.text, {
+      part: script.partId,
+    });
+  }
+  text(
+    "docs/engine-reference/godot/README.md",
+    "engine-reference",
+    gameEngineReferenceMd(),
+  );
+  const made: string[] = [];
+  const notMade: string[] = [];
+  if (filtered.characters.length > 0) {
+    const full = filtered.characters.filter(hasFullSheet).length;
+    (full === filtered.characters.length ? made : notMade).push(
+      `Character sheets (${full} of ${filtered.characters.length})`,
+    );
+  }
+  for (const part of [...filtered.parts].sort((a, b) => a.order - b.order)) {
+    if (!covered.has(part.id)) continue;
+    (part.imagePath ? made : notMade).push(`Scene art: ${part.title}`);
+    const hasScript = filtered.scripts.some((s) => s.partId === part.id);
+    (hasScript ? made : notMade).push(`Script: ${part.title}`);
+    const hasBoard = (filtered.storyboards ?? []).some(
+      (b) => b.partId === part.id,
+    );
+    (hasBoard ? made : notMade).push(`Storyboard: ${part.title}`);
+    const hasVideo = (filtered.shorts ?? []).some((s) => s.partId === part.id);
+    (hasVideo ? made : notMade).push(`Video: ${part.title}`);
+  }
+  // The art bible lists the sheets and scene art on file, so it is
+  // written once those lists are known.
+  text(
+    "design/art-bible.md",
+    "art-bible",
+    gameArtBibleMd(filtered, { sheets: sheetAssets, scenes: sceneAssets }),
+  );
+  text("production/stage.md", "stage", gameStageMd(made, notMade));
+  text("src/.gitkeep", "gitkeep", "");
+  text(".agents/README.md", "agents-readme", gameAgentsReadmeMd());
+  text("scripts/setup-studio.sh", "setup-script", gameSetupScript());
+  return files;
 }

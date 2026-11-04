@@ -51,7 +51,7 @@ export const LocationSchema = z.object({
   description: z.string(),
 });
 
-export const ChannelKindSchema = z.enum(["game", "series", "shorts", "press"]);
+export const ChannelKindSchema = z.enum(["game", "series", "shorts", "press", "film", "website", "ad", "other"]);
 
 export const ChannelSchema = z.object({
   id: z.string(),

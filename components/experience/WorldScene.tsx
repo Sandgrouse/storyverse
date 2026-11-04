@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type {
   Part,
@@ -611,10 +612,10 @@ export default function WorldScene({ active = true, world, onWorld, drawer: cont
       .join(" and ");
   })();
 
-  const whosHere = part.characterIds
-    .map((id) => liveWorld.characters.find((c) => c.id === id)?.name)
-    .filter(Boolean)
-    .join(", ");
+  const whosHere = part.characterIds.flatMap((id) => {
+    const character = liveWorld.characters.find((c) => c.id === id);
+    return character ? [{ id: character.id, name: character.name }] : [];
+  });
 
   const channelOf = (fix: RippleFix) =>
     liveWorld.channels.find((c) => c.id === fix.channelId);
@@ -672,7 +673,23 @@ export default function WorldScene({ active = true, world, onWorld, drawer: cont
               <b>{toldIn}</b>Told in
             </div>
             <div>
-              <b>{whosHere}</b>Who&rsquo;s here
+              <b>
+                {whosHere.length > 0 ? (
+                  whosHere.map((entry, index) => (
+                    <Fragment key={entry.id}>
+                      {index > 0 && ", "}
+                      <Link
+                        href={`/projects/${liveWorld.id}/characters?c=${entry.id}`}
+                      >
+                        {entry.name}
+                      </Link>
+                    </Fragment>
+                  ))
+                ) : (
+                  "—"
+                )}
+              </b>
+              Who&rsquo;s here
             </div>
           </div>
           {!part.imagePath && sceneState.kind !== "idle" && (

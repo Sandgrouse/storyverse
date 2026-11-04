@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import "./characters.css";
+import "./package.css";
 
 const serif = localFont({
   src: [

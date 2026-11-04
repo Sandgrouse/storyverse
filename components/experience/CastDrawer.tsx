@@ -1,8 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Character, World } from "@/lib/world/schemas";
 import { SHEET_VIEWS } from "@/lib/art";
+import {
+  filterCharacters,
+  resolveCharacterId,
+  scenesForCharacter,
+} from "@/lib/cast";
 import {
   SHEET_CUTOUT_CONCEPT,
   SHEET_CUTOUT_FALLBACK_CONCEPT,
@@ -522,10 +528,43 @@ function Pronunciations({
   );
 }
 
+/** The `?c=` query value, if the browser has one. */
+function paramCharacterId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return new URLSearchParams(window.location.search).get("c");
+  } catch {
+    return null;
+  }
+}
+
+function portraitFor(character: Character): string | undefined {
+  return character.artPath ?? character.sheet[0]?.imagePath;
+}
+
 export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
-  const [selectedId, setSelectedId] = useState(world.characters[0]?.id);
+  // The selection lives in the URL as `?c=<character-id>`: it survives
+  // reloads and other pages can link to one character. Next's router
+  // is left alone so this also renders in tests without a router.
+  const [urlChar, setUrlChar] = useState<string | null>(() => paramCharacterId());
+  useEffect(() => {
+    const sync = () => setUrlChar(paramCharacterId());
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+  const select = (id: string) => {
+    setUrlChar(id);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("c", id);
+      window.history.replaceState(null, "", url);
+    } catch {
+      // A URL that cannot be rewritten still keeps the local selection.
+    }
+  };
   const selected: Character | undefined =
-    world.characters.find((c) => c.id === selectedId) ?? world.characters[0];
+    world.characters.find((c) => c.id === (urlChar ?? resolveCharacterId(world, null))) ??
+    world.characters[0];
 
   const [slots, setSlots] = useState<Record<string, SlotState>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -549,18 +588,18 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
   const cutting =
     cuttingAll || Object.values(cutouts).some((s) => s.kind === "working");
 
-  const appearsIn = useMemo(() => {
-    if (!selected) return "";
-    return world.beats
-      .filter((b) => b.characterIds.includes(selected.id))
-      .map((b) => {
-        const channel = world.channels.find((c) => c.id === b.channelId);
-        return `${channel?.name ?? ""} ${b.unitLabel}`.trim();
-      })
-      .join("; ");
-  }, [world, selected]);
+  const [query, setQuery] = useState("");
+  const visible = useMemo(
+    () => filterCharacters(world.characters, query),
+    [world.characters, query],
+  );
 
-  const figures = world.characters.filter((c) => c.artPath);
+  const scenes = useMemo(
+    () => (selected ? scenesForCharacter(world, world.id, selected.id) : []),
+    [world, selected],
+  );
+
+  const largeArt = selected ? portraitFor(selected) : undefined;
 
   const markSlot = (view: string, state: SlotState) =>
     setSlots((prev) => ({ ...prev, [view]: state }));
@@ -863,40 +902,110 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
         Close
       </button>
       <div className="kicker">Characters</div>
-      <h2>{selected?.name ?? ""}</h2>
-      <div className="castlist">
-        {world.characters.map((c) => (
-          <button
-            key={c.id}
-            className={c.id === selected?.id ? "on" : ""}
-            onClick={() => setSelectedId(c.id)}
+      <h2>{selected?.name ?? "Characters"}</h2>
+      <div className="castlayout">
+        <div className="castside">
+          {world.characters.length > 8 && (
+            <input
+              type="search"
+              className="castsearch"
+              aria-label="Search characters"
+              placeholder="Search characters"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              tabIndex={open ? 0 : -1}
+            />
+          )}
+          <select
+            className="castselect"
+            aria-label="Choose a character"
+            value={selected?.id ?? ""}
+            onChange={(e) => {
+              if (e.target.value) select(e.target.value);
+            }}
             tabIndex={open ? 0 : -1}
           >
-            {c.name}
-          </button>
-        ))}
-      </div>
-      <div className="who">
-        {figures.map((c) => (
-          <div
-            key={c.id}
-            className="fig"
-            style={{ backgroundImage: `url(${c.artPath})` }}
-            role="img"
-            aria-label={c.name}
-          />
-        ))}
-        <div className="txt">
-          <small>Canon</small>
-          <p>{selected?.canon ?? ""}</p>
-          {selected?.secret && (
-            <>
-              <small>Secret</small>
-              <p>{selected.secret}</p>
-            </>
+            {world.characters.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <ul className="castlistbox" aria-label="Characters">
+            {visible.map((c) => {
+              const portrait = portraitFor(c);
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    className={`castitem${c.id === selected?.id ? " on" : ""}`}
+                    aria-current={c.id === selected?.id ? "true" : undefined}
+                    onClick={() => select(c.id)}
+                    tabIndex={open ? 0 : -1}
+                  >
+                    {portrait ? (
+                      <span
+                        className="castthumb"
+                        style={{ backgroundImage: `url(${portrait})` }}
+                        role="img"
+                        aria-label={c.name}
+                      />
+                    ) : (
+                      <span className="castthumb empty" aria-hidden="true" />
+                    )}
+                    <span className="castname">{c.name}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {visible.length === 0 && (
+            <p className="castempty" role="status">
+              No characters match.
+            </p>
           )}
-          <small>Appears in</small>
-          <p>{appearsIn}</p>
+        </div>
+        <div className="castdetail">
+          {selected ? (
+            <>
+              <div
+                className={`castart${largeArt ? "" : " empty"}`}
+                style={largeArt ? { backgroundImage: `url(${largeArt})` } : undefined}
+                role={largeArt ? "img" : undefined}
+                aria-label={largeArt ? selected.name : undefined}
+              >
+                {!largeArt && <span>No art yet</span>}
+              </div>
+              <small>Canon</small>
+              <p>{selected.canon}</p>
+              {selected.secret && (
+                <>
+                  <small>Secret</small>
+                  <p>{selected.secret}</p>
+                </>
+              )}
+              <small>Appears in</small>
+              {scenes.length > 0 ? (
+                <ul className="appearchips">
+                  {scenes.map((scene) => (
+                    <li key={`${scene.channelId}::${scene.partId}`}>
+                      <Link
+                        className="appearchip"
+                        href={scene.href}
+                        tabIndex={open ? 0 : -1}
+                      >
+                        {scene.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>Nowhere yet.</p>
+              )}
+            </>
+          ) : (
+            <p role="status">No characters yet.</p>
+          )}
         </div>
       </div>
       <div className="sheetwrap">

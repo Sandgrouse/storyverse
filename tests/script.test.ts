@@ -372,9 +372,10 @@ describe("agent package scripts", () => {
 
     const game = planAgentFiles(world, "game");
     const gameScript = game.find((f) => f.type === "script");
+    expect(gameScript?.path).toBe("docs/story/part-1/script.txt");
     expect(gameScript?.content).toBe("Game draft for part one.");
     expect(
-      game.some((f) => f.path.endsWith("scripts/part-1.txt") && f.content === "Series draft."),
+      game.some((f) => f.path.endsWith("script.txt") && f.content === "Series draft."),
     ).toBe(false);
   });
 });
