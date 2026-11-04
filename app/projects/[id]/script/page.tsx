@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { MissingStory, useProject } from "@/components/projects/ProjectContext";
 import {
   ScriptCheckResponseSchema,
+  applyScriptReplacement,
   highlightSegments,
   highlightTerms,
   initialScriptText,
@@ -226,12 +227,7 @@ function ScriptEditor({
   };
 
   const applyFix = (issue: ScriptIssue) => {
-    const at = text.indexOf(issue.quote);
-    if (at !== -1) {
-      setText(
-        text.slice(0, at) + issue.fix + text.slice(at + issue.quote.length),
-      );
-    }
+    setText(applyScriptReplacement(text, issue.quote, issue.replacement));
     keepIssue(issue.quote);
   };
 
@@ -376,7 +372,9 @@ function ScriptEditor({
               </div>
               {revealed.includes(issue.quote) ? (
                 <div className="script-fix">
-                  {issue.fix}
+                  {issue.replacement.length > 0
+                    ? issue.replacement
+                    : "Remove this line"}
                   <div className="script-row">
                     <button
                       className="pill sm"

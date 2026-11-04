@@ -15,7 +15,7 @@ export const DRAFT_INSTRUCTIONS =
   "You write one scene of a story told across several channels, in the form that channel asks for. Use only the canon and the secrets this channel may know, listed below. A secret that belongs to another channel must never appear or be hinted at. Use the world's real names and details exactly. Never rename anyone or change an established detail. Return only the scene.";
 
 export const CHECK_INSTRUCTIONS =
-  "You check one script draft against the canon. The canon lists every secret and the channels that may know it, so you can spot leaks: a line leaks when it reveals a secret to a channel that may not know it. Report each real problem as either a contradiction (the line is false against the canon) or a leak (the line reveals what this channel must not know). Quote the exact line you mean. Never repeat a secret from another channel in your report: describe the problem and the fix without quoting or paraphrasing that secret's text.";
+  "You check one script draft against the canon. The canon lists every secret and the channels that may know it, so you can spot leaks: a line leaks when it reveals a secret to a channel that may not know it. Report each real problem as either a contradiction (the line is false against the canon) or a leak (the line reveals what this channel must not know). Quote the exact line you mean. For a contradiction, the problem must say plainly what is wrong and what the canon says, using the real names and details from the canon. For a leak, the problem says which channel the information belongs to, without repeating that secret's text. replacement is the exact script text that replaces the quote, written in the script's own form. Never describe an edit. Use an empty string only if the line should simply be removed. Never repeat a secret from another channel in problem or replacement: describe the problem and write the replacement without quoting or paraphrasing that secret's text.";
 
 export const DRAFT_SCHEMA_NAME = "script_draft";
 
@@ -41,9 +41,9 @@ export const CHECK_JSON_SCHEMA = {
           kind: { type: "string", enum: ["contradiction", "leak"] },
           quote: { type: "string" },
           problem: { type: "string" },
-          fix: { type: "string" },
+          replacement: { type: "string" },
         },
-        required: ["kind", "quote", "problem", "fix"],
+        required: ["kind", "quote", "problem", "replacement"],
         additionalProperties: false,
       },
     },
@@ -81,7 +81,7 @@ export const ScriptIssueSchema = z.object({
   kind: z.enum(["contradiction", "leak"]),
   quote: z.string().min(1),
   problem: z.string().min(1),
-  fix: z.string().min(1),
+  replacement: z.string(),
 });
 
 export type ScriptIssue = z.infer<typeof ScriptIssueSchema>;
@@ -127,7 +127,7 @@ export function allowedSecrets(
 /**
  * Secret text this channel must not reveal: every world secret it may not
  * know, plus every other channel's channel secret. The check filter drops
- * any issue that repeats one of these in its problem or fix.
+ * any issue that repeats one of these in its problem or replacement.
  */
 export function foreignSecretTexts(world: World, channelId: string): string[] {
   const texts: string[] = [];
@@ -250,8 +250,9 @@ export function scriptCheckInput(
 
 /**
  * Validate each model issue on its own, then drop any whose quote is not
- * an exact substring of the draft, and any whose problem or fix repeats a
- * secret from another channel. Drops instead of failing the whole check.
+ * an exact substring of the draft, and any whose problem or replacement
+ * repeats a secret from another channel. Drops instead of failing the
+ * whole check.
  */
 export function toScriptIssues(
   modelIssues: unknown[],
@@ -266,13 +267,29 @@ export function toScriptIssues(
     if (!parsed.success) continue;
     const issue = parsed.data;
     if (!text.includes(issue.quote)) continue;
-    const says = `${issue.problem}\n${issue.fix}`;
+    const says = `${issue.problem}\n${issue.replacement}`;
     if (foreign.some((secret) => secret.length > 0 && says.includes(secret))) {
       continue;
     }
     kept.push(issue);
   }
   return kept;
+}
+
+/**
+ * Apply one issue's replacement to the draft: swap the first occurrence
+ * of the quote for the replacement text. An empty replacement removes
+ * the quote. Pure, so the page and tests share it.
+ */
+export function applyScriptReplacement(
+  text: string,
+  quote: string,
+  replacement: string,
+): string {
+  if (!quote) return text;
+  const at = text.indexOf(quote);
+  if (at === -1) return text;
+  return text.slice(0, at) + replacement + text.slice(at + quote.length);
 }
 
 /** The stored script for one channel's take on one part, if any. */

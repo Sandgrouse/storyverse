@@ -5,6 +5,7 @@ import { __resetBudgetMemory } from "@/lib/budget";
 import { planAgentFiles } from "@/lib/package";
 import { mergeWorldAssets } from "@/lib/projects";
 import {
+  applyScriptReplacement,
   highlightSegments,
   initialScriptText,
   scriptCheckInput,
@@ -201,13 +202,13 @@ describe("script check filtering", () => {
           kind: "contradiction",
           quote: "Ada walks to the stream at dawn.",
           problem: "The canon says she arrives at noon.",
-          fix: "Move the walk to noon.",
+          replacement: "Move the walk to noon.",
         },
         {
           kind: "leak",
           quote: "A line that is nowhere in the draft.",
           problem: "Nothing holds it.",
-          fix: "Cut it.",
+          replacement: "Cut it.",
         },
       ],
       text,
@@ -225,19 +226,19 @@ describe("script check filtering", () => {
           kind: "leak",
           quote: "The water is cold.",
           problem: `This hints that ${GAME_SECRET}.`,
-          fix: "Keep the water undescribed.",
+          replacement: "Keep the water undescribed.",
         },
         {
           kind: "leak",
           quote: "The water is cold.",
           problem: "The cold water reads flat here.",
-          fix: `Warm it, since ${GAME_CHANNEL_SECRET}.`,
+          replacement: `Warm it, since ${GAME_CHANNEL_SECRET}.`,
         },
         {
           kind: "contradiction",
           quote: "The water is cold.",
           problem: "The canon says the stream runs warm.",
-          fix: "Call the water warm.",
+          replacement: "Call the water warm.",
         },
       ],
       text,
@@ -245,7 +246,7 @@ describe("script check filtering", () => {
       "series",
     );
     expect(issues).toHaveLength(1);
-    expect(issues[0].fix).toBe("Call the water warm.");
+    expect(issues[0].replacement).toBe("Call the water warm.");
   });
 
   it("filters at the route level too", async () => {
@@ -256,19 +257,19 @@ describe("script check filtering", () => {
             kind: "contradiction",
             quote: "The water is cold.",
             problem: "The canon says the stream runs warm.",
-            fix: "Call the water warm.",
+            replacement: "Call the water warm.",
           },
           {
             kind: "leak",
             quote: "A line that is nowhere in the draft.",
             problem: "Nothing holds it.",
-            fix: "Cut it.",
+            replacement: "Cut it.",
           },
           {
             kind: "leak",
             quote: "The water is cold.",
             problem: `This hints that ${GAME_SECRET}.`,
-            fix: "Keep the water undescribed.",
+            replacement: "Keep the water undescribed.",
           },
         ],
       }),
@@ -398,5 +399,36 @@ describe("script highlights", () => {
     expect(stream?.strong).toBe(true);
     const ada = segments.find((s) => s.text === "Ada");
     expect(ada?.strong).toBe(false);
+  });
+});
+
+describe("applyScriptReplacement", () => {
+  const text =
+    "Anukili is a small and gentle woman from Lagos. She walks on.";
+
+  it("swaps the quote for the replacement text", () => {
+    expect(
+      applyScriptReplacement(
+        text,
+        "Anukili is a small and gentle woman from Lagos.",
+        "Anukili is a huge man of the Igbo myth.",
+      ),
+    ).toBe("Anukili is a huge man of the Igbo myth. She walks on.");
+  });
+
+  it("removes the quote when the replacement is empty", () => {
+    expect(
+      applyScriptReplacement(
+        text,
+        "Anukili is a small and gentle woman from Lagos. ",
+        "",
+      ),
+    ).toBe("She walks on.");
+  });
+
+  it("leaves the text alone when the quote is missing", () => {
+    expect(applyScriptReplacement(text, "No such line.", "New line.")).toBe(
+      text,
+    );
   });
 });
