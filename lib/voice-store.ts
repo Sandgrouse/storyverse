@@ -99,6 +99,30 @@ export function makeInviteToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
+/**
+ * Invite tokens are always 24 random bytes as base64url: 32 chars of
+ * [A-Za-z0-9_-]. Anything else never names an invite, so reject it
+ * before any disk or Blob access.
+ */
+const INVITE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32}$/;
+
+export function isInviteToken(value: unknown): value is string {
+  return typeof value === "string" && INVITE_TOKEN_PATTERN.test(value);
+}
+
+/**
+ * Audio ids are exactly what putAudio generates:
+ * `${safeSegment(prefix)}-${randomId()}.${ext}`. Reject anything else
+ * before any disk or Blob access.
+ */
+const AUDIO_FILE_ID_PATTERN = new RegExp(
+  `^[a-z0-9_-]{1,48}-[A-Za-z0-9_-]{16}\\.(${[...new Set(ALLOWED_MIME.values())].join("|")})$`,
+);
+
+export function isAudioFileId(value: unknown): value is string {
+  return typeof value === "string" && AUDIO_FILE_ID_PATTERN.test(value);
+}
+
 export function isInviteExpired(createdAt: number, now: number = Date.now()): boolean {
   return now - createdAt > INVITE_TTL_MS;
 }
@@ -157,6 +181,7 @@ async function writeInviteRecord(record: InviteRecord): Promise<void> {
 }
 
 async function removeInviteRecord(token: string): Promise<void> {
+  if (!isInviteToken(token)) return;
   if (isMemoryStore()) {
     memInvites.delete(token);
     return;
@@ -179,10 +204,14 @@ async function removeInviteRecord(token: string): Promise<void> {
 }
 
 export async function saveInvite(record: InviteRecord): Promise<void> {
+  if (!isInviteToken(record.token)) {
+    throw new VoiceStoreError("NOT_FOUND", VOICE_INVITE_MISSING_MESSAGE);
+  }
   await writeInviteRecord(record);
 }
 
 export async function readInvite(token: string): Promise<InviteRecord | null> {
+  if (!isInviteToken(token)) return null;
   let record: InviteRecord | null = null;
   if (isMemoryStore()) {
     record = memInvites.get(token) ?? null;
@@ -261,10 +290,7 @@ export async function putAudio(
 }
 
 export async function getAudio(fileId: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
-  if (fileId.includes("..") || fileId.includes("/")) {
-    const parts = fileId.split("/");
-    if (parts.length !== 2 || parts.some((p) => p.includes(".."))) return null;
-  }
+  if (!isAudioFileId(fileId)) return null;
   if (isMemoryStore()) {
     const found = memAudio.get(fileId);
     return found ? { bytes: found.bytes, mime: found.mime } : null;
@@ -354,13 +380,13 @@ export async function putSample(
 }
 
 export async function getSample(sampleId: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
-  if (!/^[A-Za-z0-9_-]+\.[a-z0-9]+$/.test(sampleId)) return null;
+  if (!isAudioFileId(sampleId)) return null;
   return getAudio(sampleId);
 }
 
 export async function deleteSamples(sampleIds: string[]): Promise<void> {
   for (const id of sampleIds) {
-    if (!/^[A-Za-z0-9_-]+\.[a-z0-9]+$/.test(id)) continue;
+    if (!isAudioFileId(id)) continue;
     await deleteAudioFile(id).catch(() => {});
   }
 }

@@ -356,7 +356,7 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
       {tab === "record" && (
         <div>
           <div className="row between" style={{ marginBottom: 8 }}>
-            <span className="sub">Record the lines yourself.</span>
+            <span className="vx-sub">Record the lines yourself.</span>
             <button type="button" className="quiet" onClick={() => void pickLines()} disabled={pickingLines}>
               {pickingLines ? "Writing…" : "Pick lines from the story"}
             </button>
@@ -381,7 +381,7 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
             </button>
           </div>
           <Recorder lines={lines.filter((l) => l.trim())} onChange={setTakes} />
-          <label className="consent" style={{ display: "flex", gap: 8, margin: "12px 0" }}>
+          <label className="vx-consent" style={{ display: "flex", gap: 8, margin: "12px 0" }}>
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>{OWNER_CONSENT_TEXT}</span>
           </label>
@@ -398,7 +398,7 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
 
       {tab === "upload" && (
         <div>
-          <div className="sub" style={{ marginBottom: 8 }}>
+          <div className="vx-sub" style={{ marginBottom: 8 }}>
             MP3, WAV or M4A. One to two minutes of one clear voice works best.
           </div>
           <input
@@ -411,13 +411,13 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
           {uploads.length > 0 && (
             <ul style={{ listStyle: "none", margin: "10px 0", padding: 0 }}>
               {uploads.map((file, i) => (
-                <li key={`${file.name}-${i}`} className="sub">
+                <li key={`${file.name}-${i}`} className="vx-sub">
                   {file.name} · {(file.size / 1024).toFixed(0)} KB
                 </li>
               ))}
             </ul>
           )}
-          <label className="consent" style={{ display: "flex", gap: 8, margin: "12px 0" }}>
+          <label className="vx-consent" style={{ display: "flex", gap: 8, margin: "12px 0" }}>
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>{OWNER_CONSENT_TEXT}</span>
           </label>
@@ -434,7 +434,7 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
 
       {tab === "ask" && (
         <div>
-          <div className="sub" style={{ marginBottom: 6 }}>Who should they voice?</div>
+          <div className="vx-sub" style={{ marginBottom: 6 }}>Who should they voice?</div>
           <div className="row" style={{ gap: 8, marginBottom: 12 }}>
             {world.characters.map((c) => (
               <button
@@ -451,7 +451,7 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
           </div>
           {selectedCharacters.map((c) => (
             <div key={c.id} style={{ marginBottom: 12 }}>
-              <div className="sub" style={{ marginBottom: 4 }}>Brief for {c.name}</div>
+              <div className="vx-sub" style={{ marginBottom: 4 }}>Brief for {c.name}</div>
               <textarea
                 aria-label={`Brief for ${c.name}`}
                 rows={2}
@@ -459,7 +459,7 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
                 onChange={(e) => setBriefs((prev) => ({ ...prev, [c.id]: e.target.value }))}
                 style={{ width: "100%", font: "inherit", color: "inherit", background: "var(--sheet)", border: "1px solid var(--rule)", borderRadius: 10, padding: "8px 10px" }}
               />
-              <div className="sub" style={{ margin: "6px 0 4px" }}>Lines for {c.name}</div>
+              <div className="vx-sub" style={{ margin: "6px 0 4px" }}>Lines for {c.name}</div>
               {(inviteLines[c.id] ?? c.lines?.map((l) => l.text) ?? []).map((text, i) => (
                 <div key={i} className="row" style={{ marginBottom: 6 }}>
                   <input
@@ -500,7 +500,7 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
               </button>
             </div>
           ))}
-          <div className="sub" style={{ marginBottom: 4 }}>Note for the artist</div>
+          <div className="vx-sub" style={{ marginBottom: 4 }}>Note for the artist</div>
           <textarea
             aria-label="Note for the artist"
             rows={2}
@@ -508,7 +508,7 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
             onChange={(e) => setNote(e.target.value)}
             style={{ width: "100%", font: "inherit", color: "inherit", background: "var(--sheet)", border: "1px solid var(--rule)", borderRadius: 10, padding: "8px 10px" }}
           />
-          <div className="sub" style={{ marginTop: 8 }}>
+          <div className="vx-sub" style={{ marginTop: 8 }}>
             10 lines each, picked from the story. Secrets are never included.
           </div>
           <div className="row" style={{ marginTop: 10 }}>
@@ -521,7 +521,7 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
           </div>
           {inviteUrl && (
             <div className="row" style={{ marginTop: 10 }}>
-              <span className="sub" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{inviteUrl}</span>
+              <span className="vx-sub" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{inviteUrl}</span>
               <button type="button" className="pill light" onClick={() => void navigator.clipboard?.writeText(inviteUrl)}>
                 Copy
               </button>
@@ -534,16 +534,16 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
                 if (takes.length === 0) return null;
                 return (
                   <div key={c.id} style={{ marginBottom: 10 }}>
-                    <div className="sub">{c.name}, {takes.length} takes</div>
+                    <div className="vx-sub">{c.name}, {takes.length} takes</div>
                     {takes.map((take) => (
                       <div key={take.id} className="row" style={{ gap: 8, padding: "6px 0" }}>
                         {take.audioDataUrl && (
                           <audio controls preload="none" src={take.audioDataUrl} style={{ maxWidth: 220 }} />
                         )}
-                        <span className="sub" style={{ flex: 1 }}>
+                        <span className="vx-sub" style={{ flex: 1 }}>
                           {take.artistName} · consent {new Date(take.consentAt).toLocaleString()}
                         </span>
-                        <label className="sub">
+                        <label className="vx-sub">
                           <input
                             type="checkbox"
                             checked={useTakes.includes(take.id)}
@@ -557,7 +557,7 @@ export default function CustomVoice({ world, character, onWorld }: Props) {
                         </label>
                       </div>
                     ))}
-                    <div className="sub" style={{ fontStyle: "italic" }}>
+                    <div className="vx-sub" style={{ fontStyle: "italic" }}>
                       “{takes[0]?.consentText}”
                     </div>
                     <button type="button" className="pill" disabled={working} onClick={() => void createFromArtist(c.id)} style={{ marginTop: 6 }}>

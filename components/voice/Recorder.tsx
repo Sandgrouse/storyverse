@@ -247,12 +247,12 @@ export default function Recorder({ lines, onChange }: Props) {
 
   return (
     <div>
-      <div className="line">
-        <div className="sub">
+      <div className="vx-line">
+        <div className="vx-sub">
           Line {lines.length === 0 ? 0 : index + 1} of {lines.length}
         </div>
         <q>{line || "No lines yet."}</q>
-        <div className={`meter${recording ? " recording" : ""}`} aria-hidden>
+        <div className={`vx-meter${recording ? " vx-recording" : ""}`} aria-hidden>
           {bars.map((i) => (
             <i
               key={i}
@@ -291,7 +291,7 @@ export default function Recorder({ lines, onChange }: Props) {
           </button>
         </div>
       </div>
-      <div className="prog">
+      <div className="vx-prog">
         <span>
           {formatLength(totalSeconds)} recorded · {Object.keys(takes).length} of {lines.length} lines
         </span>
@@ -312,7 +312,7 @@ export default function Recorder({ lines, onChange }: Props) {
             onChange={(e) => void upload(e.target.files?.[0])}
           />
         </label>
-        <div className="sub" style={{ marginTop: 4 }}>
+        <div className="vx-sub" style={{ marginTop: 4 }}>
           MP3, WAV or M4A.
         </div>
       </div>

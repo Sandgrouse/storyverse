@@ -2202,24 +2202,25 @@ p {
   }
 }
 
-/* Custom voices: one shared recorder, the drawer section, the artist page. */
-.line {
+/* Custom voices: one shared recorder, the drawer section, the artist page.
+   The vx- prefix keeps these clear of the story styles above. */
+.vx-line {
   padding: 20px;
   border-radius: 12px;
   background: var(--paper);
   text-align: center;
 }
-.line q {
+.vx-line q {
   display: block;
   font: 300 24px/1.25 var(--serif);
   quotes: none;
   margin: 6px 0 14px;
 }
-.line .sub {
+.vx-sub {
   color: var(--soft);
   font-size: 13px;
 }
-.meter {
+.vx-meter {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2227,18 +2228,18 @@ p {
   height: 30px;
   margin-bottom: 12px;
 }
-.meter i {
+.vx-meter i {
   width: 4px;
   height: 5px;
   border-radius: 2px;
   background: var(--soft);
   opacity: 0.4;
 }
-.recording .meter i {
+.vx-recording .vx-meter i {
   background: var(--clay);
   opacity: 1;
 }
-.prog {
+.vx-prog {
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -2247,7 +2248,7 @@ p {
   font-size: 13px;
   margin: 10px 2px 0;
 }
-.consent {
+.vx-consent {
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -2255,48 +2256,49 @@ p {
   color: #4b4439;
   font-size: 14px;
 }
-.consent input {
+.vx-consent input {
   margin-top: 4px;
   accent-color: var(--clay);
 }
-.artist {
+.vx-artist {
   max-width: 640px;
   margin: 0 auto;
   padding: 40px 16px 80px;
 }
-.artist h1 {
+.vx-artist h1 {
   font: 300 clamp(34px, 8vw, 52px)/1.05 var(--serif);
   margin: 6px 0 10px;
 }
-.artist h2 {
+.vx-artist h2 {
   font: 300 34px/1.08 var(--serif);
   margin: 6px 0 10px;
 }
-.artist h3 {
+.vx-artist h3 {
   font: 400 26px/1.15 var(--serif);
   margin: 0 0 6px;
 }
-.artist .logo {
+.vx-artist .vx-logo {
+  position: static;
   font: 400 20px var(--serif);
   margin-bottom: 24px;
 }
-.artist .note {
+.vx-artist .vx-note {
   font: 300 18px/1.4 var(--serif);
   margin-bottom: 24px;
 }
-.artist .panel {
+.vx-artist .vx-panel {
   background: var(--sheet);
   border-radius: 14px;
   padding: 22px;
   box-shadow: 0 24px 50px -18px rgba(50, 35, 15, 0.45);
   margin-bottom: 20px;
 }
-.artist .brief {
+.vx-artist .vx-brief {
   font: 300 17px/1.4 var(--serif);
   margin: 4px 0 14px;
   color: #4b4439;
 }
-.artist input[type="text"] {
+.vx-artist input[type="text"] {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--rule);
@@ -2305,15 +2307,11 @@ p {
   font: inherit;
   color: inherit;
 }
-.artist .sub {
-  color: var(--soft);
-  font-size: 13px;
-}
 @media (max-width: 640px) {
-  .line q {
+  .vx-line q {
     font-size: 20px;
   }
-  .artist .panel {
+  .vx-artist .vx-panel {
     padding: 16px;
   }
 }

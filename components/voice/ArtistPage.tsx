@@ -61,29 +61,29 @@ export default function ArtistPage({ token }: { token: string }) {
 
   if (sent) {
     return (
-      <main className="artist">
-        <div className="logo">Storyverse</div>
+      <main className="vx-artist">
+        <div className="vx-logo">Storyverse</div>
         <h2>Thanks, your recordings were sent.</h2>
-        <p className="sub">You can close this page.</p>
+        <p className="vx-sub">You can close this page.</p>
       </main>
     );
   }
 
   if (missing) {
     return (
-      <main className="artist">
-        <div className="logo">Storyverse</div>
+      <main className="vx-artist">
+        <div className="vx-logo">Storyverse</div>
         <h1>That link isn&apos;t working.</h1>
-        <p className="note">It may have expired. Ask the owner for a fresh link.</p>
+        <p className="vx-note">It may have expired. Ask the owner for a fresh link.</p>
       </main>
     );
   }
 
   if (!invite) {
     return (
-      <main className="artist">
-        <div className="logo">Storyverse</div>
-        <p className="note">Loading…</p>
+      <main className="vx-artist">
+        <div className="vx-logo">Storyverse</div>
+        <p className="vx-note">Loading…</p>
       </main>
     );
   }
@@ -129,22 +129,22 @@ export default function ArtistPage({ token }: { token: string }) {
   };
 
   return (
-    <main className="artist">
-      <div className="logo">Storyverse</div>
+    <main className="vx-artist">
+      <div className="vx-logo">Storyverse</div>
       <div className="kicker">A voice request</div>
       <h1>{invite.projectTitle}</h1>
-      {invite.note && <p className="note">{invite.note}</p>}
+      {invite.note && <p className="vx-note">{invite.note}</p>}
       {invite.characters.map((character) => (
-        <section key={character.id} className="panel">
+        <section key={character.id} className="vx-panel">
           <h3>{character.name}</h3>
-          {character.brief && <p className="brief">{character.brief}</p>}
+          {character.brief && <p className="vx-brief">{character.brief}</p>}
           <Recorder
             lines={character.lines}
             onChange={(list) => setTakes((prev) => ({ ...prev, [character.id]: list }))}
           />
         </section>
       ))}
-      <section className="panel">
+      <section className="vx-panel">
         <input
           type="text"
           placeholder="Your name"
@@ -152,7 +152,7 @@ export default function ArtistPage({ token }: { token: string }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <label className="consent">
+        <label className="vx-consent">
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
           <span>{consentWording(invite.projectTitle)}</span>
         </label>
@@ -160,11 +160,11 @@ export default function ArtistPage({ token }: { token: string }) {
           {sending ? "Sending…" : "Send recordings"}
         </button>
         {totalSeconds > 0 && totalSeconds < 10 && (
-          <p className="sub" style={{ marginTop: 8 }}>
+          <p className="vx-sub" style={{ marginTop: 8 }}>
             Record at least 10 seconds before sending.
           </p>
         )}
-        {error && <p className="sub">{error}</p>}
+        {error && <p className="vx-sub">{error}</p>}
       </section>
     </main>
   );

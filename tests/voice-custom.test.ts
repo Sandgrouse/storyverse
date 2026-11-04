@@ -12,10 +12,18 @@ import {
 import { __resetVoiceMemory } from "@/lib/voice";
 import { __resetOwnerAttempts } from "@/lib/voice-owner";
 import {
+  VoiceStoreError,
   __resetVoiceStore,
   appendSubmission,
+  deleteSamples,
+  getAudio,
+  getSample,
+  isAudioFileId,
+  isInviteToken,
+  listSubmissions,
   makeInviteToken,
   putSample,
+  readInvite,
   saveInvite,
   type InviteRecord,
   type SubmissionRecord,
@@ -65,7 +73,7 @@ function submissionFile(name = "take.m4a", type = "audio/mp4", bytes = new Uint8
   return new File([bytes as unknown as BlobPart], name, { type });
 }
 
-async function seedInvite(token = "tok-123"): Promise<InviteRecord> {
+async function seedInvite(token = makeInviteToken()): Promise<InviteRecord> {
   const record: InviteRecord = {
     token,
     projectTitle: "Anukili",
@@ -332,7 +340,8 @@ describe("invites store only the given fields", () => {
   });
 
   it("deletes the invite and its files", async () => {
-    await seedInvite("tok-del");
+    const token = makeInviteToken();
+    await seedInvite(token);
     const form = new FormData();
     form.set("file", submissionFile());
     form.set("characterId", "c1");
@@ -340,29 +349,30 @@ describe("invites store only the given fields", () => {
     form.set("artistName", "Ada");
     form.set("consent", "true");
     const sent = await filesPOST(
-      new Request("http://localhost/api/voice/invites/tok-del/files", { method: "POST", body: form }),
-      { params: Promise.resolve({ token: "tok-del" }) },
+      new Request(`http://localhost/api/voice/invites/${token}/files`, { method: "POST", body: form }),
+      { params: Promise.resolve({ token }) },
     );
     expect(sent.status).toBe(201);
     const removed = await inviteDELETE(
       new Request("http://localhost/x", { method: "DELETE", headers: ownerHeaders() }),
-      { params: Promise.resolve({ token: "tok-del" }) },
+      { params: Promise.resolve({ token }) },
     );
     expect(removed.status).toBe(200);
     const gone = await inviteGET(new Request("http://localhost/x"), {
-      params: Promise.resolve({ token: "tok-del" }),
+      params: Promise.resolve({ token }),
     });
     expect(gone.status).toBe(404);
   });
 
   it("needs the owner code to list and delete", async () => {
-    await seedInvite("tok-gate");
+    const token = makeInviteToken();
+    await seedInvite(token);
     const listed = await filesGET(new Request("http://localhost/x"), {
-      params: Promise.resolve({ token: "tok-gate" }),
+      params: Promise.resolve({ token }),
     });
     expect(listed.status).toBe(401);
     const removed = await inviteDELETE(new Request("http://localhost/x", { method: "DELETE" }), {
-      params: Promise.resolve({ token: "tok-gate" }),
+      params: Promise.resolve({ token }),
     });
     expect(removed.status).toBe(401);
   });
@@ -381,17 +391,18 @@ describe("artist submissions", () => {
   }
 
   it("stores the consent record with the submission", async () => {
-    await seedInvite("tok-consent");
+    const token = makeInviteToken();
+    await seedInvite(token);
     const sent = await filesPOST(
-      new Request("http://localhost/api/voice/invites/tok-consent/files", {
+      new Request(`http://localhost/api/voice/invites/${token}/files`, {
         method: "POST",
         body: uploadForm(),
       }),
-      { params: Promise.resolve({ token: "tok-consent" }) },
+      { params: Promise.resolve({ token }) },
     );
     expect(sent.status).toBe(201);
     const listed = await filesGET(new Request("http://localhost/x", { headers: ownerHeaders() }), {
-      params: Promise.resolve({ token: "tok-consent" }),
+      params: Promise.resolve({ token }),
     });
     expect(listed.status).toBe(200);
     const json = (await listed.json()) as { submissions: SubmissionRecord[] };
@@ -402,13 +413,14 @@ describe("artist submissions", () => {
   });
 
   it("requires consent", async () => {
-    await seedInvite("tok-noconsent");
+    const token = makeInviteToken();
+    await seedInvite(token);
     const sent = await filesPOST(
-      new Request("http://localhost/api/voice/invites/tok-noconsent/files", {
+      new Request(`http://localhost/api/voice/invites/${token}/files`, {
         method: "POST",
         body: uploadForm({ consent: "false" }),
       }),
-      { params: Promise.resolve({ token: "tok-noconsent" }) },
+      { params: Promise.resolve({ token }) },
     );
     expect(sent.status).toBe(400);
     expect(await sent.json()).toEqual({
@@ -420,29 +432,30 @@ describe("artist submissions", () => {
   });
 
   it("rejects non-audio files and files over 4MB", async () => {
-    await seedInvite("tok-types");
+    const token = makeInviteToken();
+    await seedInvite(token);
     const bad = await filesPOST(
-      new Request("http://localhost/api/voice/invites/tok-types/files", {
+      new Request(`http://localhost/api/voice/invites/${token}/files`, {
         method: "POST",
         body: uploadForm({ file: submissionFile("pic.png", "image/png") }),
       }),
-      { params: Promise.resolve({ token: "tok-types" }) },
+      { params: Promise.resolve({ token }) },
     );
     expect(bad.status).toBe(400);
     const big = await filesPOST(
-      new Request("http://localhost/api/voice/invites/tok-types/files", {
+      new Request(`http://localhost/api/voice/invites/${token}/files`, {
         method: "POST",
         body: uploadForm({
           file: submissionFile("big.mp3", "audio/mpeg", new Uint8Array(4 * 1024 * 1024 + 1)),
         }),
       }),
-      { params: Promise.resolve({ token: "tok-types" }) },
+      { params: Promise.resolve({ token }) },
     );
     expect(big.status).toBe(413);
   });
 
   it("holds at most 12 files per character", async () => {
-    const record = await seedInvite("tok-full");
+    const record = await seedInvite();
     for (let i = 0; i < 12; i++) {
       await appendSubmission(record.token, {
         characterId: "c1",
@@ -457,11 +470,11 @@ describe("artist submissions", () => {
       });
     }
     const extra = await filesPOST(
-      new Request("http://localhost/api/voice/invites/tok-full/files", {
+      new Request(`http://localhost/api/voice/invites/${record.token}/files`, {
         method: "POST",
         body: uploadForm(),
       }),
-      { params: Promise.resolve({ token: "tok-full" }) },
+      { params: Promise.resolve({ token: record.token }) },
     );
     expect(extra.status).toBe(400);
     expect(await extra.json()).toEqual({
@@ -553,5 +566,117 @@ describe("creating the voice", () => {
     });
     expect(customVoiceErrorFor(422, "voice limit reached")).toBe(CUSTOM_VOICE_LIMIT_MESSAGE);
     expect(customVoiceErrorFor(500, "boom")).not.toBe(CUSTOM_VOICE_LIMIT_MESSAGE);
+  });
+});
+
+describe("invite tokens and file ids are validated", () => {
+  it("only accepts 32-char base64url tokens", () => {
+    expect(isInviteToken(makeInviteToken())).toBe(true);
+    for (const bad of [
+      "../",
+      "../../etc/passwd",
+      "..%2F..%2Fetc%2Fpasswd",
+      "tok-123",
+      "",
+      "a".repeat(31),
+      "a".repeat(33),
+      "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1",
+      "abc/defghijklmnopqrstuvwxyz12345",
+    ]) {
+      expect(isInviteToken(bad)).toBe(false);
+    }
+  });
+
+  it("returns not found for traversal tokens without touching the store", async () => {
+    const token = makeInviteToken();
+    await seedInvite(token);
+    for (const bad of ["../", "../../etc/passwd", "..", "tok-123", ""]) {
+      expect(await readInvite(bad)).toBeNull();
+      await expect(
+        appendSubmission(bad, {
+          characterId: "c1",
+          lineIndex: 0,
+          artistName: "Ada",
+          consentText: "consent",
+          consentAt: Date.now(),
+          mimeType: "audio/mpeg",
+          size: 4,
+          fileId: "c1-abcdefghijklmnop.mp3",
+          url: null,
+        }),
+      ).rejects.toBeInstanceOf(VoiceStoreError);
+      await expect(listSubmissions(bad)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    }
+    // The real invite still reads fine.
+    expect((await readInvite(token))?.token).toBe(token);
+  });
+
+  it("answers 404 for traversal tokens at the invite routes", async () => {
+    const missing = await inviteGET(new Request("http://localhost/x"), {
+      params: Promise.resolve({ token: "../../etc/passwd" }),
+    });
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual({
+      error: { code: "INVITE_NOT_FOUND", message: "That link has expired or never existed." },
+    });
+    const removed = await inviteDELETE(
+      new Request("http://localhost/x", { method: "DELETE", headers: ownerHeaders() }),
+      { params: Promise.resolve({ token: "../other" }) },
+    );
+    expect(removed.status).toBe(404);
+  });
+
+  it("rejects saving an invite with a bad token", async () => {
+    await expect(
+      saveInvite({
+        token: "../evil",
+        projectTitle: "Anukili",
+        note: "",
+        characters: [],
+        createdAt: Date.now(),
+        submissions: [],
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("only accepts file ids in the exact form putAudio generates", async () => {
+    const sampleId = await putSample("c1", new Uint8Array([1, 2, 3]), "audio/mpeg");
+    expect(isAudioFileId(sampleId)).toBe(true);
+    expect((await getSample(sampleId))?.bytes).toEqual(new Uint8Array([1, 2, 3]));
+    // Right shape but never stored still reads as missing.
+    expect(isAudioFileId("c1-abcdefghijklmnop.mp3")).toBe(true);
+    expect(await getSample("c1-abcdefghijklmnop.mp3")).toBeNull();
+    for (const bad of [
+      "../invite.json",
+      "../../etc/passwd",
+      "audio/../../etc/passwd",
+      "c1-evil.mp3",
+      "c1-tooshort.mp3",
+      "c1-abcdefghijklmnop.exe",
+      "c1-abcdefghijklmnop.MP3",
+      "file-0.mp3",
+      "",
+    ]) {
+      expect(isAudioFileId(bad)).toBe(false);
+      expect(await getSample(bad)).toBeNull();
+      expect(await getAudio(bad)).toBeNull();
+    }
+    // Skipping bad ids never throws and never deletes the real sample.
+    await deleteSamples(["../other.mp3", "nope"]);
+    expect((await getSample(sampleId))?.bytes).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it("answers 400 for traversal sample ids at the custom-voice route", async () => {
+    const res = await customPOST(
+      postJson(
+        "http://localhost/api/voice/custom",
+        { characterName: "Anukili", sampleIds: ["../../etc/passwd"], consent: true },
+        ownerHeaders(),
+      ),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: { code: "VALIDATION_ERROR", message: "One of those recordings is missing." },
+    });
   });
 });
