@@ -21,6 +21,7 @@ import {
 import { stripImageData } from "@/lib/story";
 import type { PremadeVoice } from "@/lib/voice";
 import type { CharacterVoice } from "@/lib/world/schemas";
+import CustomVoice from "@/components/voice/CustomVoice";
 
 type Props = {
   world: World;
@@ -90,6 +91,7 @@ function VoiceSection({
   onWorld: (world: World) => void;
 }) {
   const [voices, setVoices] = useState<PremadeVoice[] | null>(null);
+  const [provider, setProvider] = useState<"fish" | "elevenlabs" | null>(null);
   const [listState, setListState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [listError, setListError] = useState("");
   const [finding, setFinding] = useState(false);
@@ -121,7 +123,9 @@ function VoiceSection({
         json !== null && typeof json === "object" && Array.isArray((json as Record<string, unknown>).voices)
           ? ((json as Record<string, unknown>).voices as PremadeVoice[])
           : [];
+      const record = json !== null && typeof json === "object" ? (json as Record<string, unknown>) : null;
       setVoices(list);
+      setProvider(record?.provider === "fish" ? "fish" : "elevenlabs");
       setListState("ready");
     } catch {
       setListState("error");
@@ -144,7 +148,12 @@ function VoiceSection({
   const storedVoice = character.voice;
   const lines = character.lines ?? [];
   const selectedId = pickedId ?? storedVoice?.id ?? null;
-  const selected = voices?.find((v) => v.id === selectedId) ?? null;
+  const customOption =
+    storedVoice?.kind === "custom"
+      ? { id: storedVoice.id, name: `${storedVoice.name} (custom)`, labels: {}, previewUrl: "" }
+      : null;
+  const orderedVoices: PremadeVoice[] = [...(customOption ? [customOption] : []), ...(voices ?? [])];
+  const selected = orderedVoices.find((v) => v.id === selectedId) ?? null;
   const tabIndex = open ? 0 : -1;
 
   const stopAudio = () => {
@@ -228,6 +237,12 @@ function VoiceSection({
   };
 
   const chooseVoice = (id: string) => {
+    if (customOption && id === customOption.id && storedVoice) {
+      setPickedId(id);
+      setReason(null);
+      onWorld(withVoice(world, character.id, storedVoice));
+      return;
+    }
     const match = voices?.find((voice) => voice.id === id);
     if (!match) return;
     setPickedId(id);
@@ -240,11 +255,25 @@ function VoiceSection({
     if (speaking || !selectedId || text.length === 0 || text.length > 300) return;
     setSpeaking(true);
     setSpeakError(null);
+    const isCustom = customOption?.id === selectedId;
+    let ownerCode = "";
+    try {
+      ownerCode = sessionStorage.getItem("voice-owner-code") ?? "";
+    } catch {
+      ownerCode = "";
+    }
     try {
       const res = await fetch("/api/voice/speak", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voiceId: selectedId, text }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(isCustom ? { "x-voice-owner-code": ownerCode } : {}),
+        },
+        body: JSON.stringify({
+          voiceId: selectedId,
+          text,
+          pronunciations: world.pronunciations ?? [],
+        }),
       });
       const json: unknown = await res.json().catch(() => null);
       if (!res.ok) {
@@ -351,7 +380,7 @@ function VoiceSection({
                 maxWidth: "100%",
               }}
             >
-              {voices?.map((voice) => (
+              {orderedVoices.map((voice) => (
                 <option key={voice.id} value={voice.id}>
                   {voice.name}
                 </option>
@@ -413,9 +442,82 @@ function VoiceSection({
           )}
         </>
       )}
+      <Pronunciations world={world} onWorld={onWorld} tabIndex={tabIndex} />
       <div className="artstate">
-        <p>Voices by ElevenLabs.</p>
+        <p>{provider === "fish" ? "Voices by Fish Audio." : "Voices by ElevenLabs."}</p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * "How names are said": the story keeps real names everywhere; only
+ * spoken audio uses these. Fish Audio gets them as a pronunciation
+ * dictionary, ElevenLabs as plain text replacements.
+ */
+function Pronunciations({
+  world,
+  onWorld,
+  tabIndex,
+}: {
+  world: World;
+  onWorld: (world: World) => void;
+  tabIndex: number;
+}) {
+  const entries = world.pronunciations ?? [];
+  const setEntry = (index: number, patch: { name?: string; sayAs?: string }) => {
+    onWorld({
+      ...world,
+      pronunciations: entries.map((entry, i) =>
+        i === index ? { ...entry, ...patch } : entry,
+      ),
+    });
+  };
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div className="vx-sub" style={{ marginBottom: 4 }}>How names are said</div>
+      {entries.map((entry, i) => (
+        <div key={i} className="row" style={{ marginBottom: 6 }}>
+          <input
+            type="text"
+            aria-label="Name"
+            placeholder="Name"
+            value={entry.name}
+            onChange={(e) => setEntry(i, { name: e.target.value })}
+            tabIndex={tabIndex}
+            style={{ flex: 1, font: "inherit", color: "inherit", background: "var(--sheet)", border: "1px solid var(--rule)", borderRadius: 10, padding: "8px 10px" }}
+          />
+          <input
+            type="text"
+            aria-label="Say it as"
+            placeholder="Say it as"
+            value={entry.sayAs}
+            onChange={(e) => setEntry(i, { sayAs: e.target.value })}
+            tabIndex={tabIndex}
+            style={{ flex: 1, font: "inherit", color: "inherit", background: "var(--sheet)", border: "1px solid var(--rule)", borderRadius: 10, padding: "8px 10px" }}
+          />
+          <button
+            type="button"
+            className="quiet"
+            onClick={() =>
+              onWorld({ ...world, pronunciations: entries.filter((_, j) => j !== i) })
+            }
+            tabIndex={tabIndex}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="quiet"
+        onClick={() =>
+          onWorld({ ...world, pronunciations: [...entries, { name: "", sayAs: "" }] })
+        }
+        tabIndex={tabIndex}
+      >
+        Add a name
+      </button>
     </div>
   );
 }
@@ -938,6 +1040,14 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
           key={selected.id}
           world={world}
           open={open}
+          character={selected}
+          onWorld={onWorld}
+        />
+      )}
+      {selected && (
+        <CustomVoice
+          key={`custom-${selected.id}`}
+          world={world}
           character={selected}
           onWorld={onWorld}
         />

@@ -28,6 +28,7 @@ export const ROUTE_COSTS = {
   cutout: 1,
   "voice-suggest": 1,
   "voice-speak": 2,
+  "voice-design": 3,
 } as const;
 
 export type BudgetRoute = keyof typeof ROUTE_COSTS;

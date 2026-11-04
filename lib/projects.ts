@@ -337,8 +337,12 @@ export function mergeWorldAssets(oldWorld: World, nextWorld: World): World {
     const key = `${script.channelId}::${script.partId}`;
     if (!scriptsByKey.has(key)) scriptsByKey.set(key, script);
   }
+  const nextPronunciations = nextWorld.pronunciations ?? [];
+  const oldPronunciations = oldWorld.pronunciations ?? [];
   return {
     ...nextWorld,
+    pronunciations:
+      nextPronunciations.length > 0 ? nextPronunciations : oldPronunciations,
     scripts: [...scriptsByKey.values()],
     characters: nextWorld.characters.map((character) => {
       const old = charactersByName.get(lower(character.name));

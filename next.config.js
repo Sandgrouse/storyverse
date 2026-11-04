@@ -11,6 +11,7 @@ const nextConfig = {
             value: "strict-origin-when-cross-origin",
           },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Permissions-Policy", value: "microphone=(self)" },
         ],
       },
     ];

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { WorldSchema } from "@/lib/world/schemas";
+import { stripImageData } from "@/lib/story";
+import { WorldSchema, type World } from "@/lib/world/schemas";
 
 /**
  * Character voices, spoken by ElevenLabs. Meta has no text-to-speech
@@ -132,6 +133,14 @@ export async function loadPremadeVoices(apiKey: string): Promise<PremadeVoicesRe
   return { ok: true, voices: parsed.data.voices };
 }
 
+/** One "how names are said" entry: the story keeps the name, audio says sayAs. */
+export const PronunciationSchema = z.object({
+  name: z.string().min(1).max(120),
+  sayAs: z.string().min(1).max(120),
+});
+
+export type Pronunciation = z.infer<typeof PronunciationSchema>;
+
 /** A voice the suggest route may pick from: no preview needed to choose. */
 export const SuggestVoiceSchema = z.object({
   id: z.string().min(1),
@@ -150,6 +159,7 @@ export type SuggestRequest = z.infer<typeof SuggestRequestSchema>;
 export const SpeakRequestSchema = z.object({
   voiceId: z.string().regex(VOICE_ID_PATTERN),
   text: z.string().min(1).max(300),
+  pronunciations: z.array(PronunciationSchema).max(50).default([]),
 });
 
 export type SpeakRequest = z.infer<typeof SpeakRequestSchema>;
@@ -188,6 +198,135 @@ export function logVoiceFailure(route: string, status: number, message: string):
 }
 
 export const NO_VOICE_KEY_MESSAGE = "Voices aren't set up here yet.";
+
+/** Fish Audio has run out of credits. */
+export const FISH_CREDITS_MESSAGE = "Your voice credits have run out.";
+
+/** Owner record/upload consent, shown beside the checkbox. */
+export const OWNER_CONSENT_TEXT =
+  "I have the right and the speaker's consent to create an AI voice from this audio.";
+
+/** Artist consent wording, with the project title filled in. */
+export function artistConsentText(projectTitle: string): string {
+  return (
+    "I'm the person speaking, and I agree that the owner of " +
+    `${projectTitle} may create an AI voice from these recordings ` +
+    "for the characters listed here."
+  );
+}
+
+/** Secrets must never reach a reading-lines prompt. */
+export function secretTextsFor(world: World, characterId: string): string[] {
+  const texts: string[] = [];
+  for (const secret of world.secrets) {
+    if (secret.text.trim()) texts.push(secret.text);
+    if (secret.note.trim()) texts.push(secret.note);
+  }
+  for (const channel of world.channels) {
+    if (channel.secret.trim()) texts.push(channel.secret);
+  }
+  const character = world.characters.find((c) => c.id === characterId);
+  if (character?.secret?.trim()) texts.push(character.secret);
+  return texts;
+}
+
+/** Redact every known secret string so none reaches the model. */
+export function redactSecrets(text: string, secretTexts: string[]): string {
+  let out = text;
+  for (const secret of secretTexts) {
+    const needle = secret.trim();
+    if (needle.length === 0) continue;
+    out = out.split(needle).join("[redacted]");
+  }
+  return out;
+}
+
+/**
+ * Material for the reading-lines prompt: the character's canon plus
+ * story text, with images stripped and every secret redacted.
+ */
+export function buildVoiceLinesPrompt(world: World, characterId: string): string {
+  const secrets = secretTextsFor(world, characterId);
+  const clean = stripImageData(world);
+  const character = clean.characters.find((c) => c.id === characterId);
+  const canon = redactSecrets(character?.canon ?? "", secrets);
+  const material = [
+    ...clean.parts.map((p) => `${p.title}: ${p.summary} ${p.excerpt}`),
+    ...clean.beats
+      .filter((b) => b.characterIds.includes(characterId))
+      .map((b) => `${b.title}: ${b.content}`),
+    ...clean.channels.map((c) => `${c.name}: ${c.pitch} ${c.tagline}`),
+  ]
+    .map((text) => redactSecrets(text, secrets))
+    .filter((text) => text.replace(/\[redacted\]/g, "").trim().length > 0)
+    .slice(0, 40)
+    .join("\n");
+  return (
+    `Character: ${character?.name ?? "Unknown"}. Canon: ${canon}\n\n` +
+    `Story material:\n${material}`
+  );
+}
+
+export const LinesRequestSchema = z.object({
+  world: WorldSchema,
+  characterId: z.string().min(1),
+});
+
+export type LinesRequest = z.infer<typeof LinesRequestSchema>;
+
+export const LinesModelOutputSchema = z.object({
+  lines: z.array(z.string().min(1).max(200)).min(8).max(12),
+});
+
+export type LinesModelOutput = z.infer<typeof LinesModelOutputSchema>;
+
+export const LINES_INSTRUCTIONS =
+  "Write 8 to 12 short lines this story character would say, taken " +
+  "from or true to the story material. Together they take about 90 " +
+  "seconds to read aloud. Vary the emotion: joy, fear, anger, wonder, " +
+  "sorrow. Each line is one breath, at most 200 characters. Never " +
+  "mention or hint at anything marked [redacted].";
+
+export const LINES_SCHEMA_NAME = "voice_lines";
+
+export const LINES_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    lines: { type: "array", items: { type: "string" }, minItems: 8, maxItems: 12 },
+  },
+  required: ["lines"],
+  additionalProperties: false,
+} as const;
+
+export const ELEVENLABS_ADD_VOICE_URL = "https://api.elevenlabs.io/v1/voices/add";
+
+export const CUSTOM_VOICE_LIMIT_MESSAGE =
+  "Your ElevenLabs plan can't add another custom voice. Check your plan or remove a voice there.";
+
+function isVoiceLimitMessage(message: string): boolean {
+  return /voice.{0,20}limit|limit.{0,20}voice|maximum.{0,20}voice|too many voices|quota|plan/i.test(
+    message,
+  );
+}
+
+/**
+ * Map an ElevenLabs voice-add failure. Plan and voice-limit errors get
+ * the actionable plan message; anything else stays calm and generic.
+ */
+export function customVoiceErrorFor(status: number, message: string): string {
+  if (status === 422 || status === 402 || status === 429 || isVoiceLimitMessage(message)) {
+    return CUSTOM_VOICE_LIMIT_MESSAGE;
+  }
+  return voiceErrorFor(status, message);
+}
+
+export const CustomRequestSchema = z.object({
+  characterName: z.string().min(1).max(80),
+  sampleIds: z.array(z.string().min(1).max(120)).min(1).max(12),
+  consent: z.literal(true),
+});
+
+export type CustomRequest = z.infer<typeof CustomRequestSchema>;
 
 /** Calm message for 401s, quota errors and other ElevenLabs failures. */
 export const VOICE_UNAVAILABLE_MESSAGE = "The voice service isn't available right now.";
@@ -246,6 +385,69 @@ export function voiceDailyChars(): number {
 
 export function voiceDayKeyUTC(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
+}
+
+export const DesignRequestSchema = z.object({
+  world: WorldSchema,
+  characterId: z.string().min(1),
+});
+
+export type DesignRequest = z.infer<typeof DesignRequestSchema>;
+
+/** What Muse Spark returns: a voice description and a short test line. */
+export const DesignModelOutputSchema = z.object({
+  description: z.string().min(1).max(300),
+  testLine: z.string().min(1).max(150),
+});
+
+export type DesignModelOutput = z.infer<typeof DesignModelOutputSchema>;
+
+export const DESIGN_INSTRUCTIONS =
+  "You invent a voice for a story character from their canon: describe " +
+  "how the voice sounds in at most 300 characters, and write one short " +
+  "line they would say, in character, of at most 150 characters, to test " +
+  "the voice. Never rename anyone, change an established detail, or " +
+  "mention or hint at anything marked [redacted].";
+
+export const DESIGN_SCHEMA_NAME = "voice_design";
+
+export const DESIGN_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    description: { type: "string" },
+    testLine: { type: "string" },
+  },
+  required: ["description", "testLine"],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Material for the voice-design prompt: the character's canon plus
+ * story text, with images stripped and every secret redacted.
+ */
+export function buildVoiceDesignPrompt(
+  world: World,
+  characterId: string,
+): string {
+  const secrets = secretTextsFor(world, characterId);
+  const clean = stripImageData(world);
+  const character = clean.characters.find((c) => c.id === characterId);
+  const canon = redactSecrets(character?.canon ?? "", secrets);
+  const material = [
+    ...clean.parts.map((p) => `${p.title}: ${p.summary} ${p.excerpt}`),
+    ...clean.beats
+      .filter((b) => b.characterIds.includes(characterId))
+      .map((b) => `${b.title}: ${b.content}`),
+    ...clean.channels.map((c) => `${c.name}: ${c.pitch} ${c.tagline}`),
+  ]
+    .map((text) => redactSecrets(text, secrets))
+    .filter((text) => text.replace(/\[redacted\]/g, "").trim().length > 0)
+    .slice(0, 20)
+    .join("\n");
+  return (
+    `Character: ${character?.name ?? "Unknown"}. Canon: ${canon}\n\n` +
+    `Story material:\n${material}`
+  );
 }
 
 type VoiceBlobState = { day: string; chars: number };
