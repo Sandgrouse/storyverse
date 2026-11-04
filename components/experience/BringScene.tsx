@@ -216,7 +216,7 @@ export default function BringScene({
         }}
         style={dragging ? { outline: "2px solid var(--clay)", borderRadius: 14 } : undefined}
       >
-        {!ready && !hideSample && (
+        {!ready && (
           <div className="bring-empty">
             <div className="drop">
               <b>Drop files here</b>
@@ -234,9 +234,11 @@ export default function BringScene({
                 }}
               />
             </div>
-            <button type="button" className="pill light" onClick={onSample}>
-              Use the sample project
-            </button>
+            {!hideSample && (
+              <button type="button" className="pill light" onClick={onSample}>
+                Use the sample project
+              </button>
+            )}
           </div>
         )}
         {visible.map((card, i) => {

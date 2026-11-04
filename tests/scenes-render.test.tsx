@@ -71,6 +71,16 @@ describe("experience scenes", () => {
     expect(countSample(hidden)).toBe(0);
   });
 
+  it("keeps the file input visible when hideSample is set", async () => {
+    const world = await loadWorld();
+    const noop = () => {};
+    const { html } = renderQuiet(
+      <BringScene active files={[]} onFiles={noop} seed={world} sample={false} hideSample onSample={noop} onRead={noop} />,
+    );
+    expect(html).toContain("Drop files here");
+    expect(html).toContain('type="file"');
+  });
+
   it("renders story copy from the world data", async () => {
     const world = await loadWorld();
     const noop = () => {};
