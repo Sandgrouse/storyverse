@@ -148,7 +148,9 @@ function heroCards(out0 = 0): LandingCard[] {
     ["fire", "Firelight"],
     ["omabala", "The Omabala river"],
   ];
-  const scales = [0.9, 0.8, 0.7, 0.6];
+  // Outer cards are larger and closer, matching the prototype's seat sizes
+  // (inner 30vh tall, growing outward) against the fixed card CSS width.
+  const scales = [0.56, 0.86, 1.38, 2.15];
   const depths = [0.5, 0.8, 1, 1.2];
   const build = (
     side: -1 | 1,
@@ -321,7 +323,9 @@ export const CHAPTERS: Chapter[] = [
     body: "Give a coding agent the package for your game, holding only what the game may know.",
     feature: "tree",
     cards: [
-      { src: ART("hippo"), kind: "art", alt: "The stream", x: -3, y: 0, r: 4, ry: 0, z: 0, s: 0.66, depth: 0.6 },
+      { src: ART("hippo"), kind: "art", alt: "The stream", x: -3, y: -4, r: 4, ry: 0, z: 0, s: 0.66, depth: 0.6 },
+      { src: SHEET("anukili-ugama/front"), kind: "sheet", alt: "Anukili, front view", x: -10, y: 5, r: -6, ry: 0, z: 0, s: 0.62, depth: 0.8 },
+      { src: SHEET("enyinyi/front"), kind: "sheet", alt: "Enyinyi, front view", x: 4, y: 7, r: 7, ry: 0, z: 0, s: 0.62, depth: 0.9 },
     ],
   },
   {

@@ -1668,6 +1668,15 @@ p {
   align-items: center;
   gap: 22px;
 }
+/* Pills keep their own text colour on links, dark and light, and are never
+   underlined. This beats the `.land-bar a` colour rule and the UA underline. */
+.land a.pill {
+  color: var(--sheet);
+  text-decoration: none;
+}
+.land a.pill.light {
+  color: var(--ink);
+}
 .land-pin {
   height: 100vh;
   overflow: hidden;

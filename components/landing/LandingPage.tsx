@@ -306,6 +306,9 @@ export default function LandingPage() {
               rotationY: card.ry,
               z: card.z,
               scale: card.s,
+              // Each outer carries its own perspective, so rotationY reads
+              // as a curved wall even through the nested wrappers.
+              transformPerspective: 1500,
             });
           });
         });

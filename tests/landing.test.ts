@@ -169,6 +169,13 @@ describe("hero gallery", () => {
         expect(ordered[i]!.z).toBeGreaterThan(ordered[i - 1]!.z);
       }
     }
+    // Outer cards are larger and closer, like the prototype wall.
+    for (const side of [left, right]) {
+      const ordered = [...side].sort((a, b) => Math.abs(a.x) - Math.abs(b.x));
+      for (let i = 1; i < ordered.length; i++) {
+        expect(ordered[i]!.s).toBeGreaterThan(ordered[i - 1]!.s);
+      }
+    }
     // The headline column (roughly 36-64vw) stays clear.
     for (const card of start!.cards) {
       const [l, r] = spanVw(card);
@@ -218,12 +225,31 @@ describe("chapter layouts", () => {
     expect(change!.cards.filter((c) => c.flag === "Breaks")).toHaveLength(3);
   });
 
-  it("keeps the game card between the file tree and the copy", () => {
+  it("keeps the game cards between the file tree and the copy", () => {
     const game = CHAPTERS.find((c) => c.id === "game");
-    expect(game!.cards).toHaveLength(1);
-    const [l, r] = spanVw(game!.cards[0]!);
-    expect(l).toBeGreaterThanOrEqual(32);
-    expect(r).toBeLessThanOrEqual(62);
+    // Hippo art plus the Anukili and Enyinyi sheets, overlapping it.
+    expect(game!.cards).toHaveLength(3);
+    const kinds = game!.cards.map((c) => c.kind).sort();
+    expect(kinds).toEqual(["art", "sheet", "sheet"]);
+    const srcs = game!.cards.map((c) => c.src);
+    expect(srcs).toContain("/anukili/hippo.webp");
+    expect(srcs).toContain("/anukili/sheets/anukili-ugama/front.webp");
+    expect(srcs).toContain("/anukili/sheets/enyinyi/front.webp");
+    for (const card of game!.cards) {
+      const [l, r] = spanVw(card);
+      expect(l, card.src).toBeGreaterThanOrEqual(32);
+      expect(r, card.src).toBeLessThanOrEqual(62);
+    }
+  });
+
+  it("clears gallery rotation to 0 outside the hero and closing chapters", () => {
+    for (const chapter of CHAPTERS) {
+      if (chapter.id === "start" || chapter.id === "begin") continue;
+      for (const card of chapter.cards) {
+        expect(card.ry, `${chapter.id} ${card.src}`).toBe(0);
+        expect(card.z, `${chapter.id} ${card.src}`).toBe(0);
+      }
+    }
   });
 
   it("shows every characters card on stage with its image path", () => {
