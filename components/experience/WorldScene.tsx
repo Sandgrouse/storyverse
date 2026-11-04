@@ -657,7 +657,7 @@ export default function WorldScene({ active = true, world, onWorld, drawer: cont
 
   return (
     <section
-      className={`scene${active ? " on" : ""}${ripple ? " ripple" : ""}${showBook ? " book" : ""}`}
+      className={`scene${active ? " on" : ""}${ripple ? " ripple" : ""}${showBook ? " bookview" : ""}`}
       id="world"
       style={{ "--tint": part.tint } as React.CSSProperties}
     >
