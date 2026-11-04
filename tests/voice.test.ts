@@ -5,7 +5,9 @@ import { __resetBudgetMemory } from "@/lib/budget";
 import {
   __resetVoiceListCache,
   __resetVoiceMemory,
+  elevenLabsSpeakUrl,
   mapUpstreamVoices,
+  writeVoiceListCache,
 } from "@/lib/voice";
 import { GET as listGET } from "@/app/api/voice/list/route";
 import { POST as suggestPOST } from "@/app/api/voice/suggest/route";
@@ -256,6 +258,11 @@ describe("voice suggest", () => {
 
 describe("voice speak", () => {
   function mockSpeak(status = 200, bytes: number[] = [1, 2, 3]) {
+    // The speak route only speaks listed premade voices: seed the cache
+    // so these tests exercise the speak call, not the list fetch.
+    writeVoiceListCache([
+      { id: "v-alice", name: "Alice", labels: {}, previewUrl: "" },
+    ]);
     const fetchMock = vi.fn(async (url: unknown, init?: RequestInit) => {
       if (!String(url).includes("elevenlabs.io")) {
         throw new Error(`unexpected call to ${String(url)}`);
@@ -308,6 +315,51 @@ describe("voice speak", () => {
     );
     expect(res.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a voice id shaped like a path", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error("must not call upstream for a bad voice id");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await speakPOST(
+      post("http://localhost/api/voice/speak", {
+        voiceId: "../../voices/add",
+        text: "Hi.",
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: { code: "UNKNOWN_VOICE", message: "Choose one of the listed voices." },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a voice id that isn't listed", async () => {
+    const fetchMock = vi.fn(async (url: unknown) => {
+      if (String(url).includes("/v2/voices")) {
+        return new Response(JSON.stringify(upstreamVoices()), { status: 200 });
+      }
+      throw new Error(`must not speak an unlisted voice: ${String(url)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await speakPOST(
+      post("http://localhost/api/voice/speak", {
+        voiceId: "v-stranger",
+        text: "Hi.",
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: { code: "UNKNOWN_VOICE", message: "Choose one of the listed voices." },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/v2/voices");
+  });
+
+  it("encodes the voice id in the speak URL", () => {
+    expect(elevenLabsSpeakUrl("v-alice")).toContain("/text-to-speech/v-alice?");
+    expect(elevenLabsSpeakUrl("a/b")).toContain("/text-to-speech/a%2Fb?");
   });
 
   it("returns 503 without the key", async () => {

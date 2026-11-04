@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -71,6 +73,18 @@ describe("CastDrawer reload", () => {
     );
     expect(html.length).toBeGreaterThan(0);
     expect(html).toContain("No image yet");
+  });
+});
+
+describe("CastDrawer scroll", () => {
+  it("drawer scrolls as one column with full-height sections", async () => {
+    const css = await readFile(join(process.cwd(), "app", "globals.css"), "utf-8");
+    const drawerBlock = css.match(/\.drawer\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(drawerBlock, ".drawer must scroll").toContain("overflow-y: auto");
+    // Art row, canon text and sheet sections must not shrink away.
+    expect(css, "drawer sections must keep full height").toContain("flex-shrink: 0");
+    const whoOverride = css.match(/\.drawer\s+\.who\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(whoOverride, ".drawer .who must size to its content").toContain("flex: none");
   });
 });
 

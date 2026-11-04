@@ -4,9 +4,12 @@ import {
   ELEVENLABS_MODEL_ID,
   NO_VOICE_KEY_MESSAGE,
   SpeakRequestSchema,
+  UNKNOWN_SPEAK_VOICE_MESSAGE,
+  VOICE_ID_PATTERN,
   VOICE_LIMIT_MESSAGE,
   checkVoiceChars,
   elevenLabsSpeakUrl,
+  loadPremadeVoices,
   logVoiceFailure,
   upstreamMessage,
   voiceErrorFor,
@@ -38,6 +41,13 @@ export async function POST(req: Request) {
   }
   const parsed = SpeakRequestSchema.safeParse(body);
   if (!parsed.success) {
+    const voiceId =
+      body !== null && typeof body === "object"
+        ? (body as Record<string, unknown>).voiceId
+        : undefined;
+    if (typeof voiceId !== "string" || !VOICE_ID_PATTERN.test(voiceId)) {
+      return errorResponse(400, "UNKNOWN_VOICE", UNKNOWN_SPEAK_VOICE_MESSAGE);
+    }
     return errorResponse(400, "VALIDATION_ERROR", "Write a line of up to 300 characters.");
   }
   const { voiceId, text } = parsed.data;
@@ -45,6 +55,16 @@ export async function POST(req: Request) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     return errorResponse(503, "NO_VOICE_KEY", NO_VOICE_KEY_MESSAGE);
+  }
+
+  // Premade voices only: the id must be on the listed voices. Uses the
+  // cached list, fetching it once when the cache is empty.
+  const premade = await loadPremadeVoices(apiKey);
+  if (!premade.ok) {
+    return errorResponse(premade.status, "VOICE_FAILED", premade.message);
+  }
+  if (!premade.voices.some((voice) => voice.id === voiceId)) {
+    return errorResponse(400, "UNKNOWN_VOICE", UNKNOWN_SPEAK_VOICE_MESSAGE);
   }
 
   const charge = await checkBudget("voice-speak", req);

@@ -12,8 +12,14 @@ export const ELEVENLABS_VOICES_URL =
   "https://api.elevenlabs.io/v2/voices?category=premade&page_size=100";
 
 export function elevenLabsSpeakUrl(voiceId: string): string {
-  return `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
+  return `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`;
 }
+
+/** Server-side voice id shape: plain ids only, never paths. */
+export const VOICE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Calm message when the speak voice isn't one of the listed premade voices. */
+export const UNKNOWN_SPEAK_VOICE_MESSAGE = "Choose one of the listed voices."
 
 export const ELEVENLABS_MODEL_ID = "eleven_multilingual_v2";
 
@@ -88,6 +94,44 @@ export function writeVoiceListCache(voices: PremadeVoice[], now: number = Date.n
   cachedAt = now;
 }
 
+export type PremadeVoicesResult =
+  | { ok: true; voices: PremadeVoice[] }
+  | { ok: false; status: number; message: string };
+
+/**
+ * Premade voices for server-side allowlist checks. Uses the cached list
+ * when fresh, otherwise fetches the upstream list once and caches it.
+ * Only the speak route needs this; the list route serves the cache itself.
+ */
+export async function loadPremadeVoices(apiKey: string): Promise<PremadeVoicesResult> {
+  const cached = readVoiceListCache();
+  if (cached) return { ok: true, voices: cached };
+  let res: Response;
+  try {
+    res = await fetch(ELEVENLABS_VOICES_URL, {
+      headers: { "xi-api-key": apiKey },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logVoiceFailure("speak", 0, message);
+    return { ok: false, status: 500, message: voiceErrorFor(0, "") };
+  }
+  if (!res.ok) {
+    const message = await upstreamMessage(res);
+    logVoiceFailure("speak", res.status, message);
+    const status = res.status >= 400 && res.status < 600 ? res.status : 502;
+    return { ok: false, status, message: voiceErrorFor(res.status, message) };
+  }
+  const mapped = mapUpstreamVoices(await res.json().catch(() => null));
+  const parsed = VoiceListResponseSchema.safeParse(mapped);
+  if (!parsed.success) {
+    logVoiceFailure("speak", res.status, "unparseable voice list");
+    return { ok: false, status: 502, message: voiceErrorFor(502, "") };
+  }
+  writeVoiceListCache(parsed.data.voices);
+  return { ok: true, voices: parsed.data.voices };
+}
+
 /** A voice the suggest route may pick from: no preview needed to choose. */
 export const SuggestVoiceSchema = z.object({
   id: z.string().min(1),
@@ -104,7 +148,7 @@ export const SuggestRequestSchema = z.object({
 export type SuggestRequest = z.infer<typeof SuggestRequestSchema>;
 
 export const SpeakRequestSchema = z.object({
-  voiceId: z.string().min(1),
+  voiceId: z.string().regex(VOICE_ID_PATTERN),
   text: z.string().min(1).max(300),
 });
 
