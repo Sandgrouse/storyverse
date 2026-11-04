@@ -122,6 +122,7 @@ function worldWithCast(): World {
         title: "Beginnings",
         summary: "Ada arrives.",
         excerpt: "",
+        text: "",
         imagePath: "",
         imagePosition: "",
         tint: "",

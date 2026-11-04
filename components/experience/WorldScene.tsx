@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import type {
   Part,
   RippleDecision,
