@@ -7,6 +7,7 @@ Storyverse holds one master copy of a story world and shows how it plays across 
 - **Muse Spark** (`muse-spark-1.3`) plans the canon from the creator's files, lays out the channels, checks continuity, and proposes each ripple fix.
 - **Muse Image** (`muse-image-1.0`) draws character sheets, scene art, and edits, chained with `previous_response_id` so a character stays on-model.
 - **SAM 3.1** (`sam-3.1`) cuts characters out of their sheets for the agent package.
+- **ElevenLabs** speaks the saved voice lines, because Meta has no text-to-speech model. Muse Spark chooses each character's voice and writes the line; ElevenLabs only speaks it.
 - **Muse Code** wrote the application code, from task specs in `docs/tasks/`.
 
 ## Run it
@@ -15,7 +16,7 @@ Storyverse holds one master copy of a story world and shows how it plays across 
 pnpm install
 ```
 
-Set `MODEL_API_KEY`, then:
+Set `MODEL_API_KEY` (and optionally `ELEVENLABS_API_KEY` for character voices), then:
 
 ```sh
 pnpm dev
@@ -32,5 +33,7 @@ Without a key the app runs in sample mode: the seeded story stays fully browsabl
 ## Third-party
 
 This project uses `@meta-sam/parser` under the SAM License. See the license terms at [https://dev.meta.ai/](https://dev.meta.ai/).
+
+Character voices are spoken by the [ElevenLabs](https://elevenlabs.io/) text-to-speech API; the app sends it only the chosen voice and the line to speak.
 
 The scrolling landing page uses [GSAP](https://gsap.com/) (`gsap` and `@gsap/react`) under the GSAP Standard License (free of charge; see [https://gsap.com/standard-license](https://gsap.com/standard-license)) and [Lenis](https://lenis.darkroom.engineering/) (`lenis`) under the MIT License.

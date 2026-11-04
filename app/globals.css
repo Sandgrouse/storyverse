@@ -37,6 +37,10 @@ button {
   border: 0;
   cursor: pointer;
 }
+a {
+  color: inherit;
+  text-decoration: none;
+}
 button:focus-visible,
 input:focus-visible {
   outline: 2px solid var(--clay);
@@ -1245,6 +1249,17 @@ p {
   padding: 70px 8vw 34px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+}
+/* The drawer scrolls as one column: sections keep their full height. */
+.drawer .castlist,
+.drawer .who,
+.drawer .sheetwrap {
+  flex-shrink: 0;
+}
+.drawer .who {
+  flex: none;
+  overflow: visible;
 }
 .drawer.on {
   transform: none;

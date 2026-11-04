@@ -169,6 +169,10 @@ export function stripImageData(world: World): World {
         imagePath: clean(view.imagePath) ?? "",
         cutoutPath: view.cutoutPath ? clean(view.cutoutPath) : undefined,
       })),
+      lines: (character.lines ?? []).map((line) => ({
+        ...line,
+        audioPath: clean(line.audioPath) ?? "",
+      })),
     })),
     channels: world.channels.map((channel) => ({
       ...channel,

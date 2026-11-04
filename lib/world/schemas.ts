@@ -7,6 +7,18 @@ export const SheetViewSchema = z.object({
   cutoutPath: z.string().optional(),
 });
 
+export const CharacterVoiceSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  reason: z.string().optional(),
+});
+
+export const CharacterLineSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  audioPath: z.string(),
+});
+
 export const CharacterSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -14,6 +26,8 @@ export const CharacterSchema = z.object({
   secret: z.string().optional(),
   artPath: z.string().optional(),
   sheet: z.array(SheetViewSchema),
+  voice: CharacterVoiceSchema.optional(),
+  lines: z.array(CharacterLineSchema).optional(),
 });
 
 export const LocationSchema = z.object({
@@ -143,6 +157,8 @@ export const RippleResultSchema = z.object({
 });
 
 export type SheetView = z.infer<typeof SheetViewSchema>;
+export type CharacterVoice = z.infer<typeof CharacterVoiceSchema>;
+export type CharacterLine = z.infer<typeof CharacterLineSchema>;
 export type Character = z.infer<typeof CharacterSchema>;
 export type Location = z.infer<typeof LocationSchema>;
 export type ChannelKind = z.infer<typeof ChannelKindSchema>;

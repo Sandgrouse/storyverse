@@ -18,6 +18,9 @@ import {
   styleImageFor,
   type ArtPostResult,
 } from "@/lib/images";
+import { stripImageData } from "@/lib/story";
+import type { PremadeVoice } from "@/lib/voice";
+import type { CharacterVoice } from "@/lib/world/schemas";
 
 type Props = {
   world: World;
@@ -38,6 +41,384 @@ type CutoutState =
   | { kind: "error"; message: string };
 
 
+
+function newLineId(): string {
+  try {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return `line-${crypto.randomUUID()}`;
+    }
+  } catch {
+    // Fall through to the timestamp fallback.
+  }
+  return `line-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
+}
+
+function voiceErrorMessage(json: unknown, fallback: string): string {
+  if (json !== null && typeof json === "object") {
+    const error = (json as Record<string, unknown>).error;
+    if (error !== null && typeof error === "object") {
+      const message = (error as Record<string, unknown>).message;
+      if (typeof message === "string" && message.length > 0) return message;
+    }
+  }
+  return fallback;
+}
+
+function withVoice(base: World, characterId: string, voice: CharacterVoice): World {
+  return {
+    ...base,
+    characters: base.characters.map((c) =>
+      c.id === characterId ? { ...c, voice } : c,
+    ),
+  };
+}
+
+/**
+ * One character's voice: Muse Spark picks a premade ElevenLabs voice and
+ * writes a line, ElevenLabs speaks it. Audio never blocks sheet work:
+ * this section keeps its own state and never touches the sheet flags.
+ */
+function VoiceSection({
+  world,
+  open,
+  character,
+  onWorld,
+}: {
+  world: World;
+  open: boolean;
+  character: Character;
+  onWorld: (world: World) => void;
+}) {
+  const [voices, setVoices] = useState<PremadeVoice[] | null>(null);
+  const [listState, setListState] = useState<"loading" | "ready" | "missing" | "error">("loading");
+  const [listError, setListError] = useState("");
+  const [finding, setFinding] = useState(false);
+  const [findError, setFindError] = useState<string | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [reason, setReason] = useState<string | null>(character.voice?.reason ?? null);
+  const [line, setLine] = useState("");
+  const [speaking, setSpeaking] = useState(false);
+  const [speakError, setSpeakError] = useState<string | null>(null);
+  const [playing, setPlaying] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const loadList = async () => {
+    setListState("loading");
+    setListError("");
+    try {
+      const res = await fetch("/api/voice/list");
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        if (res.status === 503) {
+          setListState("missing");
+          return;
+        }
+        setListState("error");
+        setListError(voiceErrorMessage(json, "The voices failed to load."));
+        return;
+      }
+      const list =
+        json !== null && typeof json === "object" && Array.isArray((json as Record<string, unknown>).voices)
+          ? ((json as Record<string, unknown>).voices as PremadeVoice[])
+          : [];
+      setVoices(list);
+      setListState("ready");
+    } catch {
+      setListState("error");
+      setListError("The voices failed to load.");
+    }
+  };
+
+  useEffect(() => {
+    void loadList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(
+    () => () => {
+      audioRef.current?.pause();
+    },
+    [],
+  );
+
+  const storedVoice = character.voice;
+  const lines = character.lines ?? [];
+  const selectedId = pickedId ?? storedVoice?.id ?? null;
+  const selected = voices?.find((v) => v.id === selectedId) ?? null;
+  const tabIndex = open ? 0 : -1;
+
+  const stopAudio = () => {
+    audioRef.current?.pause();
+    setPlaying(null);
+  };
+
+  const playSrc = (key: string, src: string) => {
+    if (!src) return;
+    let el = audioRef.current;
+    if (!el) {
+      el = new Audio();
+      el.onended = () => setPlaying(null);
+      audioRef.current = el;
+    }
+    if (playing === key) {
+      el.pause();
+      setPlaying(null);
+      return;
+    }
+    try {
+      el.src = src;
+      el.play()
+        .then(() => setPlaying(key))
+        .catch(() => setPlaying(null));
+    } catch {
+      setPlaying(null);
+    }
+  };
+
+  const findVoice = async () => {
+    if (finding || !voices) return;
+    setFinding(true);
+    setFindError(null);
+    try {
+      const res = await fetch("/api/voice/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          world: stripImageData(world),
+          characterId: character.id,
+          voices: voices.map((voice) => ({
+            id: voice.id,
+            name: voice.name,
+            labels: voice.labels,
+          })),
+        }),
+      });
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        if (res.status === 503) {
+          setListState("missing");
+          return;
+        }
+        setFindError(voiceErrorMessage(json, "Choosing a voice failed."));
+        return;
+      }
+      const record = json !== null && typeof json === "object" ? (json as Record<string, unknown>) : null;
+      const voiceId = record?.voiceId;
+      const suggestion = record?.reason;
+      const suggestionLine = record?.line;
+      if (typeof voiceId !== "string" || typeof suggestionLine !== "string") {
+        setFindError("Choosing a voice failed.");
+        return;
+      }
+      const match = voices.find((voice) => voice.id === voiceId);
+      if (!match) {
+        setFindError("That voice isn't in the list.");
+        return;
+      }
+      const nextReason = typeof suggestion === "string" ? suggestion : null;
+      setPickedId(voiceId);
+      setReason(nextReason);
+      setLine(suggestionLine);
+      onWorld(withVoice(world, character.id, { id: voiceId, name: match.name, reason: nextReason ?? undefined }));
+    } catch {
+      setFindError("Choosing a voice failed.");
+    } finally {
+      setFinding(false);
+    }
+  };
+
+  const chooseVoice = (id: string) => {
+    const match = voices?.find((voice) => voice.id === id);
+    if (!match) return;
+    setPickedId(id);
+    setReason(null);
+    onWorld(withVoice(world, character.id, { id: match.id, name: match.name }));
+  };
+
+  const speak = async () => {
+    const text = line.trim();
+    if (speaking || !selectedId || text.length === 0 || text.length > 300) return;
+    setSpeaking(true);
+    setSpeakError(null);
+    try {
+      const res = await fetch("/api/voice/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voiceId: selectedId, text }),
+      });
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        if (res.status === 503) {
+          setListState("missing");
+          return;
+        }
+        setSpeakError(voiceErrorMessage(json, "The voice failed."));
+        return;
+      }
+      const record = json !== null && typeof json === "object" ? (json as Record<string, unknown>) : null;
+      const audioDataUrl = record?.audioDataUrl;
+      if (typeof audioDataUrl !== "string" || !audioDataUrl.startsWith("data:audio/")) {
+        setSpeakError("The voice failed.");
+        return;
+      }
+      const entry = { id: newLineId(), text, audioPath: audioDataUrl };
+      onWorld({
+        ...world,
+        characters: world.characters.map((c) =>
+          c.id === character.id ? { ...c, lines: [...(c.lines ?? []), entry] } : c,
+        ),
+      });
+    } catch {
+      setSpeakError("The voice failed.");
+    } finally {
+      setSpeaking(false);
+    }
+  };
+
+  const removeLine = (id: string) => {
+    if (playing === id) stopAudio();
+    onWorld({
+      ...world,
+      characters: world.characters.map((c) =>
+        c.id === character.id ? { ...c, lines: (c.lines ?? []).filter((entry) => entry.id !== id) } : c,
+      ),
+    });
+  };
+
+  if (listState === "missing") {
+    return (
+      <div className="sheetwrap">
+        <div className="sheethead">
+          <span className="kicker">Voice</span>
+        </div>
+        <div className="artstate">
+          <p>Voices aren&apos;t set up here yet.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sheetwrap">
+      <div className="sheethead">
+        <span className="kicker">Voice</span>
+      </div>
+      {listState === "loading" && (
+        <div className="artstate">
+          <p>Loading voices…</p>
+        </div>
+      )}
+      {listState === "error" && (
+        <div className="artstate">
+          <p>{listError}</p>
+          <button type="button" className="quiet" onClick={() => void loadList()} tabIndex={tabIndex}>
+            Retry
+          </button>
+        </div>
+      )}
+      {listState === "ready" && !selectedId && !finding && (
+        <div style={{ marginTop: 10 }}>
+          <button type="button" className="pill" onClick={() => void findVoice()} tabIndex={tabIndex}>
+            Find a voice
+          </button>
+        </div>
+      )}
+      {listState === "ready" && finding && (
+        <div className="artstate">
+          <p>Listening for {character.name}&apos;s voice…</p>
+        </div>
+      )}
+      {findError && (
+        <div className="artstate">
+          <p>{findError}</p>
+        </div>
+      )}
+      {listState === "ready" && selectedId && (
+        <>
+          <div style={{ marginTop: 10 }}>
+            <select
+              aria-label={`Voice for ${character.name}`}
+              value={selectedId}
+              onChange={(e) => chooseVoice(e.target.value)}
+              tabIndex={tabIndex}
+              style={{
+                font: "inherit",
+                color: "inherit",
+                background: "var(--sheet)",
+                border: "1px solid var(--rule)",
+                borderRadius: 10,
+                padding: "8px 10px",
+                maxWidth: "100%",
+              }}
+            >
+              {voices?.map((voice) => (
+                <option key={voice.id} value={voice.id}>
+                  {voice.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {reason && (
+            <div className="artstate">
+              <p>{reason}</p>
+            </div>
+          )}
+          <div>
+            <button
+              type="button"
+              className="quiet"
+              onClick={() => selected?.previewUrl && playSrc("preview", selected.previewUrl)}
+              disabled={!selected?.previewUrl}
+              tabIndex={tabIndex}
+            >
+              {playing === "preview" ? "Stop the preview" : "Hear this voice"}
+            </button>
+          </div>
+          <div className="artstate">
+            <textarea
+              aria-label={`Line for ${character.name}`}
+              value={line}
+              onChange={(e) => setLine(e.target.value)}
+              rows={3}
+              tabIndex={tabIndex}
+            />
+            <span>{line.length} / 300</span>
+            <div>
+              <button
+                type="button"
+                className="pill"
+                onClick={() => void speak()}
+                disabled={speaking || line.trim().length === 0 || line.trim().length > 300}
+                tabIndex={tabIndex}
+              >
+                {speaking ? "Speaking…" : "Speak this line"}
+              </button>
+            </div>
+            {speakError && <p>{speakError}</p>}
+          </div>
+          {lines.length > 0 && (
+            <ul style={{ listStyle: "none", margin: "10px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              {lines.map((entry) => (
+                <li key={entry.id} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <button type="button" className="quiet" onClick={() => playSrc(entry.id, entry.audioPath)} tabIndex={tabIndex}>
+                    {playing === entry.id ? "Stop" : "Play"}
+                  </button>
+                  <span style={{ flex: 1, fontSize: 13 }}>{entry.text}</span>
+                  <button type="button" className="quiet" onClick={() => removeLine(entry.id)} tabIndex={tabIndex}>
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      <div className="artstate">
+        <p>Voices by ElevenLabs.</p>
+      </div>
+    </div>
+  );
+}
 
 export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
   const [selectedId, setSelectedId] = useState(world.characters[0]?.id);
@@ -552,6 +933,15 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
           })}
         </div>
       </div>
+      {selected && (
+        <VoiceSection
+          key={selected.id}
+          world={world}
+          open={open}
+          character={selected}
+          onWorld={onWorld}
+        />
+      )}
     </div>
   );
 }

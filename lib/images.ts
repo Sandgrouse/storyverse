@@ -94,6 +94,18 @@ function entryName(kind: string, id: string, extra?: string): string {
   return extra ? `${kind}-${id}-${extra}` : `${kind}-${id}`;
 }
 
+/**
+ * Saved voice lines travel with the images: a spoken line is a
+ * `data:audio/mpeg` URL in memory and an `idb:` ref in the world,
+ * saved under `voice-<character>-<line>` like any other entry.
+ */
+function extractLine(line: { id: string; text: string; audioPath: string }, characterId: string, entries: ImageEntry[]): { id: string; text: string; audioPath: string } {
+  return {
+    ...line,
+    audioPath: swap(line.audioPath, entryName("voice", characterId, line.id), entries),
+  };
+}
+
 function swap(path: string | undefined, name: string, entries: ImageEntry[]): string {
   if (!path) return path ?? "";
   if (isStoredRef(path)) return path;
@@ -135,6 +147,7 @@ export function extractImageEntries(world: World): {
               )
             : undefined,
         })),
+        lines: (character.lines ?? []).map((line) => extractLine(line, character.id, entries)),
       })),
       channels: world.channels.map((channel) => ({
         ...channel,
@@ -174,6 +187,10 @@ export function restoreImageRefs(
         imagePath: fill(view.imagePath),
         cutoutPath: view.cutoutPath ? fill(view.cutoutPath) : undefined,
       })),
+      lines: (character.lines ?? []).map((line) => ({
+        ...line,
+        audioPath: fill(line.audioPath),
+      })),
     })),
     channels: world.channels.map((channel) => ({
       ...channel,
@@ -206,6 +223,10 @@ export function dropStoredRefs(world: World): World {
         imagePath: drop(view.imagePath),
         cutoutPath: view.cutoutPath ? drop(view.cutoutPath) : undefined,
       })),
+      lines: (character.lines ?? []).map((line) => ({
+        ...line,
+        audioPath: drop(line.audioPath),
+      })),
     })),
     channels: world.channels.map((channel) => ({
       ...channel,
@@ -228,6 +249,7 @@ export function hasStoredRefs(world: World): boolean {
   for (const character of world.characters) {
     paths.push(character.artPath);
     for (const view of character.sheet) paths.push(view.imagePath);
+    for (const line of character.lines ?? []) paths.push(line.audioPath);
   }
   for (const channel of world.channels) paths.push(channel.imagePath);
   for (const part of world.parts) paths.push(part.imagePath);
