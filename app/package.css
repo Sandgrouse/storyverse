@@ -1,0 +1,181 @@
+/* Agent package dashboard: tiles, channel cards, folder tree. */
+
+.packtiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.packtile {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--lift);
+}
+
+.packtile-num {
+  font: 300 30px/1.1 var(--serif);
+}
+
+.packtile-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.packtile-sub {
+  font-size: 12px;
+  color: var(--soft);
+}
+
+.packbar {
+  display: block;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--rule);
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.packbar > span {
+  display: block;
+  height: 100%;
+  background: var(--clay);
+  border-radius: 99px;
+}
+
+.packchannels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.packcard {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: var(--lift);
+}
+
+.packcard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.packcard-head b {
+  font: 400 17px var(--serif);
+}
+
+.packcard-head span {
+  font-size: 12px;
+  color: var(--soft);
+  white-space: nowrap;
+}
+
+.packcard .packbar {
+  margin-top: 10px;
+}
+
+.packcard-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--clay);
+  margin-top: 12px;
+}
+
+.packtodo {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.packtodo a {
+  font-size: 13.5px;
+  color: inherit;
+}
+
+.packdone {
+  font-size: 13px;
+  color: var(--soft);
+  margin: 10px 0 0;
+}
+
+.gamenote {
+  font-size: 13px;
+  color: var(--soft);
+  margin: 10px 0 0;
+}
+
+.filefold {
+  margin-top: 14px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 12px 16px;
+  box-shadow: var(--lift);
+}
+
+.filefold > summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.packtree {
+  margin-top: 10px;
+  font: 13.5px/1.7 ui-monospace, Menlo, monospace;
+}
+
+.packroot {
+  color: var(--clay);
+  font-weight: 600;
+}
+
+.packdir {
+  margin-left: 12px;
+}
+
+.packdir > summary {
+  cursor: pointer;
+  color: var(--clay);
+}
+
+.packdir-count {
+  color: var(--soft);
+  font-size: 12px;
+}
+
+.packdir-body {
+  margin-left: 14px;
+  border-left: 1px solid var(--rule);
+  padding-left: 10px;
+}
+
+.packfile {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 1px 0;
+}
+
+.packfile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.packfile-size {
+  flex: none;
+  color: var(--soft);
+}
