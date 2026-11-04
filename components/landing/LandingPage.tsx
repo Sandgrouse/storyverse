@@ -27,9 +27,11 @@ import {
   TREE_SECRET,
   VIDEO_CAPTION,
   cardBasePx,
+  cardTag,
   clamp01,
   layoutRects,
   lerp,
+  nearRest,
   segmentEase,
   smooth,
   stagger,
@@ -467,14 +469,13 @@ export default function LandingPage() {
             // Tag labels near the chapter rest, as in the prototype.
             const flag = flagEls.current.get(card.id);
             if (flag) {
-              const lay = LAYOUTS[ri]?.[card.id];
-              const tag = lay?.hit ?? lay?.shot ?? "";
-              const near = Math.abs(s - ri) < 0.12;
+              const { text: tag, hit } = cardTag(ri, card.id);
+              const near = nearRest(s);
               if (flagText.current.get(card.id) !== tag) {
                 flagText.current.set(card.id, tag);
                 flag.textContent = tag;
-                flag.classList.toggle("hit", !!lay?.hit);
-                flag.classList.toggle("shot", !!lay?.shot && !lay?.hit);
+                flag.classList.toggle("hit", hit);
+                flag.classList.toggle("shot", !hit && tag !== "");
               }
               flag.style.opacity = tag && near ? "1" : "0";
             }

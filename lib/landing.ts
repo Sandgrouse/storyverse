@@ -464,6 +464,27 @@ export function resolveSeat(
   };
 }
 
+/**
+ * Prototype frame(): the tag badge a card carries at a chapter rest. The
+ * seat's hit label wins ("Breaks"), else its shot label ("Shot 1",
+ * "Series", ...), else the card carries no tag.
+ */
+export type CardTag = { text: string; hit: boolean };
+
+export function cardTag(ch: number, id: number): CardTag {
+  const seat = LAYOUTS[ch]?.[id];
+  const text = seat?.hit ?? seat?.shot ?? "";
+  return { text, hit: !!seat?.hit };
+}
+
+/**
+ * Prototype frame(): a card's tag badge shows only near its chapter rest
+ * (`near = Math.abs(s - Math.round(s)) < .12`) and hides while cards travel.
+ */
+export function nearRest(s: number): boolean {
+  return Math.abs(s - Math.round(s)) < 0.12;
+}
+
 export type CardRect = ResolvedSeat & {
   id: number;
   /** Centre in px. */

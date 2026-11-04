@@ -1,16 +1,18 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   BROWSER_SUB,
   BROWSER_TITLE,
   CARDS,
+  cardTag,
   CHAPTERS,
   CHANGE_LINE,
   clampSeatBelowBar,
   LANDING_IMAGES,
   LAYOUTS,
   layoutRects,
+  nearRest,
   resolveSeat,
   SCRIPT_LINES,
   SCRIPT_NOTE,
@@ -303,6 +305,53 @@ describe("prototype scroll math", () => {
     const wide = resolveSeat(6, 6, 16 / 9);
     expect(wide.w).toBeCloseTo(52 * (16 / 9), 5);
     expect(wide.h).toBe(58);
+  });
+});
+
+describe("landing anchor regression", () => {
+  it("anchors .land-outer at the stage top-left", () => {
+    // The scroll engine positions each card centre at (cx, cy) with
+    // xPercent/yPercent -50, so the outer must sit at left/top 0: any other
+    // origin shifts every card by half the viewport (task 017).
+    const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+    const rule = css.match(/\.land-outer\s*\{([^}]*)\}/);
+    expect(rule, ".land-outer rule exists in app/globals.css").not.toBeNull();
+    const left = rule![1].match(/left\s*:\s*([^;]+);/);
+    const top = rule![1].match(/top\s*:\s*([^;]+);/);
+    expect(left?.[1].trim()).toMatch(/^0(px)?$/);
+    expect(top?.[1].trim()).toMatch(/^0(px)?$/);
+  });
+});
+
+describe("tag labels", () => {
+  it("shows each chapter's tags at its rest", () => {
+    const storyboard = [0, 2, 7, 3, 4, 6].map((id) => cardTag(4, id).text);
+    expect(storyboard).toEqual([
+      "Shot 1",
+      "Shot 2",
+      "Shot 3",
+      "Shot 4",
+      "Shot 5",
+      "Shot 6",
+    ]);
+    expect(cardTag(5, 2).text).toBe("Series");
+    expect(cardTag(5, 4).text).toBe("Game");
+    expect(cardTag(5, 3).text).toBe("Shorts");
+    expect(cardTag(5, 6).text).toBe("Film");
+    for (const id of [3, 4, 6]) {
+      expect(cardTag(9, id)).toEqual({ text: "Breaks", hit: true });
+    }
+    // Cards with no seat at that chapter carry no tag.
+    expect(cardTag(4, 1)).toEqual({ text: "", hit: false });
+    expect(cardTag(6, 0)).toEqual({ text: "", hit: false });
+  });
+
+  it("shows tags only near the chapter rest", () => {
+    expect(nearRest(4)).toBe(true);
+    expect(nearRest(4.05)).toBe(true);
+    expect(nearRest(3.95)).toBe(true);
+    expect(nearRest(4.2)).toBe(false);
+    expect(nearRest(4.5)).toBe(false);
   });
 });
 

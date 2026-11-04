@@ -1719,8 +1719,8 @@ p {
    stretches; the outer clips so the card visibly reshapes. */
 .land-outer {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  left: 0;
+  top: 0;
   overflow: hidden;
   border-radius: 10px;
   box-shadow: var(--lift);
