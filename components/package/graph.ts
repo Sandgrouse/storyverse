@@ -1,4 +1,4 @@
-import { hasFullSheet } from "@/lib/readiness";
+import { hasFullSheet, writtenKindForChannelKind } from "@/lib/readiness";
 import type { Part, World } from "@/lib/world/schemas";
 
 /**
@@ -208,45 +208,52 @@ export function buildPackageGraph(
     const scriptMade = world.scripts.some(
       (entry) => entry.channelId === channelId && entry.partId === part.id,
     );
-    const boardMade = (world.storyboards ?? []).some(
-      (board) => board.channelId === channelId && board.partId === part.id,
-    );
-    const videoMade = (world.shorts ?? []).some(
-      (short) => short.channelId === channelId && short.partId === part.id,
-    );
+    const written = writtenKindForChannelKind(channel?.kind ?? "series");
+    const writtenSubtitle =
+      written === "design" ? "Design" : written === "copy" ? "Copy" : "Script";
     const scriptId = `script:${part.id}`;
-    const boardId = `storyboard:${part.id}`;
-    const videoId = `video:${part.id}`;
     push({
       id: scriptId,
       kind: "script",
       column: columnOf("script"),
       title: part.title,
-      subtitle: "Script",
+      subtitle: writtenSubtitle,
       href: `/projects/${projectId}/script?channel=${channelId}&part=${part.id}`,
       made: scriptMade,
     });
-    push({
-      id: boardId,
-      kind: "storyboard",
-      column: columnOf("storyboard"),
-      title: part.title,
-      subtitle: "Storyboard",
-      href: `/projects/${projectId}/storyboard?channel=${channelId}&part=${part.id}`,
-      made: boardMade,
-    });
-    push({
-      id: videoId,
-      kind: "video",
-      column: columnOf("video"),
-      title: part.title,
-      subtitle: "Video",
-      href: `/projects/${projectId}/video?channel=${channelId}&part=${part.id}`,
-      made: videoMade,
-    });
     link(sceneId, scriptId);
-    link(scriptId, boardId);
-    link(boardId, videoId);
+    // A game does not need storyboards or video, and copy kinds ask
+    // for copy, not boards or cuts: only screen kinds map those nodes.
+    if (written === "script") {
+      const boardMade = (world.storyboards ?? []).some(
+        (board) => board.channelId === channelId && board.partId === part.id,
+      );
+      const videoMade = (world.shorts ?? []).some(
+        (short) => short.channelId === channelId && short.partId === part.id,
+      );
+      const boardId = `storyboard:${part.id}`;
+      const videoId = `video:${part.id}`;
+      push({
+        id: boardId,
+        kind: "storyboard",
+        column: columnOf("storyboard"),
+        title: part.title,
+        subtitle: "Storyboard",
+        href: `/projects/${projectId}/storyboard?channel=${channelId}&part=${part.id}`,
+        made: boardMade,
+      });
+      push({
+        id: videoId,
+        kind: "video",
+        column: columnOf("video"),
+        title: part.title,
+        subtitle: "Video",
+        href: `/projects/${projectId}/video?channel=${channelId}&part=${part.id}`,
+        made: videoMade,
+      });
+      link(scriptId, boardId);
+      link(boardId, videoId);
+    }
   }
 
   const secretText = (channel?.secret ?? "").trim();

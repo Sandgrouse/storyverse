@@ -264,6 +264,23 @@ describe("package map nodes and edges", () => {
     expect(animated.get("secret>>package")).toBe(true);
   });
 
+  it("maps design, not boards or video, for a game channel", () => {
+    const graph = buildPackageGraph(makeWorld(), "game", "test-story", 4);
+    const kinds = graph.nodes.map((node) => node.kind);
+    expect(kinds).not.toContain("storyboard");
+    expect(kinds).not.toContain("video");
+    const byId = new Map(graph.nodes.map((node) => [node.id, node]));
+    expect(byId.get("script:part-1")?.subtitle).toBe("Design");
+    expect(byId.get("script:part-1")?.href).toBe(
+      "/projects/test-story/script?channel=game&part=part-1",
+    );
+    const has = (source: string, target: string) =>
+      graph.edges.some((edge) => edge.source === source && edge.target === target);
+    expect(has("scene:part-1", "script:part-1")).toBe(true);
+    expect(has("script:part-1", "package")).toBe(true);
+    expect(JSON.stringify(graph)).not.toContain("SERIES_CHANNEL_SECRET");
+  });
+
   it("links places by the part's own words", () => {
     const world = makeWorld();
     const part = world.parts.find((p) => p.id === "part-1") as NonNullable<
@@ -301,6 +318,16 @@ describe("grouped readiness rows", () => {
     expect(unfinishedSceneRows(rows)).toHaveLength(1);
     const done = (rows[0]?.chips ?? []).map((entry) => ({ ...entry, made: true }));
     expect(unfinishedSceneRows([{ ...(rows[0] as (typeof rows)[number]), chips: done }])).toHaveLength(0);
+  });
+
+  it("makes game rows with design and art only", () => {
+    const rows = sceneRows(makeWorld(), "test-story", "game");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.chips.map((chip) => chip.kind)).toEqual(["design", "art"]);
+    expect(rows[0]?.chips.map((chip) => chip.label)).toEqual(["Design", "Art"]);
+    expect(rows[0]?.chips[0]?.href).toBe(
+      "/projects/test-story/script?channel=game&part=part-1",
+    );
   });
 
   it("makes one row per character with sheet, cutout and voice chips", () => {

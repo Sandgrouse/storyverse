@@ -75,11 +75,40 @@ export function plannedPairs(world: World): Array<{
 }
 
 export type ReadinessItem = {
-  kind: "sheets" | "art" | "script" | "storyboard" | "video";
+  kind: "sheets" | "art" | "script" | "design" | "copy" | "storyboard" | "video";
   label: string;
   href: string;
   done: boolean;
 };
+
+/**
+ * The readiness word a channel kind uses for its written work: games
+ * are designed, copy kinds are written as copy, screen kinds as
+ * scripts. Pure, so readiness rows, the map and the dashboard agree.
+ */
+export function writtenKindForChannelKind(kind: string): "design" | "copy" | "script" {
+  if (kind === "game") return "design";
+  if (kind === "website" || kind === "press" || kind === "ad" || kind === "other") {
+    return "copy";
+  }
+  return "script";
+}
+
+/** True for channels whose written work is copy, not screenplay. */
+export function isCopyChannelKind(kind: string): boolean {
+  return writtenKindForChannelKind(kind) === "copy";
+}
+
+/** A game does not need storyboards or video: both stay unlisted. */
+export function isGameChannelKind(kind: string): boolean {
+  return kind === "game";
+}
+
+/** Capitalized readiness label for the written work, e.g. "Design". */
+export function writtenLabelForChannelKind(kind: string): string {
+  const written = writtenKindForChannelKind(kind);
+  return written === "design" ? "Design" : written === "copy" ? "Copy" : "Script";
+}
 
 export type ChannelReadiness = {
   channelId: string;
@@ -112,6 +141,9 @@ export function channelReadiness(
         : `/projects/${projectId}/characters`,
     done: world.characters.length > 0 && missingSheets.length === 0,
   });
+  const kind = world.channels.find((c) => c.id === channelId)?.kind ?? "series";
+  const written = writtenKindForChannelKind(kind);
+  const writtenLabel = writtenLabelForChannelKind(kind);
   const pairs = plannedPairs(world).filter((p) => p.channelId === channelId);
   const orderedParts = [...world.parts].sort((a, b) => a.order - b.order);
   for (const pair of pairs) {
@@ -125,11 +157,14 @@ export function channelReadiness(
       done: artDone,
     });
     items.push({
-      kind: "script",
-      label: `Script: ${partLabel}`,
+      kind: written,
+      label: `${writtenLabel}: ${partLabel}`,
       href: `/projects/${projectId}/script?channel=${channelId}&part=${pair.partId}`,
       done: scriptForScene(world, channelId, pair.partId) !== undefined,
     });
+    // A game does not need storyboards or video: neither is listed,
+    // made or not, so the Readiness view and the ZIP agree.
+    if (isGameChannelKind(kind)) continue;
     items.push({
       kind: "storyboard",
       label: `Storyboard: ${partLabel}`,

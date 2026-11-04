@@ -323,6 +323,202 @@ function pushFile(files: PackageFile[], file: PackageFile | null): void {
   if (file) files.push(file);
 }
 
+export type ChannelTile = {
+  label: string;
+  value: string;
+  sub: string;
+  made: number;
+  total: number;
+};
+
+/** The six design sections a game channel's design entries fill. */
+export const GAME_DESIGN_SECTIONS = [
+  "Game type",
+  "Camera and view",
+  "Core mechanics",
+  "Goal and ending",
+  "Controls",
+  "Progression",
+] as const;
+
+function channelKindOf(world: World, channelId: string): string {
+  return world.channels.find((c) => c.id === channelId)?.kind ?? "series";
+}
+
+/**
+ * The six design sections with the owner's saved text, if any. Design
+ * entries (`ScriptEntry.form === "design"`) hold one-line blocks such
+ * as `Game type: Platformer. ...`; the text after the prefix is the
+ * section's short text, null when the owner has not decided it yet.
+ * Pure, so the dashboard and tests share it.
+ */
+export function gameDesignSections(
+  world: World,
+  channelId: string,
+): Array<{ label: string; text: string | null }> {
+  const combined = world.scripts
+    .filter(
+      (script) => script.channelId === channelId && script.form === "design",
+    )
+    .map((script) => script.text)
+    .join("\n");
+  const lines = combined.split("\n").map((line) => line.trim());
+  return GAME_DESIGN_SECTIONS.map((label) => {
+    const line = lines.find((entry) => entry.startsWith(`${label}:`));
+    const rest = line ? line.slice(label.length + 1).trim() : "";
+    return { label, text: rest.length > 0 ? rest : null };
+  });
+}
+
+/**
+ * Stat tiles for the selected channel only: screen kinds
+ * (series/shorts/film) count scripts, storyboards and videos;
+ * the game counts places and filled design sections instead of
+ * storyboards and videos; copy kinds (website/press/ad/other)
+ * count copy. Pure, so the dashboard and tests share it.
+ */
+export function packageChannelTiles(
+  world: World,
+  channelId: string,
+): ChannelTile[] {
+  const kind = channelKindOf(world, channelId);
+  const fullSheets = world.characters.filter(hasFullSheet).length;
+  const voices = world.characters.filter((c) => c.voice).length;
+  const characters: ChannelTile = {
+    label: "Characters",
+    value: `${world.characters.length}`,
+    sub: `${fullSheets} full sheets · ${voices} voices`,
+    made: fullSheets,
+    total: world.characters.length,
+  };
+  const keptApart = world.secrets.filter(
+    (secret) => secret.knownThrough.length === 0,
+  ).length;
+  const secrets: ChannelTile = {
+    label: "Secrets kept apart",
+    value: `${keptApart}`,
+    sub: `of ${world.secrets.length} secrets`,
+    made: keptApart,
+    total: world.secrets.length,
+  };
+  if (kind === "game") {
+    const filled = gameDesignSections(world, channelId).filter(
+      (section) => section.text !== null,
+    ).length;
+    const places =
+      world.locations.length === 1
+        ? "1 place in the canon"
+        : `${world.locations.length} places in the canon`;
+    return [
+      characters,
+      {
+        label: "Places",
+        value: `${world.locations.length}`,
+        sub: places,
+        made: world.locations.length,
+        total: world.locations.length,
+      },
+      {
+        label: "Game design",
+        value: `${filled} of 6`,
+        sub:
+          filled === 6
+            ? "sections filled"
+            : "sections filled · rest not decided",
+        made: filled,
+        total: 6,
+      },
+      {
+        label: "Character art ready",
+        value: `${fullSheets}`,
+        sub: `of ${world.characters.length} characters`,
+        made: fullSheets,
+        total: world.characters.length,
+      },
+      secrets,
+    ];
+  }
+  const covered = new Set(
+    world.beats
+      .filter((beat) => beat.channelId === channelId)
+      .map((beat) => beat.partId),
+  );
+  const scenes: ChannelTile = {
+    label: "Scenes told",
+    value: `${covered.size}`,
+    sub: `of ${world.parts.length} scenes`,
+    made: covered.size,
+    total: world.parts.length,
+  };
+  const scriptsWritten = world.scripts.filter(
+    (script) => script.channelId === channelId,
+  ).length;
+  const artMade = world.parts.filter(
+    (part) => covered.has(part.id) && part.imagePath.length > 0,
+  ).length;
+  const art: ChannelTile = {
+    label: "Scene art",
+    value: `${artMade}`,
+    sub:
+      covered.size === 0 ? "no scenes told yet" : `of ${covered.size} told`,
+    made: artMade,
+    total: covered.size,
+  };
+  if (kind === "website" || kind === "press" || kind === "ad" || kind === "other") {
+    return [
+      characters,
+      scenes,
+      {
+        label: "Copy written",
+        value: `${scriptsWritten}`,
+        sub:
+          covered.size === 0
+            ? "no scenes told yet"
+            : `of ${covered.size} planned`,
+        made: scriptsWritten,
+        total: covered.size,
+      },
+      art,
+      secrets,
+    ];
+  }
+  const boards = (world.storyboards ?? []).filter(
+    (board) => board.channelId === channelId,
+  ).length;
+  const videos = (world.shorts ?? []).filter(
+    (short) => short.channelId === channelId,
+  ).length;
+  const planned = (sub: string) =>
+    covered.size === 0 ? "no scenes told yet" : `of ${covered.size} ${sub}`;
+  return [
+    characters,
+    scenes,
+    {
+      label: "Scripts written",
+      value: `${scriptsWritten}`,
+      sub: planned("planned"),
+      made: scriptsWritten,
+      total: covered.size,
+    },
+    {
+      label: "Storyboards",
+      value: `${boards}`,
+      sub: planned("planned"),
+      made: boards,
+      total: covered.size,
+    },
+    {
+      label: "Videos",
+      value: `${videos}`,
+      sub: planned("planned"),
+      made: videos,
+      total: covered.size,
+    },
+    art,
+    secrets,
+  ];
+}
+
 /**
  * Every file the package should hold, including expected-but-missing
  * ones (no content, missing: true). Pure and fully testable.
@@ -1074,13 +1270,9 @@ export function planGameFiles(world: World, channelId: string): PackageFile[] {
     if (!covered.has(part.id)) continue;
     (part.imagePath ? made : notMade).push(`Scene art: ${part.title}`);
     const hasScript = filtered.scripts.some((s) => s.partId === part.id);
-    (hasScript ? made : notMade).push(`Script: ${part.title}`);
-    const hasBoard = (filtered.storyboards ?? []).some(
-      (b) => b.partId === part.id,
-    );
-    (hasBoard ? made : notMade).push(`Storyboard: ${part.title}`);
-    const hasVideo = (filtered.shorts ?? []).some((s) => s.partId === part.id);
-    (hasVideo ? made : notMade).push(`Video: ${part.title}`);
+    // A game is designed, not scripted, boarded or cut: storyboards
+    // and videos are never listed, so the ZIP and Readiness agree.
+    (hasScript ? made : notMade).push(`Design: ${part.title}`);
   }
   // The art bible lists the sheets and scene art on file, so it is
   // written once those lists are known.

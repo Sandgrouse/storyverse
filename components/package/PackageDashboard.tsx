@@ -7,13 +7,13 @@ import {
   buildAgentZip,
   fileSizeOf,
   formatFileSize,
+  gameDesignSections,
+  packageChannelTiles,
   planAgentFiles,
   type PackageFile,
 } from "@/lib/package";
-import {
-  channelReadiness,
-  summaryCounts,
-} from "@/lib/readiness";
+import { channelReadiness } from "@/lib/readiness";
+import { visualStyleLine } from "@/lib/style";
 import Accordion from "./Accordion";
 import PackageMap, { PackageMapFallback } from "./PackageMap";
 import { buildPackageGraph } from "./graph";
@@ -243,7 +243,10 @@ export default function PackageDashboard({
     }
   };
 
-  const counts = useMemo(() => summaryCounts(world), [world]);
+  const tiles = useMemo(
+    () => (channelId ? packageChannelTiles(world, channelId) : []),
+    [world, channelId],
+  );
   const files = useMemo(
     () => (channelId ? planAgentFiles(world, channelId) : []),
     [world, channelId],
@@ -273,6 +276,30 @@ export default function PackageDashboard({
     const chips = [...undoneRows.flatMap((row) => row.chips), ...undoneChars.flatMap((row) => row.chips)];
     return chips.length;
   }, [undoneRows, undoneChars]);
+  const isGame = channel?.kind === "game";
+  const designSections = useMemo(
+    () => (isGame && channelId ? gameDesignSections(world, channelId) : []),
+    [world, channelId, isGame],
+  );
+  const styleLine = useMemo(() => visualStyleLine(world.visualStyle), [world]);
+  const castNames = useMemo(() => {
+    const ids = new Set<string>();
+    for (const beat of world.beats) {
+      if (beat.channelId !== channelId) continue;
+      for (const id of beat.characterIds) ids.add(id);
+    }
+    return world.characters
+      .filter((character) => ids.has(character.id))
+      .map((character) => character.name);
+  }, [world, channelId]);
+  const designPartId =
+    world.scripts.find(
+      (script) => script.channelId === channelId && script.form === "design",
+    )?.partId ?? rows[0]?.partId;
+  const designHref =
+    designPartId !== undefined
+      ? `/projects/${world.id}/script?channel=${channelId}&part=${designPartId}`
+      : `/projects/${world.id}/script?channel=${channelId}`;
 
   const openMapNode = (href: string) => {
     window.location.assign(href);
@@ -332,63 +359,82 @@ export default function PackageDashboard({
         </div>
       </div>
       <div className="packtiles" role="list" aria-label="Package summary">
-        <Tile
-          label="Characters"
-          value={`${counts.characters}`}
-          sub={`${counts.fullSheets} full sheets · ${counts.voices} voices`}
-          made={counts.fullSheets}
-          total={counts.characters}
-          open={open}
-        />
-        <Tile
-          label="Scenes"
-          value={`${counts.scenes}`}
-          sub={`${counts.coveredScenes} told`}
-          made={counts.coveredScenes}
-          total={counts.scenes}
-          open={open}
-        />
-        <Tile
-          label="Scripts written"
-          value={`${counts.scriptsWritten}`}
-          sub={`of ${counts.plannedPairs} planned`}
-          made={counts.scriptsWritten}
-          total={counts.plannedPairs}
-          open={open}
-        />
-        <Tile
-          label="Storyboards"
-          value={`${counts.storyboards}`}
-          sub={`of ${counts.plannedPairs} planned`}
-          made={counts.storyboards}
-          total={counts.plannedPairs}
-          open={open}
-        />
-        <Tile
-          label="Scene art"
-          value={`${counts.sceneArt}`}
-          sub={`of ${counts.scenes} scenes`}
-          made={counts.sceneArt}
-          total={counts.scenes}
-          open={open}
-        />
-        <Tile
-          label="Videos"
-          value={`${counts.videos}`}
-          sub={`of ${counts.plannedPairs} planned`}
-          made={counts.videos}
-          total={counts.plannedPairs}
-          open={open}
-        />
-        <Tile
-          label="Secrets kept apart"
-          value={`${counts.secretsKeptApart}`}
-          sub={`of ${counts.secretsTotal} secrets`}
-          made={counts.secretsKeptApart}
-          total={counts.secretsTotal}
-          open={open}
-        />
+        {tiles.map((tile) => (
+          <Tile
+            key={tile.label}
+            label={tile.label}
+            value={tile.value}
+            sub={tile.sub}
+            made={tile.made}
+            total={tile.total}
+            open={open}
+          />
+        ))}
       </div>
+      {channel && (
+        <div
+          className="packcard"
+          aria-label={isGame ? "The game" : `The ${channel.kind}`}
+        >
+          <div className="packcard-head">
+            <b>{isGame ? "The game" : `The ${channel.kind}`}</b>
+            <span>{channel.name}</span>
+          </div>
+          <p className="packcard-sub">
+            {channel.title || "Untitled channel"}
+          </p>
+          <p className="packdone">
+            {channel.pitch || channel.tagline || "No pitch written yet."}
+          </p>
+          {isGame ? (
+            <>
+              <ul className="packtodo">
+                {designSections.map((section) => (
+                  <li key={section.label}>
+                    {section.label}: {section.text ?? "Not decided yet."}{" "}
+                    <Link href={designHref}>Decide on the Script page</Link>
+                  </li>
+                ))}
+              </ul>
+              <p className="packdone">
+                Look: {styleLine || "No visual style chosen yet."}
+              </p>
+              <p className="packdone">
+                Playing:{" "}
+                {castNames.length > 0
+                  ? castNames.join(", ")
+                  : "No characters in play yet."}
+              </p>
+              <p className="packdone">
+                Your coding agent builds this game with the studio files in
+                the download.
+              </p>
+              <button
+                className="pill"
+                onClick={() => void exportZip()}
+                disabled={!channelId || state.kind === "working"}
+                tabIndex={open ? 0 : -1}
+              >
+                {state.kind === "working" ? "Exporting…" : "Export package"}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="packdone">
+                {rows.length === 1
+                  ? "1 scene told in this channel."
+                  : `${rows.length} scenes told in this channel.`}
+              </p>
+              <p className="packdone">
+                Holds back:{" "}
+                {channel.secret.trim().length > 0
+                  ? channel.secret
+                  : "No secret revealed yet."}
+              </p>
+            </>
+          )}
+        </div>
+      )}
       {channel?.kind === "game" && (
         <p className="gamenote">
           A game agent that builds this in Godot is coming next. For now, hand
@@ -492,16 +538,18 @@ export default function PackageDashboard({
           <p>The export failed.</p>
         </div>
       )}
-      <div style={{ marginTop: 18, textAlign: "right" }}>
-        <button
-          className="pill"
-          onClick={() => void exportZip()}
-          disabled={!channelId || state.kind === "working"}
-          tabIndex={open ? 0 : -1}
-        >
-          {state.kind === "working" ? "Exporting…" : "Export package"}
-        </button>
-      </div>
+      {!isGame && (
+        <div style={{ marginTop: 18, textAlign: "right" }}>
+          <button
+            className="pill"
+            onClick={() => void exportZip()}
+            disabled={!channelId || state.kind === "working"}
+            tabIndex={open ? 0 : -1}
+          >
+            {state.kind === "working" ? "Exporting…" : "Export package"}
+          </button>
+        </div>
+      )}
     </>
   );
 }

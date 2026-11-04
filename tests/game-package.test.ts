@@ -279,8 +279,10 @@ describe("game package layout", () => {
       ?.content as string;
     expect(stage).toContain("Concept");
     expect(stage).toContain("Scene art: Beginnings");
-    expect(stage).toContain("Script: Beginnings");
-    expect(stage).toContain("Storyboard: Beginnings");
+    expect(stage).toContain("Design: Beginnings");
+    // A game needs no storyboards or video: neither is listed.
+    expect(stage).not.toContain("Storyboard");
+    expect(stage).not.toContain("Video");
   });
 
   it("keeps the current layout for other kinds", () => {
