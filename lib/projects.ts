@@ -337,6 +337,16 @@ export function mergeWorldAssets(oldWorld: World, nextWorld: World): World {
     const key = `${script.channelId}::${script.partId}`;
     if (!scriptsByKey.has(key)) scriptsByKey.set(key, script);
   }
+  const boardsByKey = new Map(
+    (nextWorld.storyboards ?? []).map((board) => [
+      `${board.channelId}::${board.partId}`,
+      board,
+    ]),
+  );
+  for (const board of oldWorld.storyboards ?? []) {
+    const key = `${board.channelId}::${board.partId}`;
+    if (!boardsByKey.has(key)) boardsByKey.set(key, board);
+  }
   const nextPronunciations = nextWorld.pronunciations ?? [];
   const oldPronunciations = oldWorld.pronunciations ?? [];
   return {
@@ -394,5 +404,6 @@ export function mergeWorldAssets(oldWorld: World, nextWorld: World): World {
       nextWorld.shorts && nextWorld.shorts.length > 0
         ? nextWorld.shorts
         : (oldWorld.shorts ?? []),
+    storyboards: [...boardsByKey.values()],
   };
 }

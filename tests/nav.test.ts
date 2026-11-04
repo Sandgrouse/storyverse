@@ -21,6 +21,7 @@ describe("backFor", () => {
     expect(backFor("/projects/abc/package")).toBe("/projects/abc/channels");
     expect(backFor("/projects/abc/story-pack")).toBe("/projects/abc/channels");
     expect(backFor("/projects/abc/script")).toBe("/projects/abc/story");
+    expect(backFor("/projects/abc/storyboard")).toBe("/projects/abc/script");
     expect(backFor("/projects/abc/material")).toBe("/projects/abc/understood");
     expect(backFor("/projects/abc/reading")).toBe("/projects/abc/material");
   });
@@ -55,9 +56,13 @@ describe("world sections", () => {
     expect(sectionFor(undefined)).toBe("story");
     expect(sectionFor(["characters"])).toBe("characters");
     expect(sectionFor(["script"])).toBe("script");
+    expect(sectionFor(["storyboard"])).toBe("storyboard");
     expect(sectionFor(["story-pack"])).toBe("story-pack");
     expect(sectionFor(["package"])).toBe("package");
     expect(pathForSection("abc", "characters")).toBe("/projects/abc/characters");
     expect(pathForSection("abc", "script")).toBe("/projects/abc/script");
+    expect(pathForSection("abc", "storyboard")).toBe(
+      "/projects/abc/storyboard",
+    );
   });
 });

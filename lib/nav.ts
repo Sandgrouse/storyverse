@@ -24,6 +24,7 @@ export function backFor(pathname: string): string | null {
     return `/projects/${id}/channels`;
   }
   if (page === "script") return `/projects/${id}/story`;
+  if (page === "storyboard") return `/projects/${id}/script`;
   if (page === "video") return `/projects/${id}/script`;
   if (page === "material") return `/projects/${id}/understood`;
   if (page === "reading") return `/projects/${id}/material`;
@@ -48,6 +49,7 @@ export type WorldSection =
   | "story"
   | "characters"
   | "script"
+  | "storyboard"
   | "video"
   | "story-pack"
   | "package";
@@ -57,6 +59,7 @@ export function sectionFor(section: string[] | undefined): WorldSection {
   if (!section || section.length === 0 || section[0] === "story") return "story";
   if (section[0] === "characters") return "characters";
   if (section[0] === "script") return "script";
+  if (section[0] === "storyboard") return "storyboard";
   if (section[0] === "story-pack") return "story-pack";
   if (section[0] === "package") return "package";
   return "story";

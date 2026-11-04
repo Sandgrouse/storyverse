@@ -1,0 +1,287 @@
+/* Storyboard page. All new CSS for this page lives here; nothing else
+   imports it. Follows the Script page for layout, spacing and type. */
+
+.storyboard-layout {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  min-height: 100vh;
+  padding-top: 76px;
+}
+
+.storyboard-side {
+  padding: 22px 18px;
+  overflow: auto;
+}
+
+.storyboard-group {
+  margin-bottom: 18px;
+}
+
+.storyboard-group h4 {
+  margin: 0 0 6px;
+  font: 500 12px var(--sans);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.storyboard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.storyboard-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  transition: background 0.2s, transform 0.25s var(--ease);
+}
+
+.storyboard-item:hover {
+  background: rgba(251, 248, 241, 0.8);
+  transform: translateX(2px);
+}
+
+.storyboard-item.on {
+  background: var(--sheet);
+  box-shadow: 0 1px 0 var(--rule);
+}
+
+.storyboard-main {
+  padding: 26px 28px 60px;
+  overflow: auto;
+}
+
+.storyboard-main .pill.sm {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.storyboard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.storyboard-scene {
+  font-size: 13px;
+  color: var(--soft);
+}
+
+.storyboard-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.storyboard-note {
+  font-size: 13px;
+  color: var(--soft);
+  margin-top: 10px;
+}
+
+.storyboard-flag {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--clay-soft);
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.storyboard-flag b {
+  font-weight: 500;
+}
+
+.storyboard-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.storyboard-empty {
+  max-width: 520px;
+  margin: 80px auto;
+  text-align: center;
+  color: var(--soft);
+}
+
+.storyboard-empty p {
+  margin-bottom: 16px;
+}
+
+.storyboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.storyboard-frame {
+  background: var(--sheet);
+  border-radius: 10px;
+  box-shadow: var(--lift);
+  overflow: hidden;
+  transition: transform 0.3s var(--ease), box-shadow 0.3s;
+}
+
+.storyboard-frame:hover {
+  transform: translateY(-5px) rotate(-0.6deg);
+  box-shadow: 0 18px 26px -14px rgba(50, 35, 15, 0.7);
+}
+
+.storyboard-frame.dragover {
+  outline: 2.5px dashed var(--clay);
+  outline-offset: 2px;
+}
+
+.storyboard-framenum {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px 8px;
+  font: 500 12px var(--sans);
+  color: var(--soft);
+  cursor: grab;
+}
+
+.storyboard-sketch {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #222;
+}
+
+.storyboard-placeholder {
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(31, 27, 22, 0.05);
+  color: var(--soft);
+  font-size: 13px;
+}
+
+.storyboard-edit {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.storyboard-edit label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--soft);
+}
+
+.storyboard-edit select,
+.storyboard-edit textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.storyboard-edit textarea {
+  font: 400 14px/1.45 var(--serif);
+  resize: vertical;
+}
+
+.storyboard-edit select {
+  font-size: 13px;
+}
+
+.storyboard-add {
+  min-height: 220px;
+  border: 1.5px dashed var(--rule);
+  border-radius: 10px;
+  font: 300 26px var(--serif);
+  color: var(--soft);
+}
+
+.storyboard-add:hover {
+  color: var(--ink);
+  border-color: var(--soft);
+}
+
+.storyboard-print {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .storyboard-layout {
+    grid-template-columns: 1fr;
+  }
+  .storyboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .storyboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .topbar,
+  .storyboard-side,
+  .storyboard-controls,
+  .storyboard-add,
+  .smallscreen {
+    display: none !important;
+  }
+  .storyboard-layout {
+    display: block;
+    padding-top: 0;
+    min-height: 0;
+  }
+  .storyboard-main {
+    padding: 0;
+    overflow: visible;
+  }
+  .storyboard-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .storyboard-frame {
+    background: #fff;
+    box-shadow: none;
+    border: 1px solid #999;
+    break-inside: avoid;
+  }
+  .storyboard-frame:hover {
+    transform: none;
+  }
+  .storyboard-print {
+    display: block;
+    padding: 8px 10px 10px;
+    color: #000;
+    font-size: 12px;
+  }
+  .storyboard-print h4 {
+    margin: 0 0 4px;
+    font-size: 12px;
+  }
+  .storyboard-print p {
+    margin: 0 0 4px;
+  }
+}

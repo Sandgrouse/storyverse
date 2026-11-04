@@ -7,6 +7,11 @@ import {
   packageTree,
   planAgentFiles,
 } from "@/lib/package";
+import {
+  sanitizePlannedFrames,
+  toPlannedFrames,
+  upsertStoryboard,
+} from "@/lib/storyboard";
 import { WorldSchema, type World } from "@/lib/world/schemas";
 
 const SERIES_SECRET = "the baby lived because of SERIES_MARKER";
@@ -250,5 +255,97 @@ describe("agent package secret rule", () => {
 
   it("returns no files for an unknown channel", () => {
     expect(planAgentFiles(makeWorld(), "missing")).toEqual([]);
+  });
+});
+
+describe("agent package storyboards", () => {
+  function worldWithStoryboard(): World {
+    const world = makeWorld();
+    const frames = toPlannedFrames(
+      sanitizePlannedFrames([
+        {
+          framing: "wide",
+          action: "Ada at the bank.",
+          dialogue: "Look.",
+          camera: null,
+          characterIds: ["ada"],
+        },
+        {
+          framing: "close",
+          action: "The water rises.",
+          dialogue: null,
+          camera: null,
+          characterIds: ["ada"],
+        },
+      ]),
+      world,
+      "series",
+    );
+    return upsertStoryboard(world, {
+      id: "series::part-1",
+      channelId: "series",
+      partId: "part-1",
+      title: "Beginnings",
+      frames: frames.map((frame, i) =>
+        i === 0
+          ? { ...frame, imagePath: "data:image/webp;base64,QUJD" }
+          : frame,
+      ),
+    });
+  }
+
+  it("adds storyboard.json without image bytes and the sketches beside it", () => {
+    const files = planAgentFiles(worldWithStoryboard(), "series");
+    const json = files.find((f) => f.type === "storyboard");
+    expect(json?.path).toBe(
+      "test-story-series/scenes/part-1/storyboard.json",
+    );
+    expect(json?.missing).toBe(false);
+    const parsed = JSON.parse(json?.content as string) as Array<
+      Record<string, unknown>
+    >;
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0]).toMatchObject({
+      id: "frame-1",
+      framing: "wide",
+      action: "Ada at the bank.",
+      dialogue: "Look.",
+      characterIds: ["ada"],
+    });
+    expect(JSON.stringify(json?.content)).not.toContain("data:image");
+    const sketch = files.find(
+      (f) =>
+        f.type === "storyboard-sketch" &&
+        f.path.endsWith("storyboard/frame-1.webp"),
+    );
+    expect(sketch?.missing).toBe(false);
+    const missing = files.find((f) =>
+      f.path.endsWith("storyboard/frame-2.webp"),
+    );
+    expect(missing?.missing).toBe(true);
+  });
+
+  it("keeps storyboards to their own channel", () => {
+    const game = planAgentFiles(worldWithStoryboard(), "game");
+    expect(
+      game.some(
+        (f) => f.type === "storyboard" || f.type === "storyboard-sketch",
+      ),
+    ).toBe(false);
+    expect(
+      game.filter((f) => !f.missing && f.content !== undefined).map((f) =>
+        typeof f.content === "string"
+          ? f.content
+          : new TextDecoder().decode(f.content),
+      ),
+    ).not.toContain("Ada at the bank.");
+  });
+
+  it("shows the storyboard files in the package tree", () => {
+    const files = planAgentFiles(worldWithStoryboard(), "series");
+    const tree = packageTree(files);
+    expect(tree).toContain("scenes/part-1/storyboard.json");
+    expect(tree).toContain("scenes/part-1/storyboard/frame-1.webp");
+    expect(tree).not.toContain("frame-2.webp");
   });
 });

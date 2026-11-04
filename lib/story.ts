@@ -193,6 +193,13 @@ export function stripImageData(world: World): World {
         imagePath: clean(shot.imagePath) ?? "",
       })),
     })),
+    storyboards: (world.storyboards ?? []).map((board) => ({
+      ...board,
+      frames: board.frames.map((frame) => ({
+        ...frame,
+        imagePath: frame.imagePath ? clean(frame.imagePath) : undefined,
+      })),
+    })),
   };
 }
 

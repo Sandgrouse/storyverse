@@ -138,6 +138,34 @@ export const ScriptEntrySchema = z.object({
   updatedAt: z.number().int(),
 });
 
+export const StoryboardFramingSchema = z.enum([
+  "wide",
+  "medium",
+  "close",
+  "over-shoulder",
+  "overhead",
+]);
+
+/** One pencil-sketch shot in a storyboard. */
+export const StoryboardFrameSchema = z.object({
+  id: z.string(),
+  imagePath: z.string().optional(),
+  framing: StoryboardFramingSchema,
+  action: z.string(),
+  dialogue: z.string().optional(),
+  camera: z.string().optional(),
+  characterIds: z.array(z.string()),
+});
+
+/** One storyboard per channel and part. */
+export const StoryboardSchema = z.object({
+  id: z.string(),
+  channelId: z.string(),
+  partId: z.string(),
+  title: z.string(),
+  frames: z.array(StoryboardFrameSchema),
+});
+
 /** Production material for one channel's take on one part. */
 export const PackSchema = z.object({
   partId: z.string(),
@@ -166,6 +194,7 @@ export const WorldSchema = z.object({
   packs: z.array(PackSchema).default([]),
   scripts: z.array(ScriptEntrySchema).default([]),
   shorts: z.array(ShortSchema).default([]),
+  storyboards: z.array(StoryboardSchema).default([]),
   canonChanges: z.array(z.string()).default([]),
   /** How names are said aloud. Only spoken audio uses it. */
   pronunciations: z.array(PronunciationSchema).default([]),
@@ -225,6 +254,9 @@ export type Gap = z.infer<typeof GapSchema>;
 export type ShortVoice = z.infer<typeof ShortVoiceSchema>;
 export type ShortShot = z.infer<typeof ShortShotSchema>;
 export type Short = z.infer<typeof ShortSchema>;
+export type StoryboardFraming = z.infer<typeof StoryboardFramingSchema>;
+export type StoryboardFrame = z.infer<typeof StoryboardFrameSchema>;
+export type Storyboard = z.infer<typeof StoryboardSchema>;
 export type ScriptEntry = z.infer<typeof ScriptEntrySchema>;
 export type StoryPack = z.infer<typeof PackSchema>;
 export type World = z.infer<typeof WorldSchema>;
