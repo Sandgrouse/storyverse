@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
+import { useEffect } from "react";
 import WorldScene, { type WorldDrawer } from "@/components/experience/WorldScene";
 import { MissingStory, useProject } from "@/components/projects/ProjectContext";
 import { pathForSection } from "@/lib/nav";
@@ -29,8 +30,15 @@ export default function WorldSectionPage() {
   const router = useRouter();
   const params = useParams<{ id: string; section?: string[] }>();
   const { status, world, updateWorld } = useProject();
+  const hasSection = !!params.section && params.section.length > 0;
 
-  if (params.section && params.section.length > 0 && !DRAWERS.includes(params.section[0] as (typeof DRAWERS)[number])) {
+  useEffect(() => {
+    if (!hasSection) router.replace(`/projects/${params.id}/story`);
+  }, [hasSection, router, params.id]);
+
+  if (!hasSection) return <main />;
+
+  if (!DRAWERS.includes(params.section?.[0] as (typeof DRAWERS)[number])) {
     notFound();
   }
 

@@ -182,7 +182,7 @@ p {
   position: absolute;
   left: 0;
   right: 0;
-  top: 9vh;
+  top: max(9vh, 96px);
   text-align: center;
   padding: 0 20px;
 }
@@ -643,8 +643,8 @@ p {
   position: absolute;
   left: 30%;
   right: 34px;
-  top: 76px;
-  height: calc(100% - 330px);
+  top: 96px;
+  height: calc(100% - 350px);
   background: var(--sheet);
   border-radius: 6px;
   box-shadow: 0 30px 60px -30px rgba(50, 35, 15, 0.35);
@@ -1054,7 +1054,7 @@ p {
   position: absolute;
   left: 34px;
   right: 454px;
-  top: 76px;
+  top: 96px;
   opacity: 0;
   transition: opacity 0.7s 0.2s;
   pointer-events: none;
@@ -1239,7 +1239,10 @@ p {
 /* Drawers */
 .drawer {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 84px;
   background: var(--paper);
   transform: translateY(102%);
   transition: transform 0.8s var(--ease);
@@ -1412,6 +1415,9 @@ p {
   gap: 12px;
   padding: 20px 34px;
   pointer-events: none;
+  background: rgba(239, 232, 219, 0.86);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 .topbar-left,
 .topbar-right {

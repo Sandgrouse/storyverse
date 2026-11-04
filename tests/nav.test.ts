@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { backFor, pathForSection, sectionFor } from "@/lib/nav";
+import {
+  backFor,
+  pathForSection,
+  sectionFor,
+  shouldRedirectFromReading,
+} from "@/lib/nav";
 
 describe("backFor", () => {
   it("maps every page to its parent", () => {
@@ -21,6 +26,26 @@ describe("backFor", () => {
 
   it("has no back outside the projects pages", () => {
     expect(backFor("/")).toBeNull();
+  });
+});
+
+describe("shouldRedirectFromReading", () => {
+  it("bounces to material only when ready and empty", () => {
+    expect(
+      shouldRedirectFromReading({ ready: true, empty: true, leaving: false }),
+    ).toBe(true);
+    expect(
+      shouldRedirectFromReading({ ready: false, empty: true, leaving: false }),
+    ).toBe(false);
+    expect(
+      shouldRedirectFromReading({ ready: true, empty: false, leaving: false }),
+    ).toBe(false);
+  });
+
+  it("never fires after the user presses See what I found", () => {
+    expect(
+      shouldRedirectFromReading({ ready: true, empty: true, leaving: true }),
+    ).toBe(false);
   });
 });
 

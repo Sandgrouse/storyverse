@@ -56,6 +56,21 @@ describe("experience scenes", () => {
     }
   });
 
+  it("shows the sample button only once, under the drop area", async () => {
+    const world = await loadWorld();
+    const noop = () => {};
+    const countSample = (html: string) =>
+      html.split("Use the sample project").length - 1;
+    const { html: fresh } = renderQuiet(
+      <BringScene active files={[]} onFiles={noop} seed={world} sample={false} onSample={noop} onRead={noop} />,
+    );
+    expect(countSample(fresh)).toBe(1);
+    const { html: hidden } = renderQuiet(
+      <BringScene active files={[]} onFiles={noop} seed={world} sample={false} hideSample onSample={noop} onRead={noop} />,
+    );
+    expect(countSample(hidden)).toBe(0);
+  });
+
   it("renders story copy from the world data", async () => {
     const world = await loadWorld();
     const noop = () => {};

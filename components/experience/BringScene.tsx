@@ -216,7 +216,7 @@ export default function BringScene({
         }}
         style={dragging ? { outline: "2px solid var(--clay)", borderRadius: 14 } : undefined}
       >
-        {!ready && (
+        {!ready && !hideSample && (
           <div className="bring-empty">
             <div className="drop">
               <b>Drop files here</b>
@@ -267,13 +267,7 @@ export default function BringScene({
       </div>
       <p className="gapnote">{error ? error : working ? "Reading those files…" : note ? `${gapnote}${gapnote ? " " : ""}${note}` : gapnote}</p>
       <div className="foot">
-        <span>
-          {!sample && !hideSample && (
-            <button type="button" className="pill light" onClick={onSample}>
-              Use the sample project
-            </button>
-          )}
-        </span>
+        <span />
         <button className="pill" disabled={!ready || working || extraDisabled} onClick={onRead}>
           {readLabel}
         </button>

@@ -47,7 +47,7 @@ export default function ChannelsScene({
 
   return (
     <section className={`scene${active ? " on" : ""}`} id="channels">
-      <div className="top" style={{ top: "7vh" }}>
+      <div className="top" style={{ top: "max(7vh, 96px)" }}>
         <h1 className="big" style={{ fontSize: "clamp(32px, 3.8vw, 54px)" }}>
           Give each screen its own secret.
         </h1>

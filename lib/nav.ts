@@ -28,6 +28,20 @@ export function backFor(pathname: string): string | null {
   return `/projects/${id}/story`;
 }
 
+/**
+ * Reading pages bounce back to material when no files remain. The bounce
+ * must not fire once the user has pressed "See what I found": clearing the
+ * draft empties the page before navigation finishes, and without the
+ * `leaving` guard the bounce wins and lands on material, not the project.
+ */
+export function shouldRedirectFromReading(options: {
+  ready: boolean;
+  empty: boolean;
+  leaving: boolean;
+}): boolean {
+  return options.ready && options.empty && !options.leaving;
+}
+
 export type WorldSection = "story" | "characters" | "story-pack" | "package";
 
 /** Drawer section from a catch-all param, defaulting to the story. */
