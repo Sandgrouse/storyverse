@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const READ_INSTRUCTIONS =
-  "You read a creator's raw story material and build its canon. Use only what the material says. Never rename anyone, and keep all names and details exactly. The logline tells the story itself in one gripping sentence. It never describes the document. Split the story into its natural parts. An excerpt is a short retelling in your own words, never copied text. A gap is an important question the material leaves open. For each image, say who or what it shows. Set artFile on a character, or on a part, only if an image clearly shows them, otherwise leave it empty.";
+  "You read a creator's raw story material and build its canon. Use only what the material says. Never rename anyone, and keep all names and details exactly, with real names and details only. The logline tells the story itself in one gripping sentence. It never describes the document. Split the story into its natural parts. An excerpt is a short retelling in your own words, never copied text. Each part's text is the verbatim passage of the source that belongs to that part. Facts are the story basics, chosen to suit the kind of story: for fiction, kind of story, genre, where, when, tone, told as, themes, who it's for, language and voice; for an ad, product, audience, promise, call to action, tone, where it runs; for a documentary, subject, people, question, where, when. Pick the labels, include empty ones for what matters but is missing, and set source to material only when the material states it. A gap is an important question the material leaves open. For each image, say who or what it shows. Set artFile on a character, or on a part, only if an image clearly shows them, otherwise leave it empty.";
 
 export const IDEA_ADDITION =
   "This is only an idea. Build a first draft of the canon from it, and treat what you add as a draft for the creator to confirm.";
@@ -34,26 +34,46 @@ export const ReadFileResultSchema = z.object({
   label: z.string().min(1),
 });
 
+/**
+ * Optional model text. The JSON schema marks these nullable and required,
+ * so the model always returns the key; a null reads as the default.
+ */
+const optionalText = () =>
+  z
+    .string()
+    .nullish()
+    .transform((value) => value ?? "");
+
 export const ReadCharacterSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  canon: z.string().default(""),
-  artFile: z.string().default(""),
+  canon: optionalText(),
+  artFile: optionalText(),
 });
 
 export const ReadLocationSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  description: z.string().default(""),
+  description: optionalText(),
 });
 
 export const ReadPartSchema = z.object({
   id: z.string().min(1),
   order: z.number().int().positive(),
   title: z.string().min(1),
-  summary: z.string().default(""),
-  excerpt: z.string().default(""),
-  artFile: z.string().default(""),
+  summary: optionalText(),
+  excerpt: optionalText(),
+  /** Verbatim passage of the source that belongs to this part. */
+  text: optionalText(),
+  artFile: optionalText(),
+});
+
+export const ReadFactSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  /** Empty when the material does not state it yet. */
+  value: optionalText(),
+  source: z.enum(["material", "muse", "you"]),
 });
 
 export const ReadGapSchema = z.object({
@@ -63,11 +83,12 @@ export const ReadGapSchema = z.object({
 
 export const ReadModelOutputSchema = z.object({
   title: z.string().min(1),
-  logline: z.string().default(""),
+  logline: optionalText(),
   files: z.array(ReadFileResultSchema).default([]),
   characters: z.array(ReadCharacterSchema).default([]),
   locations: z.array(ReadLocationSchema).default([]),
   parts: z.array(ReadPartSchema).default([]),
+  facts: z.array(ReadFactSchema).default([]),
   gaps: z.array(ReadGapSchema).default([]),
 });
 
@@ -153,13 +174,18 @@ export function buildReadInput(
   return [{ role: "user", content: buildReadContent(files, idea, instruction) }];
 }
 
-/** JSON Schema twin of the read model output, sent as the response format. */
+/**
+ * JSON Schema twin of the read model output, sent as the response format.
+ * Every property is required; optional text is nullable so the model
+ * returns the key with null instead of dropping it.
+ */
 export function readModelJsonSchema(): Record<string, unknown> {
+  const optional = { type: ["string", "null"] };
   return {
     type: "object",
     properties: {
       title: { type: "string" },
-      logline: { type: "string" },
+      logline: optional,
       files: {
         type: "array",
         items: {
@@ -183,8 +209,8 @@ export function readModelJsonSchema(): Record<string, unknown> {
           properties: {
             id: { type: "string" },
             name: { type: "string" },
-            canon: { type: "string" },
-            artFile: { type: "string" },
+            canon: optional,
+            artFile: optional,
           },
           required: ["id", "name", "canon", "artFile"],
           additionalProperties: false,
@@ -197,7 +223,7 @@ export function readModelJsonSchema(): Record<string, unknown> {
           properties: {
             id: { type: "string" },
             name: { type: "string" },
-            description: { type: "string" },
+            description: optional,
           },
           required: ["id", "name", "description"],
           additionalProperties: false,
@@ -211,11 +237,37 @@ export function readModelJsonSchema(): Record<string, unknown> {
             id: { type: "string" },
             order: { type: "integer", minimum: 1 },
             title: { type: "string" },
-            summary: { type: "string" },
-            excerpt: { type: "string" },
-            artFile: { type: "string" },
+            summary: optional,
+            excerpt: optional,
+            text: optional,
+            artFile: optional,
           },
-          required: ["id", "order", "title", "summary", "excerpt", "artFile"],
+          required: [
+            "id",
+            "order",
+            "title",
+            "summary",
+            "excerpt",
+            "text",
+            "artFile",
+          ],
+          additionalProperties: false,
+        },
+      },
+      facts: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            label: { type: "string" },
+            value: optional,
+            source: {
+              type: "string",
+              enum: ["material", "muse"],
+            },
+          },
+          required: ["id", "label", "value", "source"],
           additionalProperties: false,
         },
       },
@@ -239,6 +291,7 @@ export function readModelJsonSchema(): Record<string, unknown> {
       "characters",
       "locations",
       "parts",
+      "facts",
       "gaps",
     ],
     additionalProperties: false,

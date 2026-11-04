@@ -23,6 +23,7 @@ export function backFor(pathname: string): string | null {
   ) {
     return `/projects/${id}/channels`;
   }
+  if (page === "canon") return `/projects/${id}/story`;
   if (page === "script") return `/projects/${id}/story`;
   if (page === "storyboard") return `/projects/${id}/script`;
   if (page === "video") return `/projects/${id}/script`;

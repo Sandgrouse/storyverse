@@ -107,6 +107,12 @@ export function buildWorld(
       secret: "",
       imagePath: "",
     })),
+    facts: (canon.facts ?? []).map((fact) => ({
+      id: fact.id,
+      label: fact.label,
+      value: fact.value,
+      source: fact.source,
+    })),
     parts: orderedParts.map((part) => {
       const fromBeats = beatsByPart.get(part.id) ?? [];
       const fromText = characterIdsForPartText(
@@ -121,6 +127,7 @@ export function buildWorld(
         title: part.title,
         summary: part.summary,
         excerpt: part.excerpt,
+        text: part.text,
         imagePath: part.artFile ? imageForFile(part.artFile) : "",
         tint: tintForPart(part.order),
         characterIds,

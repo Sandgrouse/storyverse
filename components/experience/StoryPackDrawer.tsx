@@ -76,7 +76,7 @@ export default function StoryPackDrawer({
                 ((json as Record<string, { message?: unknown }>).error as { message?: unknown }).message ??
                   "The story pack failed.",
               )
-            : "The story pack failed.";
+            : "The scene notes failed.";
         setState({ kind: "error", message });
         return;
       }
@@ -84,7 +84,7 @@ export default function StoryPackDrawer({
       onWorld(upsertPack(world, { ...output, partId, channelId }));
       setState({ kind: "idle" });
     } catch {
-      setState({ kind: "error", message: "The story pack failed." });
+      setState({ kind: "error", message: "The scene notes failed." });
     }
   };
 
@@ -97,6 +97,38 @@ export default function StoryPackDrawer({
       setState({ kind: "error", message: "Copy failed." });
     }
   };
+
+  const sections: Array<{
+    title: string;
+    blurb: string;
+    body: string[] | null;
+    empty: string;
+  }> = [
+    {
+      title: "Scene outline",
+      blurb: "The beats of the scene in order, in this screen's voice.",
+      body: pack ? [pack.script] : null,
+      empty: "",
+    },
+    {
+      title: "Shot ideas",
+      blurb: "What to show, in plain words.",
+      body: pack ? pack.shots : null,
+      empty: "",
+    },
+    {
+      title: "Posts",
+      blurb: "Short lines to share while the scene is out.",
+      body: pack ? pack.posts : null,
+      empty: "",
+    },
+    {
+      title: "Reveals",
+      blurb: "What this screen lets the audience learn, and when.",
+      body: pack ? pack.reveals : null,
+      empty: "Nothing new is revealed in this piece.",
+    },
+  ];
 
   const download = () => {
     if (!pack) return;
@@ -122,16 +154,12 @@ export default function StoryPackDrawer({
       >
         Close
       </button>
-      <div className="kicker">Story Pack</div>
+      <div className="kicker">Scene notes</div>
       <h2>{part?.title ?? ""}</h2>
-      {part?.imagePath && (
-        <div
-          className="packart"
-          style={{ backgroundImage: `url(${part.imagePath})` }}
-          role="img"
-          aria-label={`Art for ${part.title}`}
-        />
-      )}
+      <p style={{ color: "var(--soft)", fontSize: 14, marginTop: 8 }}>
+        Working notes for this scene, written for one screen at a time. Pick
+        the screen, then ask Muse.
+      </p>
       <div className="castlist">
         {covering.map((channel) => (
           <button
@@ -148,7 +176,7 @@ export default function StoryPackDrawer({
           </button>
         ))}
       </div>
-      <div style={{ marginTop: 12 }}>
+      <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <button
           type="button"
           className="pill"
@@ -156,59 +184,10 @@ export default function StoryPackDrawer({
           disabled={!channelId || state.kind === "working"}
           tabIndex={open ? 0 : -1}
         >
-          {state.kind === "working" ? "Writing…" : pack ? "Regenerate" : "Generate"}
+          {state.kind === "working" ? "Writing…" : pack ? "Regenerate" : "Write the notes"}
         </button>
-      </div>
-      {state.kind === "error" && (
-        <div className="artstate" role="status">
-          <p>{state.message}</p>
-          <button
-            type="button"
-            className="quiet"
-            onClick={() => void generate()}
-            tabIndex={open ? 0 : -1}
-          >
-            Retry
-          </button>
-        </div>
-      )}
-      {pack && (
-        <div className="packbody">
-          <small>Script</small>
-          <p>{pack.script}</p>
-          <small>Shots</small>
-          <ul>
-            {pack.shots.map((shot, i) => (
-              <li key={i}>{shot}</li>
-            ))}
-          </ul>
-          <small>Posts</small>
-          <ul>
-            {pack.posts.map((post, i) => (
-              <li key={i}>{post}</li>
-            ))}
-          </ul>
-          <small>Reveals</small>
-          {pack.reveals.length > 0 ? (
-            <ul>
-              {pack.reveals.map((reveal, i) => (
-                <li key={i}>{reveal}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>Nothing new is revealed in this piece.</p>
-          )}
-          <small>Additions</small>
-          {pack.additions.length > 0 ? (
-            <ul>
-              {pack.additions.map((addition, i) => (
-                <li key={i}>{addition}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>Nothing invented: everything above is canon.</p>
-          )}
-          <div className="acts">
+        {pack && (
+          <>
             <button
               type="button"
               className="quiet"
@@ -225,8 +204,60 @@ export default function StoryPackDrawer({
             >
               Download .md
             </button>
-          </div>
+          </>
+        )}
+      </div>
+      <p className="hint" style={{ color: "var(--soft)", fontSize: 13, marginTop: 12 }}>
+        Uses only what that screen is allowed to know.
+      </p>
+      {state.kind === "error" && (
+        <div className="artstate" role="status">
+          <p>{state.message}</p>
+          <button
+            type="button"
+            className="quiet"
+            onClick={() => void generate()}
+            tabIndex={open ? 0 : -1}
+          >
+            Retry
+          </button>
         </div>
+      )}
+      <div className="notewhat">
+        {sections.map((section) => (
+          <div className="notew" key={section.title}>
+            <b>{section.title}</b>
+            <p>{section.blurb}</p>
+            {section.body === null ? (
+              <>
+                <div className="sk" />
+                <div className="sk" />
+                <div className="sk" />
+              </>
+            ) : section.body.length > 0 ? (
+              section.title === "Scene outline" ? (
+                <p style={{ color: "var(--ink)", marginTop: 10 }}>{section.body[0]}</p>
+              ) : (
+                <ul>
+                  {section.body.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              )
+            ) : (
+              <p>{section.empty}</p>
+            )}
+          </div>
+        ))}
+        <div className="notew" style={{ gridColumn: "1 / -1", background: "transparent", border: "1.5px dashed rgba(31,27,22,.25)", boxShadow: "none" }}>
+          <b>Want the full script or a storyboard?</b>
+          <p>Use Script for the scene itself and Storyboard to see it shot by shot. Notes are the quick planning page.</p>
+        </div>
+      </div>
+      {pack && pack.additions.length > 0 && (
+        <p className="hint" style={{ color: "var(--soft)", fontSize: 13, marginTop: 12 }}>
+          Suggested additions: {pack.additions.join(" ")}
+        </p>
       )}
     </div>
   );

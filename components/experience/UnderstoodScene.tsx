@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { World } from "@/lib/world/schemas";
+import type { Fact, World } from "@/lib/world/schemas";
+
+const SOURCE_LINE: Record<Fact["source"], string> = {
+  material: "From your treatment",
+  muse: "My reading",
+  you: "You edited this",
+};
 
 type Props = {
   active?: boolean;
@@ -15,6 +21,21 @@ export default function UnderstoodScene({ active = true, world, onWorld, onAddMa
   const [handled, setHandled] = useState<string[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [editingFact, setEditingFact] = useState<string | null>(null);
+  const [factDraft, setFactDraft] = useState("");
+
+  const saveFact = (factId: string) => {
+    const value = factDraft.trim();
+    if (!value) return;
+    onWorld({
+      ...world,
+      facts: world.facts.map((fact) =>
+        fact.id === factId ? { ...fact, value, source: "you" as const } : fact,
+      ),
+    });
+    setEditingFact(null);
+    setFactDraft("");
+  };
   // The left page shows the first available art from any file. With no
   // art at all it is a tinted plate with the story's title.
   const art = [
@@ -96,6 +117,121 @@ export default function UnderstoodScene({ active = true, world, onWorld, onAddMa
               <span key={l.id}>{l.name}</span>
             ))}
           </div>
+          {world.facts.length > 0 && (
+            <div className="facts">
+              {world.facts.map((fact) =>
+                fact.value.trim().length === 0 ? (
+                  <div className="fact miss" key={fact.id}>
+                    <small>{fact.label}</small>
+                    <p>Not in your material yet</p>
+                    {editingFact === fact.id ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          saveFact(fact.id);
+                        }}
+                        style={{ display: "flex", gap: 8, marginTop: 6 }}
+                      >
+                        <input
+                          aria-label={`Add ${fact.label}`}
+                          placeholder={fact.label}
+                          autoComplete="off"
+                          value={factDraft}
+                          onChange={(e) => setFactDraft(e.target.value)}
+                        />
+                        <button
+                          type="submit"
+                          className="quiet"
+                          disabled={!factDraft.trim()}
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          className="quiet"
+                          onClick={() => {
+                            setEditingFact(null);
+                            setFactDraft("");
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingFact(fact.id);
+                          setFactDraft("");
+                        }}
+                      >
+                        Add
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    className={`fact${fact.value.length > 70 ? " wide" : ""}`}
+                    key={fact.id}
+                  >
+                    <small>
+                      {fact.label}
+                      {editingFact !== fact.id && (
+                        <button
+                          type="button"
+                          className="edit"
+                          onClick={() => {
+                            setEditingFact(fact.id);
+                            setFactDraft(fact.value);
+                          }}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </small>
+                    {editingFact === fact.id ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          saveFact(fact.id);
+                        }}
+                        style={{ display: "flex", gap: 8, marginTop: 6 }}
+                      >
+                        <input
+                          aria-label={`Edit ${fact.label}`}
+                          autoComplete="off"
+                          value={factDraft}
+                          onChange={(e) => setFactDraft(e.target.value)}
+                        />
+                        <button
+                          type="submit"
+                          className="quiet"
+                          disabled={!factDraft.trim()}
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          className="quiet"
+                          onClick={() => {
+                            setEditingFact(null);
+                            setFactDraft("");
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <p>{fact.value}</p>
+                        <span className="src">{SOURCE_LINE[fact.source]}</span>
+                      </>
+                    )}
+                  </div>
+                ),
+              )}
+            </div>
+          )}
           {world.gaps.map((gap) => (
             <div className="gq" key={gap.id}>
               <div className="kicker" style={{ margin: 0 }}>

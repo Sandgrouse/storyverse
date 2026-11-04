@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type {
   Part,
   RippleDecision,
@@ -722,7 +723,8 @@ export default function WorldScene({ active = true, world, onWorld, drawer: cont
           )}
         </div>
         <div className="side">
-          <button onClick={() => setDrawer("story")}>Story Pack</button>
+          <button onClick={() => setDrawer("story")}>Scene notes</button>
+          <Link className="sidebtn" href={`/projects/${liveWorld.id}/canon`}>Canon</Link>
           {!part.imagePath &&
             (sceneState.kind === "working" ? (
               <button disabled>Making the art…</button>

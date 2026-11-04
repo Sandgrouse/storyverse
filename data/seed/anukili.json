@@ -107,6 +107,7 @@
       "title": "The Omen",
       "summary": "A boy is born in Aguleri legs first, with upper and lower teeth, clutching roots and herbs in both hands. His father calls it an abomination.",
       "excerpt": "He cannot cry until he is seven years old, and then only three times a day: at midnight, in the morning and in the evening. When he cries, animals take to their heels.",
+      "text": "A boy is born in Aguleri legs first, with upper and lower teeth, clutching roots and herbs in both hands. His father calls it an abomination, and in his rage decides to kill the baby on the fourth day. The child lives. He cannot cry until he is seven years old, and then only three times a day: at midnight, in the morning and in the evening. When he cries, animals take to their heels.",
       "imagePath": "/anukili/roots.webp",
       "tint": "#e9e0ce",
       "characterIds": ["anukili-ugama", "anukilis-father"]
@@ -117,6 +118,7 @@
       "title": "The Weight",
       "summary": "Anukili becomes a leader with no training at all. He eats the food meant for thirty men, and anything he touches comes crashing to the ground.",
       "excerpt": "Enyinyi, his confidant and medicine man, stays at his side.",
+      "text": "Anukili becomes a leader with no training at all. He eats the food meant for thirty men. Anything he touches comes crashing to the ground. Enyinyi, his confidant and medicine man, stays at his side.",
       "imagePath": "/anukili/anukili.webp",
       "imagePosition": "50% 0%",
       "tint": "#e5dccf",
@@ -128,6 +130,7 @@
       "title": "The Stream",
       "summary": "A hippopotamus starts attacking people at the stream. Anukili asks if they're sure it's a hippopotamus, and calls it tiny.",
       "excerpt": "He tells them to show him where it waits, then he kills it.",
+      "text": "A hippopotamus starts attacking people at the stream. Anukili asks if they're sure it's a hippopotamus, and calls it tiny. He tells them to show him where it waits, then he kills it. Aguleri has its hero.",
       "imagePath": "/anukili/hippo.webp",
       "imagePosition": "32% 32%",
       "tint": "#dbe4e0",
@@ -139,6 +142,7 @@
       "title": "The Pots",
       "summary": "At thirty, Anukili turns on his own people in Eziagulu. No quantity of water satisfies him, so he snatches the women's water pots and breaks them with one finger.",
       "excerpt": "One night they run across the Omabala to escape him. He finds them, and they run back across the river to endure him again.",
+      "text": "At thirty, Anukili turns on his own people in Eziagulu. He boasts that no man can kill him, and takes for himself the powers of the supreme being and the ancestors. No quantity of water satisfies him, so he snatches the women's water pots and breaks them with one finger. He threatens and beats people, and many die. One night they run across the Omabala to escape him. He finds them, and they run back across the river to endure him again.",
       "imagePath": "/anukili/pots.webp",
       "tint": "#ecd9c9",
       "characterIds": ["anukili-ugama", "people-of-eziagulu"]
@@ -149,6 +153,7 @@
       "title": "The Fire",
       "summary": "Owl's droppings blind Anukili, and Enyinyi's herbs restore his sight. But the people of Eziagulu have vowed to kill him. Their first plan fails. Their next puts burning fire on his head.",
       "excerpt": "The people are in ecstasy. They can't believe their eyes. So Anukili could die after all?",
+      "text": "Owl's droppings blind Anukili. Enyinyi's herbs restore his sight, and Anukili shouts that Enyinyi is a man of God, the first time he has ever spoken of God. But the people of Eziagulu have vowed to kill him. Their first plan fails. Their next puts burning fire on his head, and he dies. The people are in ecstasy. They can't believe their eyes. So Anukili could die after all?",
       "imagePath": "/anukili/fire.webp",
       "tint": "#e8d6c6",
       "characterIds": ["anukili-ugama", "enyinyi", "people-of-eziagulu"]
@@ -273,5 +278,16 @@
   "gaps": [
     { "id": "gap-lived", "question": "Why did the baby live past the fourth day?" },
     { "id": "gap-plan", "question": "Who came up with the plan that finally worked?" }
+  ],
+  "facts": [
+    { "id": "fact-kind", "label": "Kind of story", "value": "Myth retold as fiction", "source": "material" },
+    { "id": "fact-genre", "label": "Genre", "value": "Mythic tragedy", "source": "muse" },
+    { "id": "fact-where", "label": "Where", "value": "Aguleri, with its stream and the Omabala River", "source": "material" },
+    { "id": "fact-when", "label": "When", "value": "A mythic past, before anyone wrote anything down", "source": "material" },
+    { "id": "fact-tone", "label": "Tone", "value": "Dark, mythic, fearful", "source": "muse" },
+    { "id": "fact-told-as", "label": "Told as", "value": "A series, a game and shorts", "source": "material" },
+    { "id": "fact-themes", "label": "Themes", "value": "Power without limit · A hero who turns on his own people · Whether the mighty can fall", "source": "muse" },
+    { "id": "fact-audience", "label": "Who it's for", "value": "", "source": "muse" },
+    { "id": "fact-voice", "label": "Language and voice", "value": "", "source": "muse" }
   ]
 }

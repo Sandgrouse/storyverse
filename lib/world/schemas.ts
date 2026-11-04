@@ -51,7 +51,26 @@ export const LocationSchema = z.object({
   description: z.string(),
 });
 
-export const ChannelKindSchema = z.enum(["game", "series", "shorts", "press"]);
+export const ChannelKindSchema = z.enum([
+  "game",
+  "series",
+  "shorts",
+  "press",
+  "film",
+  "website",
+  "ad",
+  "other",
+]);
+
+export const FactSourceSchema = z.enum(["material", "muse", "you"]);
+
+/** One story basic: an empty value means "not in your material yet". */
+export const FactSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  value: z.string().default(""),
+  source: FactSourceSchema,
+});
 
 export const ChannelSchema = z.object({
   id: z.string(),
@@ -70,6 +89,8 @@ export const PartSchema = z.object({
   title: z.string(),
   summary: z.string(),
   excerpt: z.string(),
+  /** Verbatim passage of the source that belongs to this part. */
+  text: z.string().default(""),
   imagePath: z.string().default(""),
   /** CSS background-position for this part's art, from the seed data. */
   imagePosition: z.string().default(""),
@@ -191,6 +212,7 @@ export const WorldSchema = z.object({
   beats: z.array(BeatSchema),
   secrets: z.array(SecretSchema),
   gaps: z.array(GapSchema),
+  facts: z.array(FactSchema).default([]),
   packs: z.array(PackSchema).default([]),
   scripts: z.array(ScriptEntrySchema).default([]),
   shorts: z.array(ShortSchema).default([]),
@@ -243,6 +265,8 @@ export type SheetView = z.infer<typeof SheetViewSchema>;
 export type VoiceConsent = z.infer<typeof VoiceConsentSchema>;
 export type CharacterVoice = z.infer<typeof CharacterVoiceSchema>;
 export type CharacterLine = z.infer<typeof CharacterLineSchema>;
+export type FactSource = z.infer<typeof FactSourceSchema>;
+export type Fact = z.infer<typeof FactSchema>;
 export type Character = z.infer<typeof CharacterSchema>;
 export type Location = z.infer<typeof LocationSchema>;
 export type ChannelKind = z.infer<typeof ChannelKindSchema>;

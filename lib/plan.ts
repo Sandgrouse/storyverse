@@ -5,10 +5,14 @@ export const PLAN_INSTRUCTIONS =
   "You plan how one story spreads across channels. Propose three channels unless the material names others. Give each channel its own piece of the story, so that each holds at least one secret the others don't, and fans must follow several to get the whole truth. Every channel must hold at least one secret. A secret's knownThrough lists the ids of the channels in this same response. name is one plain word for the format, such as Series, Game or Shorts. title is the name of the work. Every part must appear in at least one channel. Beat content is two to four sentences. Invented secrets are additions: keep them consistent with the canon, and never change a name or an established detail. An invented secret is a suggestion for the creator. Never answer a question the material deliberately leaves open if it is listed as a gap: leave it open and make that the secret. A pitch is under 15 words. A secret is under 15 words.";
 
 export const PlanChannelKindSchema = z.enum([
-  "series",
   "game",
+  "series",
   "shorts",
   "press",
+  "film",
+  "website",
+  "ad",
+  "other",
 ]);
 
 export const PlanChannelSchema = z.object({
@@ -91,6 +95,17 @@ export const PlanCanonSchema = z.object({
         title: z.string().min(1),
         summary: z.string().default(""),
         excerpt: z.string().default(""),
+        text: z.string().default(""),
+      }),
+    )
+    .default([]),
+  facts: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        label: z.string().min(1),
+        value: z.string().default(""),
+        source: z.enum(["material", "muse", "you"]).default("muse"),
       }),
     )
     .default([]),
@@ -240,9 +255,17 @@ export function planModelInput(canon: ReadModelOutput): string {
   lines.push("Parts:");
   const ordered = [...canon.parts].sort((a, b) => a.order - b.order);
   for (const part of ordered) {
+    const passage = "text" in part && typeof part.text === "string" && part.text.length > 0 ? ` ${part.text}` : "";
     lines.push(
-      `- ${part.title} (${part.id}, part ${part.order}): ${part.summary} ${part.excerpt}`,
+      `- ${part.title} (${part.id}, part ${part.order}): ${part.summary} ${part.excerpt}${passage}`,
     );
+  }
+  if ("facts" in canon && Array.isArray(canon.facts) && canon.facts.length > 0) {
+    lines.push("");
+    lines.push("Story basics:");
+    for (const fact of canon.facts as Array<{ label: string; value: string }>) {
+      lines.push(`- ${fact.label}: ${fact.value}`);
+    }
   }
   lines.push("");
   lines.push("Gaps:");
@@ -281,7 +304,16 @@ export function planModelJsonSchema(canon: ReadModelOutput): Record<string, unkn
             name: { type: "string" },
             kind: {
               type: "string",
-              enum: ["series", "game", "shorts", "press"],
+              enum: [
+                "game",
+                "series",
+                "shorts",
+                "press",
+                "film",
+                "website",
+                "ad",
+                "other",
+              ],
             },
             title: { type: "string" },
             pitch: { type: "string" },
