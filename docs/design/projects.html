@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your projects prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#efe8db; --sheet:#fbf8f1; --ink:#1f1b16; --soft:#6f675a; --rule:rgba(31,27,22,.13); --clay:#c64f26; --serif:"Newsreader",Georgia,serif; --sans:"Instrument Sans",system-ui,sans-serif; --lift:0 24px 50px -18px rgba(50,35,15,.45),0 4px 12px rgba(50,35,15,.12); --ease:cubic-bezier(.2,.75,.12,1); }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 var(--sans); }
+a { color:inherit; text-decoration:none; }
+button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+:focus-visible { outline:2px solid var(--clay); outline-offset:3px; }
+.bar { height:76px; padding:0 34px; display:flex; align-items:center; gap:22px; }
+.logo { font:400 22px var(--serif); }
+.quiet { color:var(--soft); } .quiet:hover { color:var(--ink); }
+.here { color:var(--ink); }
+main { max-width:1240px; margin:0 auto; padding:34px 34px 70px; }
+.head { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:34px; }
+h1 { margin:0; font:300 clamp(42px,4.6vw,66px)/1.04 var(--serif); letter-spacing:-.018em; }
+.note { color:var(--soft); margin-top:6px; }
+.pill { display:inline-flex; align-items:center; height:48px; padding:0 24px; border-radius:99px; background:var(--ink); color:var(--sheet); font-weight:500; white-space:nowrap; transition:transform .25s var(--ease),background .25s; }
+.pill:hover { transform:translateY(-2px); background:#000; }
+.pill.light { background:var(--sheet); color:var(--ink); box-shadow:0 1px 0 var(--rule),0 6px 18px -8px rgba(50,35,15,.3); }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:28px 26px; }
+.story { position:relative; }
+.cover { display:block; aspect-ratio:4/3; border-radius:10px; background-size:cover; background-position:center; box-shadow:var(--lift); transition:transform .4s var(--ease); }
+.story:hover .cover { transform:translateY(-5px) rotate(-.6deg); }
+.none { background:#e5dccf; display:flex; align-items:center; justify-content:center; font:300 26px var(--serif); color:var(--soft); }
+.meta { display:flex; justify-content:space-between; gap:12px; margin-top:14px; }
+h2 { margin:0; font:400 22px/1.2 var(--serif); }
+.sub { color:var(--soft); font-size:13.5px; }
+.tag { margin-left:6px; padding:1px 8px; border-radius:99px; background:rgba(198,79,38,.13); color:var(--clay); font-size:11.5px; }
+.act { color:var(--soft); font-size:13.5px; height:24px; opacity:.75; }
+.act:hover { color:var(--clay); opacity:1; }
+.new { display:flex; flex-direction:column; align-items:center; justify-content:center; aspect-ratio:4/3; border:1.5px dashed var(--rule); border-radius:10px; font:300 26px var(--serif); transition:background .25s; }
+.new:hover { background:rgba(251,248,241,.6); }
+dialog { border:0; border-radius:14px; padding:28px; width:min(440px,calc(100vw - 32px)); background:var(--sheet); color:var(--ink); box-shadow:var(--lift); }
+dialog::backdrop { background:rgba(31,27,22,.35); }
+dialog h3 { margin:0 0 8px; font:400 26px/1.15 var(--serif); }
+dialog p { margin:0 0 22px; color:var(--soft); }
+.btns { display:flex; justify-content:flex-end; gap:10px; }
+.danger { background:var(--clay); } .danger:hover { background:#a93f1c; }
+@media (max-width:640px) { .bar { padding:0 16px; } main { padding:16px 16px 50px; } .head { flex-direction:column; align-items:flex-start; } }
+</style>
+</head>
+<body>
+<header class="bar"><a class="logo" href="landing.html">Storyverse</a><a class="quiet here" href="projects.html">Your projects</a></header>
+<main>
+  <div class="head">
+    <div><h1>Your projects</h1><div class="note">Saved in this browser.</div></div>
+    <a class="pill" href="#">New story</a>
+  </div>
+  <div class="grid">
+    <article class="story">
+      <a class="cover" href="#" style="background-image:url(anukili/roots.webp)" aria-label="Open Anukili Ugama"></a>
+      <div class="meta"><div><h2>Anukili Ugama<span class="tag">Sample</span></h2><div class="sub">Edited 2 minutes ago</div></div><button class="act" data-t="Reset the sample?" data-p="This removes your changes to the sample and restores the original." data-y="Reset sample" data-n="Keep my changes">Reset sample</button></div>
+    </article>
+    <article class="story">
+      <a class="cover none" href="#">A new story</a>
+      <div class="meta"><div><h2>Example story</h2><div class="sub">Edited yesterday</div></div><button class="act" data-t="Delete Example story?" data-p="This removes the story and its images from this browser. This can't be undone." data-y="Delete story" data-n="Keep story">Delete</button></div>
+    </article>
+    <a class="new" href="#">+ New story</a>
+  </div>
+</main>
+<dialog id="d"><h3></h3><p></p><div class="btns"><button class="pill light" id="n"></button><button class="pill danger" id="y"></button></div></dialog>
+<script>
+const d = document.getElementById("d");
+document.querySelectorAll(".act").forEach(b => b.onclick = () => {
+  d.querySelector("h3").textContent = b.dataset.t; d.querySelector("p").textContent = b.dataset.p;
+  document.getElementById("y").textContent = b.dataset.y; document.getElementById("n").textContent = b.dataset.n; d.showModal();
+});
+document.getElementById("y").onclick = document.getElementById("n").onclick = () => d.close();
+</script>
+</body>
+</html>
