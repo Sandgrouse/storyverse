@@ -642,8 +642,8 @@ p {
   position: absolute;
   left: 30%;
   right: 34px;
-  top: 96px;
-  height: calc(100% - 350px);
+  top: 140px;
+  height: calc(100% - 394px);
   background: var(--sheet);
   border-radius: 6px;
   box-shadow: 0 30px 60px -30px rgba(50, 35, 15, 0.35);
@@ -1053,7 +1053,7 @@ p {
   position: absolute;
   left: 34px;
   right: 454px;
-  top: 96px;
+  top: 140px;
   opacity: 0;
   transition: opacity 0.7s 0.2s;
   pointer-events: none;

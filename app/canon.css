@@ -621,12 +621,14 @@
   color: var(--clay);
 }
 
-/* Story page Timeline/Book switch: a quiet pill pinned to the top,
-   clear of the change bar and the book page below it. */
+/* Story page Timeline/Book switch: its own reserved row directly under
+   the top bar (at least 12px clear above and below the pill). Timeline and
+   Book content both start below this row, so nothing overlaps the switch,
+   the top bar or the page card. */
 
 .viewswitch {
   position: absolute;
-  top: 68px;
+  top: 92px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 9;
@@ -652,6 +654,24 @@
 .viewswitch button.on {
   background: var(--ink);
   color: var(--sheet);
+}
+
+/* In the Story Book view the switch owns the reserved row under the top
+   bar (92px, at least 12px clear of it). The three book columns start below
+   that row: the pill is about 30px tall, so 140px leaves 12px+ clear below
+   it, and the column heights shrink by the same shift. */
+#world.bookview .canonbook {
+  padding-top: 140px;
+}
+
+#world.bookview .canon-toc,
+#world.bookview .canon-side {
+  top: 140px;
+  max-height: calc(100vh - 166px);
+}
+
+#world.bookview .canon-book {
+  min-height: calc(100vh - 166px);
 }
 
 /* Understood page: the visual style card in the basics grid. */

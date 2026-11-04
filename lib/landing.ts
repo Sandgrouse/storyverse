@@ -472,6 +472,20 @@ export const HERO_IMAGES: string[] = HERO_CARD_IDS.map(
   (id) => CARDS.find((card) => card.id === id)!.src,
 );
 
+/**
+ * Whether the scroll engine must write an element's visibility this tick.
+ * The cache starts unknown (`undefined`), so the first tick always writes
+ * the real state — even when the element starts hidden in CSS and the first
+ * frame shows it. Later ticks write only on flips, keeping per-frame work
+ * to transform and opacity. Pure, so the engine and tests share it.
+ */
+export function syncVisibility(
+  cached: boolean | undefined,
+  shown: boolean,
+): boolean {
+  return cached !== shown;
+}
+
 export const BROWSER_URL = "your-story.storyverse";
 export const BROWSER_TITLE = "Anukili Ugama";
 export const BROWSER_SUB =

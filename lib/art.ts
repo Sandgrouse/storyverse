@@ -104,6 +104,49 @@ export function orderedSheetViews<T extends { view: string }>(sheet: T[]): T[] {
   });
 }
 
+/**
+ * Base sheet views still missing an image, in canonical order. Empty means
+ * the sheet is complete. Pure, so the drawer and tests share it.
+ */
+export function missingSheetViews(
+  sheet: Array<{ view: string; imagePath?: string | null }>,
+): string[] {
+  const have = new Set(
+    sheet.filter((entry) => entry.imagePath).map((entry) => entry.view),
+  );
+  return SHEET_VIEW_IDS.filter((id) => !have.has(id));
+}
+
+/** True when every base sheet view has an image. */
+export function isSheetComplete(
+  sheet: Array<{ view: string; imagePath?: string | null }>,
+): boolean {
+  return missingSheetViews(sheet).length === 0;
+}
+
+/**
+ * Wrap a sheet lightbox pose index past either end, so the arrows loop.
+ * Pure, so the lightbox and tests share it.
+ */
+export function wrapSheetIndex(index: number, count: number): number {
+  if (count <= 0) return 0;
+  return ((index % count) + count) % count;
+}
+
+/**
+ * Keyboard action for the sheet lightbox: arrows move between poses,
+ * Escape closes. Anything else is ignored. Pure, so the lightbox and
+ * tests share it.
+ */
+export function sheetLightboxKey(
+  key: string,
+): "next" | "prev" | "close" | null {
+  if (key === "Escape") return "close";
+  if (key === "ArrowRight") return "next";
+  if (key === "ArrowLeft") return "prev";
+  return null;
+}
+
 /** True when the sheet-view route may draw this view. */
 export function isSupportedSheetView(view: string): boolean {
   if (!view || view.length > 60) return false;

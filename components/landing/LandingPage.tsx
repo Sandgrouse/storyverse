@@ -40,6 +40,7 @@ import {
   segmentEase,
   smooth,
   stagger,
+  syncVisibility,
   videoPlayingAt,
   videoShotIndexAt,
   type CardRect,
@@ -243,16 +244,19 @@ export default function LandingPage() {
   const [coverInstant, setCoverInstant] = useState(false);
   // Boundary caches so per-frame writes stay transform and opacity only:
   // visibility, z-index and classes change only when their state flips.
+  // Every cache starts unknown: the markup renders hidden, so the first
+  // tick must write the real state even when it is "shown" (seeding `true`
+  // would skip that write and leave shown elements hidden on first paint).
   const vis = useRef({
     card: new Map<number, boolean>(),
     flag: new Map<number, boolean>(),
     copy: new Map<number, boolean>(),
     extra: new Map<number, boolean>(),
-    cap: false,
-    head: false,
-    hero: true,
-    close: false,
-    hint: true,
+    cap: undefined as boolean | undefined,
+    head: undefined as boolean | undefined,
+    hero: undefined as boolean | undefined,
+    close: undefined as boolean | undefined,
+    hint: undefined as boolean | undefined,
     round: -1,
     pulsed: false,
   });
@@ -519,7 +523,7 @@ export default function LandingPage() {
             const o = lerp(A.o, B.o, st);
             const shown = o >= 0.01;
             outer.style.opacity = String(o);
-            if ((v.card.get(card.id) ?? true) !== shown) {
+            if (syncVisibility(v.card.get(card.id), shown)) {
               v.card.set(card.id, shown);
               outer.style.visibility = shown ? "visible" : "hidden";
             }
@@ -542,7 +546,7 @@ export default function LandingPage() {
               gsap.set(flag, { x: cx - w / 2 + 10, y: cy - h / 2 + 10 });
               const fShown = Boolean(tag) && near && o >= 0.01;
               flag.style.opacity = fShown ? "1" : "0";
-              if ((v.flag.get(card.id) ?? true) !== fShown) {
+              if (syncVisibility(v.flag.get(card.id), fShown)) {
                 v.flag.set(card.id, fShown);
                 flag.style.visibility = fShown ? "visible" : "hidden";
               }
@@ -553,7 +557,7 @@ export default function LandingPage() {
               const so = clamp01(1 - Math.abs(s - PUBLISH_IDX) * 2.8);
               const sShown = so >= 0.01;
               secret.style.opacity = String(so);
-              if ((v.extra.get(100 + card.id) ?? true) !== sShown) {
+              if (syncVisibility(v.extra.get(100 + card.id), sShown)) {
                 v.extra.set(100 + card.id, sShown);
                 secret.style.visibility = sShown ? "visible" : "hidden";
               }
@@ -592,7 +596,7 @@ export default function LandingPage() {
             gsap.set(el, { y: -dist * 90 });
             el.style.opacity = String(o);
             const shown = o >= 0.01;
-            if ((v.copy.get(ch) ?? true) !== shown) {
+            if (syncVisibility(v.copy.get(ch), shown)) {
               v.copy.set(ch, shown);
               el.style.visibility = shown ? "visible" : "hidden";
             }
@@ -612,7 +616,7 @@ export default function LandingPage() {
             }
             el.style.opacity = String(o);
             const shown = o >= 0.01;
-            if ((v.extra.get(ch) ?? true) !== shown) {
+            if (syncVisibility(v.extra.get(ch), shown)) {
               v.extra.set(ch, shown);
               el.style.visibility = shown ? "visible" : "hidden";
             }
@@ -628,7 +632,7 @@ export default function LandingPage() {
             });
             cap.style.opacity = String(co);
             const shown = co >= 0.01;
-            if (v.cap !== shown) {
+            if (syncVisibility(v.cap, shown)) {
               v.cap = shown;
               cap.style.visibility = shown ? "visible" : "hidden";
             }
@@ -642,7 +646,7 @@ export default function LandingPage() {
             });
             head.style.opacity = String(ho);
             const shown = ho >= 0.01;
-            if (v.head !== shown) {
+            if (syncVisibility(v.head, shown)) {
               v.head = shown;
               head.style.visibility = shown ? "visible" : "hidden";
             }
@@ -653,7 +657,7 @@ export default function LandingPage() {
             const ho = clamp01(1 - s * 3.2);
             hero.style.opacity = String(ho);
             const shown = s <= 0.32;
-            if (v.hero !== shown) {
+            if (syncVisibility(v.hero, shown)) {
               v.hero = shown;
               hero.style.visibility = shown ? "visible" : "hidden";
             }
@@ -663,7 +667,7 @@ export default function LandingPage() {
             const ho = clamp01(1 - raw * 5);
             hint.style.opacity = String(ho);
             const shown = ho >= 0.01;
-            if (v.hint !== shown) {
+            if (syncVisibility(v.hint, shown)) {
               v.hint = shown;
               hint.style.visibility = shown ? "visible" : "hidden";
             }
@@ -673,7 +677,7 @@ export default function LandingPage() {
             const co = clamp01(1 - Math.abs(s - (N - 1)) * 3);
             close.style.opacity = String(co);
             const shown = co >= 0.01;
-            if (v.close !== shown) {
+            if (syncVisibility(v.close, shown)) {
               v.close = shown;
               close.style.visibility = shown ? "visible" : "hidden";
             }
