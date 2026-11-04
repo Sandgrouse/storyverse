@@ -4,7 +4,6 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { WorldSchema, type World } from "@/lib/world/schemas";
-import ArrivalScene from "@/components/experience/ArrivalScene";
 import IdeaScene from "@/components/experience/IdeaScene";
 import BringScene from "@/components/experience/BringScene";
 import ReadingScene from "@/components/experience/ReadingScene";
@@ -40,7 +39,6 @@ describe("experience scenes", () => {
     const world = await loadWorld();
     const noop = () => {};
     const scenes: Array<[string, React.ReactElement]> = [
-      ["arrival", <ArrivalScene active images={[]} onBring={noop} onIdea={noop} />],
       ["idea", <IdeaScene active idea="" onIdea={noop} onBegin={noop} />],
       ["bring", <BringScene active files={[]} onFiles={noop} seed={world} sample={false} onSample={noop} onRead={noop} />],
       ["reading", <ReadingScene files={[]} seed={world} sample onDone={noop} />],

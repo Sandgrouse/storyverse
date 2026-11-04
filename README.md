@@ -32,3 +32,5 @@ Without a key the app runs in sample mode: the seeded story stays fully browsabl
 ## Third-party
 
 This project uses `@meta-sam/parser` under the SAM License. See the license terms at [https://dev.meta.ai/](https://dev.meta.ai/).
+
+The scrolling landing page uses [GSAP](https://gsap.com/) (`gsap` and `@gsap/react`) under the GSAP Standard License (free of charge; see [https://gsap.com/standard-license](https://gsap.com/standard-license)) and [Lenis](https://lenis.darkroom.engineering/) (`lenis`) under the MIT License.

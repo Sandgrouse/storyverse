@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type PointerEvent } from "react";
 import { WorldSchema, type World } from "@/lib/world/schemas";
 import {
   deleteProject,
@@ -14,6 +14,11 @@ import {
 } from "@/lib/projects";
 import { loadImages } from "@/lib/images";
 import seedJson from "@/data/seed/anukili.json";
+import {
+  pointerRatio,
+  tiltBack,
+  tiltTo,
+} from "@/components/landing/effects";
 
 function seedWorld(): World {
   return WorldSchema.parse(seedJson);
@@ -28,8 +33,18 @@ function useEntries(): [ProjectEntry[] | null, () => void] {
   return [entries, () => setEntries(listEntries())];
 }
 
-function Cover({ entry }: { entry: ProjectEntry }) {
+function useFinePointer(): boolean {
+  const [fine] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(pointer: fine)").matches,
+  );
+  return fine;
+}
+
+function Cover({ entry, onOpen }: { entry: ProjectEntry; onOpen: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
+  const fine = useFinePointer();
   useEffect(() => {
     let live = true;
     if (!entry.cover) {
@@ -48,15 +63,28 @@ function Cover({ entry }: { entry: ProjectEntry }) {
       live = false;
     };
   }, [entry.id, entry.cover]);
+  const onMove = (e: PointerEvent<HTMLAnchorElement>) => {
+    const { px, py } = pointerRatio(e.currentTarget, e.clientX, e.clientY);
+    tiltTo(e.currentTarget, px, py);
+  };
+  const onLeave = (e: PointerEvent<HTMLAnchorElement>) => {
+    tiltBack(e.currentTarget);
+  };
   return (
-    <div
-      className="work-cover"
-      style={
-        url
-          ? { backgroundImage: `url(${url})` }
-          : { backgroundImage: "none", backgroundColor: "#e5dccf" }
-      }
-    />
+    <a
+      className={`cover${url ? "" : " none"}`}
+      href="#"
+      onClick={(e) => {
+        e.preventDefault();
+        onOpen();
+      }}
+      onPointerMove={fine ? onMove : undefined}
+      onPointerLeave={fine ? onLeave : undefined}
+      aria-label={`Open ${entry.title}`}
+      style={url ? { backgroundImage: `url(${url})` } : undefined}
+    >
+      {url ? null : entry.title}
+    </a>
   );
 }
 
@@ -81,11 +109,11 @@ function ConfirmDialog({
         <h2>{title}</h2>
         <p>{body}</p>
         <div className="confirm-acts">
-          <button type="button" className="pill" onClick={onConfirm}>
-            {confirmLabel}
-          </button>
-          <button type="button" className="quiet" onClick={onKeep}>
+          <button type="button" className="pill light" onClick={onKeep}>
             {keepLabel}
+          </button>
+          <button type="button" className="pill danger" onClick={onConfirm}>
+            {confirmLabel}
           </button>
         </div>
       </div>
@@ -110,41 +138,39 @@ export default function ProjectsPage() {
   return (
     <main className="library">
       <div className="library-head">
-        <h1>Your projects</h1>
+        <div>
+          <h1>Your projects</h1>
+          <div className="library-note">Saved in this browser.</div>
+        </div>
         <Link className="pill" href="/projects/new">
           New story
         </Link>
       </div>
-      <p className="library-sub">Saved in this browser.</p>
       <div className="library-grid">
         {(entries ?? []).map((entry) => (
-          <article key={entry.id} className="work">
-            <button
-              type="button"
-              onClick={() => openProject(entry)}
-              aria-label={`Open ${entry.title}`}
-              style={{ display: "contents" }}
-            >
-              <span style={{ display: "contents" }}>
-                <Cover entry={entry} />
-                <span className="work-body">
-                  <h2>{entry.title}</h2>
-                  <span className="work-meta">
-                    {entry.sample ? <span className="flag">Sample</span> : null}
-                    <span>{timeAgo(entry.updatedAt)}</span>
-                  </span>
-                </span>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="quiet work-del"
-              onClick={() => setConfirmId(entry.id)}
-            >
-              {entry.sample ? "Reset sample" : "Delete"}
-            </button>
+          <article key={entry.id} className="story">
+            <Cover entry={entry} onOpen={() => openProject(entry)} />
+            <div className="meta">
+              <div>
+                <h2>
+                  {entry.title}
+                  {entry.sample ? <span className="tag">Sample</span> : null}
+                </h2>
+                <div className="sub">{timeAgo(entry.updatedAt)}</div>
+              </div>
+              <button
+                type="button"
+                className="act"
+                onClick={() => setConfirmId(entry.id)}
+              >
+                {entry.sample ? "Reset sample" : "Delete"}
+              </button>
+            </div>
           </article>
         ))}
+        <Link className="library-new" href="/projects/new">
+          + New story
+        </Link>
       </div>
       {confirming ? (
         confirming.sample ? (
