@@ -15,6 +15,10 @@ import {
 
 export const VIDEO_FPS = 30;
 
+/** Shortest and longest a storyboard-cut shot may run, in seconds. */
+export const BOARD_SHOT_MIN_SEC = 3;
+export const BOARD_SHOT_MAX_SEC = 6;
+
 /** Frames shared between two shots for the crossfade. */
 export const VIDEO_CROSSFADE_FRAMES = 12;
 
@@ -254,6 +258,65 @@ export type PlannedShot = {
   /** Null from the model means no voice, same as missing. */
   voice?: { characterId: string; text: string } | null;
 };
+
+/** How long a storyboard-cut shot holds: longer text holds longer. */
+export function storyboardShotDuration(
+  action: string,
+  dialogue?: string,
+): number {
+  const said = dialogue?.trim() ?? "";
+  const length = `${action.trim()}${said.length > 0 ? ` ${said}` : ""}`.length;
+  if (length <= 60) return BOARD_SHOT_MIN_SEC;
+  if (length <= 110) return BOARD_SHOT_MIN_SEC + 1;
+  if (length <= 160) return BOARD_SHOT_MIN_SEC + 2;
+  return BOARD_SHOT_MAX_SEC;
+}
+
+/** One storyboard frame as cut input: only sketched frames cut. */
+export type BoardFrameShotSource = {
+  imagePath?: string;
+  action: string;
+  dialogue?: string;
+  characterIds: string[];
+};
+
+/**
+ * Build planned shots directly from storyboard frames, in order, with
+ * no model call: one slow push-in per sketched frame. Frames without a
+ * picture are skipped. The caption is the frame's action; the spoken
+ * line is the frame's dialogue, spoken by its first character, only
+ * when voices are on.
+ */
+export function shotsFromStoryboard(
+  frames: BoardFrameShotSource[],
+  options: { voices: boolean },
+): PlannedShot[] {
+  const shots: PlannedShot[] = [];
+  for (const frame of frames) {
+    const imagePath = frame.imagePath ?? "";
+    if (imagePath.length === 0) continue;
+    const caption = truncateCaption(frame.action ?? "");
+    if (caption.length === 0) continue;
+    const durationSec = storyboardShotDuration(
+      frame.action ?? "",
+      frame.dialogue,
+    );
+    const said = frame.dialogue?.trim() ?? "";
+    const characterId = frame.characterIds[0]?.trim() ?? "";
+    const voice =
+      options.voices && said.length > 0 && characterId.length > 0
+        ? { characterId, text: said }
+        : undefined;
+    shots.push({
+      imagePath,
+      caption,
+      durationSec,
+      motion: "push",
+      ...(voice ? { voice } : {}),
+    });
+  }
+  return shots;
+}
 
 /** Shorten a caption to 90 characters, cutting at a word boundary. */
 export function truncateCaption(caption: string): string {

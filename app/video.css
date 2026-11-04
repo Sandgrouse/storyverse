@@ -114,6 +114,38 @@
   grid-column: 2;
 }
 
+/* Cut-source choice bar above the player. */
+.video-cutbar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.video-cutbar .video-row {
+  align-items: center;
+  margin-top: 6px;
+}
+
+.video-cutbar .video-note {
+  margin-top: 4px;
+  text-align: center;
+}
+
+.video-cutbar label.video-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.video-cutbar .video-flag {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
 .video-framewrap {
   flex: 1;
   min-height: 0;

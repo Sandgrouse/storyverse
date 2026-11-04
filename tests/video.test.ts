@@ -26,6 +26,8 @@ import {
   shotObjectPosition,
   shotStartFrames,
   storyboardGuidance,
+  storyboardShotDuration,
+  shotsFromStoryboard,
   toPlannedShots,
   totalFrames,
   totalSeconds,
@@ -791,6 +793,89 @@ describe("shot framing", () => {
     expect(shotObjectPosition(false, false)).toBe("50% 50%");
     expect(shotObjectPosition(true, true)).toBe("50% 50%");
     expect(shotObjectPosition(false, true)).toBe("50% 50%");
+  });
+});
+
+describe("shots from storyboard frames", () => {
+  const SKETCH_A = "data:image/webp;base64,QUJD";
+  const SKETCH_B = "data:image/webp;base64,REVG";
+
+  function sketchedFrames() {
+    return [
+      {
+        imagePath: SKETCH_A,
+        action: "Ada reaches the water.",
+        dialogue: "I am here.",
+        characterIds: ["ada"],
+      },
+      {
+        imagePath: "",
+        action: "A frame with no picture yet.",
+        characterIds: ["ada"],
+      },
+      {
+        imagePath: SKETCH_B,
+        action: "The water rises around her.",
+        characterIds: ["ada"],
+      },
+    ];
+  }
+
+  it("keeps the frames in order and skips frames with no picture", () => {
+    const shots = shotsFromStoryboard(sketchedFrames(), { voices: true });
+    expect(shots).toHaveLength(2);
+    expect(shots[0]?.imagePath).toBe(SKETCH_A);
+    expect(shots[1]?.imagePath).toBe(SKETCH_B);
+  });
+
+  it("takes the caption from the frame's action", () => {
+    const shots = shotsFromStoryboard(sketchedFrames(), { voices: true });
+    expect(shots[0]?.caption).toBe("Ada reaches the water.");
+    expect(shots[1]?.caption).toBe("The water rises around her.");
+  });
+
+  it("holds longer text longer, from 3 to 6 seconds", () => {
+    const short = storyboardShotDuration("Ada looks up.");
+    const medium = storyboardShotDuration(
+      "Ada reaches the still water at dawn and kneels to drink.",
+      "I am here.",
+    );
+    const long = storyboardShotDuration(
+      `Ada walks beside the cold water while the ${"light ".repeat(30)}`.trim(),
+      "I have come so far to find you at last, hear me now.",
+    );
+    expect(short).toBe(3);
+    expect(long).toBe(6);
+    expect(medium).toBeGreaterThan(short);
+    expect(medium).toBeLessThan(long);
+    for (const shots of [
+      shotsFromStoryboard(sketchedFrames(), { voices: true }),
+    ]) {
+      for (const shot of shots) {
+        expect(shot.durationSec).toBeGreaterThanOrEqual(3);
+        expect(shot.durationSec).toBeLessThanOrEqual(6);
+      }
+    }
+  });
+
+  it("speaks the frame's dialogue as the voice line when voices are on", () => {
+    const shots = shotsFromStoryboard(sketchedFrames(), { voices: true });
+    expect(shots[0]?.voice).toEqual({
+      characterId: "ada",
+      text: "I am here.",
+    });
+    expect(shots[1]?.voice).toBeUndefined();
+  });
+
+  it("leaves every voice line off when voices are off", () => {
+    const shots = shotsFromStoryboard(sketchedFrames(), { voices: false });
+    expect(shots).toHaveLength(2);
+    expect(shots.every((shot) => shot.voice === undefined)).toBe(true);
+  });
+
+  it("pushes slowly into every storyboard shot", () => {
+    const shots = shotsFromStoryboard(sketchedFrames(), { voices: true });
+    expect(shots.every((shot) => shot.motion === "push")).toBe(true);
   });
 });
 

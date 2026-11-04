@@ -275,6 +275,25 @@ export function toPlannedFrames(
   return kept;
 }
 
+/**
+ * The character ids one board's sketches share, in first-appearance
+ * order, so every frame sends the same references in the same order
+ * and the same character looks the same. Falls back to the part's
+ * cast when the board names no one yet.
+ */
+export function boardReferenceIds(
+  board: Storyboard | null | undefined,
+  partCharacterIds: string[],
+): string[] {
+  const seen: string[] = [];
+  for (const frame of board?.frames ?? []) {
+    for (const id of frame.characterIds) {
+      if (!seen.includes(id)) seen.push(id);
+    }
+  }
+  return seen.length > 0 ? seen : [...partCharacterIds];
+}
+
 /** One storyboard per channel and part: the id is the pair. */
 export function storyboardIdFor(channelId: string, partId: string): string {
   return `${channelId}::${partId}`;

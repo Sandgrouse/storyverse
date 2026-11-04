@@ -18,9 +18,11 @@ import {
   type StoryboardFraming,
   type World,
 } from "@/lib/world/schemas";
+import { greyscaleSketchDataUrl } from "@/lib/sketch";
 import {
   STORYBOARD_FRAMINGS,
   STORYBOARD_PLAN_FAILED_MESSAGE,
+  boardReferenceIds,
   moveFrame,
   storyboardForScene,
   upsertStoryboard,
@@ -47,6 +49,23 @@ type SketchState =
       message: string;
       description: string;
     };
+
+type GreyAllState =
+  | { kind: "idle" }
+  | { kind: "working"; done: number; total: number }
+  | { kind: "error"; message: string };
+
+/**
+ * Flatten a fresh sketch to black and white in the browser. Falls back
+ * to the original when canvas cannot read it.
+ */
+async function blackAndWhite(dataUrl: string): Promise<string> {
+  try {
+    return await greyscaleSketchDataUrl(dataUrl);
+  } catch {
+    return dataUrl;
+  }
+}
 
 async function responseMessage(
   res: Response,
@@ -90,6 +109,7 @@ function StoryboardPageInner() {
   const [plan, setPlan] = useState<PlanState>({ kind: "idle" });
   const [sketchAll, setSketchAll] = useState<SketchAllState>({ kind: "idle" });
   const [sketch, setSketch] = useState<SketchState>({ kind: "idle" });
+  const [greyAll, setGreyAll] = useState<GreyAllState>({ kind: "idle" });
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const cancelRef = useRef(false);
@@ -248,10 +268,11 @@ function StoryboardPageInner() {
     if (!base || !part) {
       return { ok: false, kind: "error", message: "Sketching failed." };
     }
-    const ids =
-      frame.characterIds.length > 0
-        ? frame.characterIds
-        : (part.characterIds ?? []);
+    // Every frame on this board shares the same references in the same
+    // order, so the same character looks the same in every sketch.
+    const liveBoard =
+      storyboardForScene(base, channelId, partId) ?? board ?? null;
+    const ids = boardReferenceIds(liveBoard, part.characterIds ?? []);
     const references = await sceneReferences(base, ids);
     let styleImage: string | undefined;
     if (references.length === 0) {
@@ -289,7 +310,9 @@ function StoryboardPageInner() {
     const result = await requestSketch(frame, description);
     if (result.ok) {
       patchFrame(frameId, {
-        imagePath: `data:image/webp;base64,${result.imageBase64}`,
+        imagePath: await blackAndWhite(
+          `data:image/webp;base64,${result.imageBase64}`,
+        ),
       });
       setSketch({ kind: "idle" });
     } else if (result.kind === "blocked") {
@@ -329,7 +352,9 @@ function StoryboardPageInner() {
         return;
       }
       patchFrame(current.id, {
-        imagePath: `data:image/webp;base64,${result.imageBase64}`,
+        imagePath: await blackAndWhite(
+          `data:image/webp;base64,${result.imageBase64}`,
+        ),
       });
       setSketchAll({ kind: "working", done: i + 1, total: pending.length });
     }
@@ -339,6 +364,37 @@ function StoryboardPageInner() {
   const cancelSketchAll = () => {
     cancelRef.current = true;
     setSketchAll({ kind: "idle" });
+  };
+
+  const runGreyAll = async () => {
+    if (greyAll.kind === "working") return;
+    const live = worldRef.current;
+    if (!live) return;
+    const sketched = (
+      storyboardForScene(live, channelId, partId)?.frames ?? []
+    ).filter(
+      (entry) =>
+        typeof entry.imagePath === "string" &&
+        entry.imagePath.startsWith("data:image"),
+    );
+    if (sketched.length === 0) return;
+    setGreyAll({ kind: "working", done: 0, total: sketched.length });
+    try {
+      for (let i = 0; i < sketched.length; i += 1) {
+        const current = sketched[i];
+        if (!current?.imagePath) continue;
+        patchFrame(current.id, {
+          imagePath: await blackAndWhite(current.imagePath),
+        });
+        setGreyAll({ kind: "working", done: i + 1, total: sketched.length });
+      }
+      setGreyAll({ kind: "idle" });
+    } catch {
+      setGreyAll({
+        kind: "error",
+        message: "Some frames stayed in colour. Try again.",
+      });
+    }
   };
 
   const pendingCount = unsketched(frames).length;
@@ -405,6 +461,24 @@ function StoryboardPageInner() {
                 </button>
               )
             ) : null}
+            {frames.some(
+              (frame) =>
+                typeof frame.imagePath === "string" &&
+                frame.imagePath.startsWith("data:image"),
+            ) ? (
+              greyAll.kind === "working" ? (
+                <span className="storyboard-note" role="status">
+                  Making black and white {greyAll.done + 1} of {greyAll.total}…
+                </span>
+              ) : (
+                <button
+                  className="pill light sm"
+                  onClick={() => void runGreyAll()}
+                >
+                  Make all frames black and white
+                </button>
+              )
+            ) : null}
             <button
               className="pill light sm"
               onClick={() => window.print()}
@@ -437,6 +511,11 @@ function StoryboardPageInner() {
         {sketchAll.kind === "error" ? (
           <p className="storyboard-note" role="status">
             {sketchAll.message}
+          </p>
+        ) : null}
+        {greyAll.kind === "error" ? (
+          <p className="storyboard-note" role="status">
+            {greyAll.message}
           </p>
         ) : null}
         {!board || frames.length === 0 ? (
