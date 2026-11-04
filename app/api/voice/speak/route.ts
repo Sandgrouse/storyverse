@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
 import { MAX_BODY_BYTES, budgetMessage, checkBudget } from "@/lib/budget";
 import {
-  ELEVENLABS_MODEL_ID,
   NO_VOICE_KEY_MESSAGE,
   SpeakRequestSchema,
   UNKNOWN_SPEAK_VOICE_MESSAGE,
   VOICE_ID_PATTERN,
   VOICE_LIMIT_MESSAGE,
   checkVoiceChars,
-  elevenLabsSpeakUrl,
-  loadPremadeVoices,
-  logVoiceFailure,
-  upstreamMessage,
-  voiceErrorFor,
 } from "@/lib/voice";
+import { getVoiceProvider, hasValidOwnerCode } from "@/lib/voice-provider";
 import { requireOwnerCode } from "@/lib/voice-owner";
 
 export const maxDuration = 60;
@@ -22,9 +17,15 @@ function errorResponse(status: number, code: string, message: string) {
   return NextResponse.json({ error: { code, message } }, { status });
 }
 
+function audioDataUrl(bytes: Uint8Array): string {
+  return `data:audio/mpeg;base64,${Buffer.from(bytes).toString("base64")}`;
+}
+
 /**
- * Speak one short line with ElevenLabs. Returns the mp3 as a base64
- * data URL. Only successful speeches count against the daily cap.
+ * Speak one short line with the live voice provider. Returns the mp3 as
+ * a base64 data URL. Only successful speeches count against the daily
+ * cap. Premade voices speak without the owner code; anything else is a
+ * custom voice and needs the code.
  */
 export async function POST(req: Request) {
   const raw = await req.text().catch(() => null);
@@ -51,17 +52,20 @@ export async function POST(req: Request) {
     }
     return errorResponse(400, "VALIDATION_ERROR", "Write a line of up to 300 characters.");
   }
-  const { voiceId, text } = parsed.data;
+  const { voiceId, text, pronunciations } = parsed.data;
 
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) {
+  const provider = getVoiceProvider();
+  if (!provider) {
     return errorResponse(503, "NO_VOICE_KEY", NO_VOICE_KEY_MESSAGE);
   }
 
   // Premade voices speak without the owner code. Anything else is a
   // custom voice and needs the code, so a stranger can never spend the
   // owner's voice slots.
-  const premade = await loadPremadeVoices(apiKey);
+  const ownerCode = hasValidOwnerCode(req)
+    ? (req.headers.get("x-voice-owner-code") ?? "")
+    : undefined;
+  const premade = await provider.listVoices(ownerCode);
   if (!premade.ok) {
     return errorResponse(premade.status, "VOICE_FAILED", premade.message);
   }
@@ -82,35 +86,9 @@ export async function POST(req: Request) {
     return errorResponse(429, "BUDGET", VOICE_LIMIT_MESSAGE);
   }
 
-  let res: Response;
-  try {
-    res = await fetch(elevenLabsSpeakUrl(voiceId), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "xi-api-key": apiKey,
-      },
-      body: JSON.stringify({ text, model_id: ELEVENLABS_MODEL_ID }),
-    });
-  } catch (error) {
-    logVoiceFailure("speak", 0, error instanceof Error ? error.message : String(error));
-    return errorResponse(500, "VOICE_FAILED", voiceErrorFor(0, ""));
+  const spoken = await provider.speak(voiceId, text, pronunciations);
+  if (!spoken.ok) {
+    return errorResponse(spoken.status, "VOICE_FAILED", spoken.message);
   }
-  if (!res.ok) {
-    const message = await upstreamMessage(res);
-    logVoiceFailure("speak", res.status, message);
-    return errorResponse(
-      res.status >= 400 && res.status < 600 ? res.status : 502,
-      "VOICE_FAILED",
-      voiceErrorFor(res.status, message),
-    );
-  }
-  const bytes = new Uint8Array(await res.arrayBuffer().catch(() => []));
-  if (bytes.length === 0) {
-    logVoiceFailure("speak", res.status, "empty audio");
-    return errorResponse(502, "VOICE_FAILED", voiceErrorFor(502, ""));
-  }
-  return NextResponse.json({
-    audioDataUrl: `data:audio/mpeg;base64,${Buffer.from(bytes).toString("base64")}`,
-  });
+  return NextResponse.json({ audioDataUrl: audioDataUrl(spoken.audioBytes) });
 }

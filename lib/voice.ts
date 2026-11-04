@@ -133,6 +133,14 @@ export async function loadPremadeVoices(apiKey: string): Promise<PremadeVoicesRe
   return { ok: true, voices: parsed.data.voices };
 }
 
+/** One "how names are said" entry: the story keeps the name, audio says sayAs. */
+export const PronunciationSchema = z.object({
+  name: z.string().min(1).max(120),
+  sayAs: z.string().min(1).max(120),
+});
+
+export type Pronunciation = z.infer<typeof PronunciationSchema>;
+
 /** A voice the suggest route may pick from: no preview needed to choose. */
 export const SuggestVoiceSchema = z.object({
   id: z.string().min(1),
@@ -151,6 +159,7 @@ export type SuggestRequest = z.infer<typeof SuggestRequestSchema>;
 export const SpeakRequestSchema = z.object({
   voiceId: z.string().regex(VOICE_ID_PATTERN),
   text: z.string().min(1).max(300),
+  pronunciations: z.array(PronunciationSchema).max(50).default([]),
 });
 
 export type SpeakRequest = z.infer<typeof SpeakRequestSchema>;
@@ -190,6 +199,9 @@ export function logVoiceFailure(route: string, status: number, message: string):
 
 export const NO_VOICE_KEY_MESSAGE = "Voices aren't set up here yet.";
 
+/** Fish Audio has run out of credits. */
+export const FISH_CREDITS_MESSAGE = "Your voice credits have run out.";
+
 /** Owner record/upload consent, shown beside the checkbox. */
 export const OWNER_CONSENT_TEXT =
   "I have the right and the speaker's consent to create an AI voice from this audio.";
@@ -204,7 +216,7 @@ export function artistConsentText(projectTitle: string): string {
 }
 
 /** Secrets must never reach a reading-lines prompt. */
-function secretTextsFor(world: World, characterId: string): string[] {
+export function secretTextsFor(world: World, characterId: string): string[] {
   const texts: string[] = [];
   for (const secret of world.secrets) {
     if (secret.text.trim()) texts.push(secret.text);
@@ -373,6 +385,69 @@ export function voiceDailyChars(): number {
 
 export function voiceDayKeyUTC(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
+}
+
+export const DesignRequestSchema = z.object({
+  world: WorldSchema,
+  characterId: z.string().min(1),
+});
+
+export type DesignRequest = z.infer<typeof DesignRequestSchema>;
+
+/** What Muse Spark returns: a voice description and a short test line. */
+export const DesignModelOutputSchema = z.object({
+  description: z.string().min(1).max(300),
+  testLine: z.string().min(1).max(150),
+});
+
+export type DesignModelOutput = z.infer<typeof DesignModelOutputSchema>;
+
+export const DESIGN_INSTRUCTIONS =
+  "You invent a voice for a story character from their canon: describe " +
+  "how the voice sounds in at most 300 characters, and write one short " +
+  "line they would say, in character, of at most 150 characters, to test " +
+  "the voice. Never rename anyone, change an established detail, or " +
+  "mention or hint at anything marked [redacted].";
+
+export const DESIGN_SCHEMA_NAME = "voice_design";
+
+export const DESIGN_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    description: { type: "string" },
+    testLine: { type: "string" },
+  },
+  required: ["description", "testLine"],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Material for the voice-design prompt: the character's canon plus
+ * story text, with images stripped and every secret redacted.
+ */
+export function buildVoiceDesignPrompt(
+  world: World,
+  characterId: string,
+): string {
+  const secrets = secretTextsFor(world, characterId);
+  const clean = stripImageData(world);
+  const character = clean.characters.find((c) => c.id === characterId);
+  const canon = redactSecrets(character?.canon ?? "", secrets);
+  const material = [
+    ...clean.parts.map((p) => `${p.title}: ${p.summary} ${p.excerpt}`),
+    ...clean.beats
+      .filter((b) => b.characterIds.includes(characterId))
+      .map((b) => `${b.title}: ${b.content}`),
+    ...clean.channels.map((c) => `${c.name}: ${c.pitch} ${c.tagline}`),
+  ]
+    .map((text) => redactSecrets(text, secrets))
+    .filter((text) => text.replace(/\[redacted\]/g, "").trim().length > 0)
+    .slice(0, 20)
+    .join("\n");
+  return (
+    `Character: ${character?.name ?? "Unknown"}. Canon: ${canon}\n\n` +
+    `Story material:\n${material}`
+  );
 }
 
 type VoiceBlobState = { day: string; chars: number };

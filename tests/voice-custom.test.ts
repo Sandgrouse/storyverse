@@ -93,6 +93,8 @@ beforeEach(() => {
   __resetOwnerAttempts();
   __resetVoiceStore();
   vi.stubEnv("ELEVENLABS_API_KEY", "test-voice-key");
+  vi.stubEnv("FISH_API_KEY", "");
+  vi.stubEnv("VOICE_PROVIDER", "");
   vi.stubEnv("MODEL_API_KEY", "test-key");
   vi.stubEnv("VOICE_OWNER_CODE", "owner-secret");
   vi.stubEnv("VOICE_STORE_MEMORY", "1");

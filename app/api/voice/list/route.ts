@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
+import { NO_VOICE_KEY_MESSAGE } from "@/lib/voice";
 import {
-  ELEVENLABS_VOICES_URL,
-  logVoiceFailure,
-  mapUpstreamVoices,
-  readVoiceListCache,
-  upstreamMessage,
-  voiceErrorFor,
-  writeVoiceListCache,
-  NO_VOICE_KEY_MESSAGE,
-  VoiceListResponseSchema,
-} from "@/lib/voice";
+  getVoiceProvider,
+  hasValidOwnerCode,
+  resolveVoiceProvider,
+} from "@/lib/voice-provider";
 
 export const maxDuration = 60;
 
@@ -18,34 +13,18 @@ function errorResponse(status: number, code: string, message: string) {
 }
 
 /** Premade voices only. Cached in memory for an hour; costs nothing. */
-export async function GET() {
-  if (!process.env.ELEVENLABS_API_KEY) {
+export async function GET(req: Request) {
+  const id = resolveVoiceProvider();
+  const provider = getVoiceProvider();
+  if (!provider) {
     return errorResponse(503, "NO_VOICE_KEY", NO_VOICE_KEY_MESSAGE);
   }
-  const cached = readVoiceListCache();
-  if (cached) {
-    return NextResponse.json({ voices: cached });
+  const ownerCode = hasValidOwnerCode(req)
+    ? (req.headers.get("x-voice-owner-code") ?? "")
+    : undefined;
+  const result = await provider.listVoices(ownerCode);
+  if (!result.ok) {
+    return errorResponse(result.status, "VOICE_FAILED", result.message);
   }
-  let res: Response;
-  try {
-    res = await fetch(ELEVENLABS_VOICES_URL, {
-      headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY },
-    });
-  } catch (error) {
-    logVoiceFailure("list", 0, error instanceof Error ? error.message : String(error));
-    return errorResponse(500, "VOICE_FAILED", voiceErrorFor(0, ""));
-  }
-  if (!res.ok) {
-    const message = await upstreamMessage(res);
-    logVoiceFailure("list", res.status, message);
-    return errorResponse(res.status >= 400 && res.status < 600 ? res.status : 502, "VOICE_FAILED", voiceErrorFor(res.status, message));
-  }
-  const mapped = mapUpstreamVoices(await res.json().catch(() => null));
-  const parsed = VoiceListResponseSchema.safeParse(mapped);
-  if (!parsed.success) {
-    logVoiceFailure("list", res.status, "unparseable voice list");
-    return errorResponse(502, "VOICE_FAILED", voiceErrorFor(502, ""));
-  }
-  writeVoiceListCache(parsed.data.voices);
-  return NextResponse.json(parsed.data);
+  return NextResponse.json({ voices: result.voices, provider: id });
 }
