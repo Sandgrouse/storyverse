@@ -161,6 +161,17 @@ export function extractImageEntries(world: World): {
         ...beat,
         imagePath: swap(beat.imagePath, entryName("beat", beat.id), entries),
       })),
+      shorts: (world.shorts ?? []).map((short) => ({
+        ...short,
+        shots: short.shots.map((shot) => ({
+          ...shot,
+          imagePath: swap(
+            shot.imagePath,
+            entryName("short", short.id, shot.id),
+            entries,
+          ),
+        })),
+      })),
     },
     entries,
   };
@@ -204,6 +215,13 @@ export function restoreImageRefs(
       ...beat,
       imagePath: fill(beat.imagePath),
     })),
+    shorts: (world.shorts ?? []).map((short) => ({
+      ...short,
+      shots: short.shots.map((shot) => ({
+        ...shot,
+        imagePath: fill(shot.imagePath) ?? "",
+      })),
+    })),
   };
 }
 
@@ -240,6 +258,13 @@ export function dropStoredRefs(world: World): World {
       ...beat,
       imagePath: beat.imagePath ? drop(beat.imagePath) : undefined,
     })),
+    shorts: (world.shorts ?? []).map((short) => ({
+      ...short,
+      shots: short.shots.map((shot) => ({
+        ...shot,
+        imagePath: drop(shot.imagePath),
+      })),
+    })),
   };
 }
 
@@ -254,6 +279,9 @@ export function hasStoredRefs(world: World): boolean {
   for (const channel of world.channels) paths.push(channel.imagePath);
   for (const part of world.parts) paths.push(part.imagePath);
   for (const beat of world.beats) paths.push(beat.imagePath);
+  for (const short of world.shorts ?? []) {
+    for (const shot of short.shots) paths.push(shot.imagePath);
+  }
   return paths.some(isStoredRef);
 }
 

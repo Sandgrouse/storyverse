@@ -1,6 +1,7 @@
 "use client";
 
 import "@/app/script.css";
+import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { MissingStory, useProject } from "@/components/projects/ProjectContext";
@@ -67,6 +68,8 @@ function ScriptEditor({
   partId: string;
   beatId: string;
 }) {
+  const params = useParams<{ id: string }>();
+  const projectId = params.id;
   const initial = useMemo(
     () => initialScriptText(world, channelId, partId),
     // Hydrate once per scene; the key remounts on scene change.
@@ -418,6 +421,15 @@ function ScriptEditor({
               </div>
             );
           })}
+        </div>
+        <div className="script-tool">
+          <Link
+            className="pill"
+            style={{ width: "100%" }}
+            href={`/projects/${projectId}/video?channel=${encodeURIComponent(channelId)}&part=${encodeURIComponent(partId)}`}
+          >
+            Turn this into a short
+          </Link>
         </div>
       </aside>
     </>

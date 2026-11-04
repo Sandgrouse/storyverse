@@ -48,3 +48,5 @@ A project owner can make a custom voice for a character from their own recording
 - **Storage.** Audio lives in Vercel Blob in production and under `.data/voice/` locally. Files are at most 4MB of audio, 12 per character per invite, and invites expire after 14 days.
 
 The scrolling landing page uses [GSAP](https://gsap.com/) (`gsap` and `@gsap/react`) under the GSAP Standard License (free of charge; see [https://gsap.com/standard-license](https://gsap.com/standard-license)) and [Lenis](https://lenis.darkroom.engineering/) (`lenis`) under the MIT License.
+
+Short videos are rendered in the browser with [Remotion](https://www.remotion.dev/) (`remotion`, `@remotion/player`, `@remotion/media` and `@remotion/web-renderer`), used under its free license for individuals and companies of up to three employees (see [https://www.remotion.dev/docs/license](https://www.remotion.dev/docs/license)).
