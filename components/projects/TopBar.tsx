@@ -10,6 +10,7 @@ const SECTIONS = [
   { id: "story", label: "Story" },
   { id: "characters", label: "Characters" },
   { id: "script", label: "Script" },
+  { id: "video", label: "Video" },
   { id: "package", label: "Agent package" },
 ] as const;
 
@@ -33,11 +34,14 @@ export default function TopBar() {
     ? sectionFor(params.section)
     : tail === "script"
       ? "script"
-      : null;
+      : tail === "video"
+        ? "video"
+        : null;
   const showSections =
     section === "story" ||
     section === "characters" ||
     section === "script" ||
+    section === "video" ||
     section === "package";
 
   return (

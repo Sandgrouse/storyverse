@@ -37,3 +37,5 @@ This project uses `@meta-sam/parser` under the SAM License. See the license term
 Character voices are spoken by the [ElevenLabs](https://elevenlabs.io/) text-to-speech API; the app sends it only the chosen voice and the line to speak.
 
 The scrolling landing page uses [GSAP](https://gsap.com/) (`gsap` and `@gsap/react`) under the GSAP Standard License (free of charge; see [https://gsap.com/standard-license](https://gsap.com/standard-license)) and [Lenis](https://lenis.darkroom.engineering/) (`lenis`) under the MIT License.
+
+Short videos are rendered in the browser with [Remotion](https://www.remotion.dev/) (`remotion`, `@remotion/player`, `@remotion/media` and `@remotion/web-renderer`), used under its free license for individuals and companies of up to three employees (see [https://www.remotion.dev/docs/license](https://www.remotion.dev/docs/license)).

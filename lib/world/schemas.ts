@@ -89,6 +89,32 @@ export const GapSchema = z.object({
   question: z.string(),
 });
 
+/** A spoken line on a shot: which character says it, and the audio. */
+export const ShortVoiceSchema = z.object({
+  characterId: z.string(),
+  lineId: z.string(),
+  text: z.string(),
+});
+
+export const ShortShotSchema = z.object({
+  id: z.string(),
+  imagePath: z.string(),
+  caption: z.string(),
+  durationSec: z.number(),
+  motion: z.enum(["push", "pan", "still"]),
+  voice: ShortVoiceSchema.optional(),
+});
+
+/** One short video cut per channel and part. */
+export const ShortSchema = z.object({
+  id: z.string(),
+  channelId: z.string(),
+  partId: z.string(),
+  title: z.string(),
+  aspect: z.enum(["16:9", "9:16"]),
+  shots: z.array(ShortShotSchema),
+});
+
 /** One channel's draft of one part, written on the script page. */
 export const ScriptEntrySchema = z.object({
   channelId: z.string(),
@@ -124,6 +150,7 @@ export const WorldSchema = z.object({
   gaps: z.array(GapSchema),
   packs: z.array(PackSchema).default([]),
   scripts: z.array(ScriptEntrySchema).default([]),
+  shorts: z.array(ShortSchema).default([]),
   canonChanges: z.array(z.string()).default([]),
 });
 
@@ -176,6 +203,9 @@ export type Part = z.infer<typeof PartSchema>;
 export type Beat = z.infer<typeof BeatSchema>;
 export type Secret = z.infer<typeof SecretSchema>;
 export type Gap = z.infer<typeof GapSchema>;
+export type ShortVoice = z.infer<typeof ShortVoiceSchema>;
+export type ShortShot = z.infer<typeof ShortShotSchema>;
+export type Short = z.infer<typeof ShortSchema>;
 export type ScriptEntry = z.infer<typeof ScriptEntrySchema>;
 export type StoryPack = z.infer<typeof PackSchema>;
 export type World = z.infer<typeof WorldSchema>;

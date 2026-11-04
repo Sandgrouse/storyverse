@@ -24,6 +24,7 @@ export const ROUTE_COSTS = {
   scene: 2,
   "script-draft": 1,
   "script-check": 1,
+  "video-plan": 1,
   cutout: 1,
   "voice-suggest": 1,
   "voice-speak": 2,

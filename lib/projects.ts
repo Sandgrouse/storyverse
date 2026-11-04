@@ -386,5 +386,9 @@ export function mergeWorldAssets(oldWorld: World, nextWorld: World): World {
         imagePath: beat.imagePath ? beat.imagePath : old.imagePath,
       };
     }),
+    shorts:
+      nextWorld.shorts && nextWorld.shorts.length > 0
+        ? nextWorld.shorts
+        : (oldWorld.shorts ?? []),
   };
 }

@@ -186,6 +186,13 @@ export function stripImageData(world: World): World {
       ...beat,
       imagePath: clean(beat.imagePath),
     })),
+    shorts: (world.shorts ?? []).map((short) => ({
+      ...short,
+      shots: short.shots.map((shot) => ({
+        ...shot,
+        imagePath: clean(shot.imagePath) ?? "",
+      })),
+    })),
   };
 }
 
