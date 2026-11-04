@@ -7,23 +7,36 @@ import Lenis from "lenis";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, type CSSProperties, type PointerEvent } from "react";
+import { useEffect, useRef, type PointerEvent } from "react";
 import {
   BROWSER_SUB,
   BROWSER_TITLE,
   BROWSER_URL,
-  CHANGE_LINE,
+  CARDS,
+  CARD_Z_BASE,
   CHAPTERS,
+  CHANGE_LINE,
   CLOSE_HEADING,
   HERO_HEADING,
   HERO_LEDE,
   LANDING_IMAGES,
+  LAYOUTS,
+  PUBLISH_SECRETS,
   SCRIPT_LINES,
   SCRIPT_NOTE,
   TREE_LINES,
   TREE_SECRET,
   VIDEO_CAPTION,
-  type Chapter,
+  cardBasePx,
+  cardTag,
+  clamp01,
+  layoutRects,
+  lerp,
+  nearRest,
+  segmentEase,
+  smooth,
+  stagger,
+  type CardRect,
 } from "@/lib/landing";
 import { ensureSample } from "@/lib/projects";
 import { WorldSchema } from "@/lib/world/schemas";
@@ -35,6 +48,10 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const DESKTOP = "(min-width: 901px) and (prefers-reduced-motion: no-preference)";
 const STACKED = "(max-width: 900px), (prefers-reduced-motion: reduce)";
+
+const PUBLISH_IDX = CHAPTERS.findIndex((c) => c.id === "publish");
+const VIDEO_IDX = CHAPTERS.findIndex((c) => c.id === "video");
+const CHANGE_IDX = CHAPTERS.findIndex((c) => c.id === "change");
 
 function scriptLine(
   line: (typeof SCRIPT_LINES)[number],
@@ -57,31 +74,24 @@ function scriptLine(
   return <div key={index}>{parts}</div>;
 }
 
-function ChapterExtras({ chapter }: { chapter: Chapter }) {
+function ChapterExtras({
+  chapter,
+  panelRef,
+}: {
+  chapter: (typeof CHAPTERS)[number];
+  panelRef: (el: HTMLDivElement | null) => void;
+}) {
   if (chapter.feature === "script") {
     return (
-      <div className="land-extra land-script" aria-label="Script excerpt">
+      <div ref={panelRef} className="land-extra land-script" aria-label="Script excerpt">
         {SCRIPT_LINES.map(scriptLine)}
         <small>{SCRIPT_NOTE}</small>
       </div>
     );
   }
-  if (chapter.feature === "video") {
-    // Playhead line sweeping across the thumbnail row, which spans the
-    // player's width. Thumbs sit at y 22vh; the track covers their height.
-    return (
-      <div
-        className="land-extra land-track"
-        style={{ left: "18vw", width: "40vw", "--run": "40vw" } as CSSProperties}
-        aria-hidden
-      >
-        <div className="land-playhead" />
-      </div>
-    );
-  }
   if (chapter.feature === "line") {
     return (
-      <div className="land-extra land-line">
+      <div ref={panelRef} className="land-extra land-line">
         <span className="land-line-kicker">The change</span>
         {CHANGE_LINE}
       </div>
@@ -89,7 +99,7 @@ function ChapterExtras({ chapter }: { chapter: Chapter }) {
   }
   if (chapter.feature === "tree") {
     return (
-      <div className="land-extra land-tree" aria-label="Agent package contents">
+      <div ref={panelRef} className="land-extra land-tree" aria-label="Agent package contents">
         <b>the-hunt-at-the-stream/</b>
         {TREE_LINES.slice(1).map((line) => (
           <div key={line.text} className={line.indent ? "in" : ""}>
@@ -102,7 +112,7 @@ function ChapterExtras({ chapter }: { chapter: Chapter }) {
   }
   if (chapter.feature === "browser") {
     return (
-      <div className="land-extra land-browser" aria-label="Story website preview">
+      <div ref={panelRef} className="land-extra land-browser" aria-label="Story website preview">
         <div className="chrome">
           <i />
           <i />
@@ -129,22 +139,6 @@ function ChapterExtras({ chapter }: { chapter: Chapter }) {
     );
   }
   return null;
-}
-
-function ChapterCopy({ chapter }: { chapter: Chapter }) {
-  return (
-    <div className={`land-copywrap${chapter.low ? " low" : ""}`}>
-      <div className={`land-copy ${chapter.side ?? ""}`}>
-        {chapter.soon ? (
-          <span className="soon">Coming next</span>
-        ) : (
-          <div className="kicker">{chapter.kicker}</div>
-        )}
-        {chapter.heading ? <h2>{chapter.heading}</h2> : null}
-        {chapter.body ? <p>{chapter.body}</p> : null}
-      </div>
-    </div>
-  );
 }
 
 function MagPill({
@@ -200,14 +194,52 @@ function MagPill({
   );
 }
 
+type Geo = {
+  W: number;
+  H: number;
+  rects: CardRect[][];
+  base: Map<number, { w: number; h: number }>;
+  capW: number;
+  capH: number;
+};
+
 export default function LandingPage() {
   const router = useRouter();
   const root = useRef<HTMLDivElement>(null);
   const rail = useRef<Array<HTMLButtonElement | null>>([]);
   const lenis = useRef<Lenis | null>(null);
   const trigger = useRef<ScrollTrigger | null>(null);
-  const active = useRef(0);
-  const pulsed = useRef(false);
+  const progress = useRef(0);
+
+  const outerEls = useRef(new Map<number, HTMLDivElement>());
+  const counterEls = useRef(new Map<number, HTMLDivElement>());
+  const flagEls = useRef(new Map<number, HTMLSpanElement>());
+  const flagText = useRef(new Map<number, string>());
+  const secretEls = useRef(new Map<number, HTMLDivElement>());
+  const copyEls = useRef(new Map<number, HTMLDivElement>());
+  const extraEls = useRef(new Map<number, HTMLDivElement>());
+  const tintEls = useRef<Array<HTMLDivElement | null>>([]);
+  const heroEl = useRef<HTMLDivElement>(null);
+  const closeEl = useRef<HTMLDivElement>(null);
+  const hintEl = useRef<HTMLDivElement>(null);
+  const capEl = useRef<HTMLDivElement>(null);
+  const headEl = useRef<HTMLDivElement>(null);
+  const geo = useRef<Geo | null>(null);
+  // Boundary caches so per-frame writes stay transform and opacity only:
+  // visibility, z-index and classes change only when their state flips.
+  const vis = useRef({
+    card: new Map<number, boolean>(),
+    flag: new Map<number, boolean>(),
+    copy: new Map<number, boolean>(),
+    extra: new Map<number, boolean>(),
+    cap: false,
+    head: false,
+    hero: true,
+    close: false,
+    hint: true,
+    round: -1,
+    pulsed: false,
+  });
 
   const exploreSample = () => {
     ensureSample(WorldSchema.parse(seedJson));
@@ -251,13 +283,6 @@ export default function LandingPage() {
     };
   }, []);
 
-  const setRail = (index: number) => {
-    active.current = index;
-    rail.current.forEach((button, i) => {
-      button?.classList.toggle("on", i === index);
-    });
-  };
-
   const goChapter = (index: number) => {
     const st = trigger.current;
     if (lenis.current && st) {
@@ -266,7 +291,7 @@ export default function LandingPage() {
       lenis.current.scrollTo(y);
     } else {
       document
-        .querySelector(`.land-ch-${index}`)
+        .querySelector(`.land-stack [data-stack="${CHAPTERS[index].id}"]`)
         ?.scrollIntoView({ behavior: "smooth" });
     }
   };
@@ -287,175 +312,371 @@ export default function LandingPage() {
         gsap.ticker.add(tick);
         gsap.ticker.lagSmoothing(0);
 
-        const groups = q<HTMLElement>(".land-ch");
-        const outers = q<HTMLElement>(".land-outer");
-        gsap.set(outers, { xPercent: -50, yPercent: -50 });
-        groups.forEach((group, i) => {
-          gsap.set(group, { autoAlpha: i === 0 ? 1 : 0, zIndex: i === 0 ? 10 : 1 });
-        });
-        // Park every card on its seat; entrances use relative offsets.
-        CHAPTERS.forEach((chapter, i) => {
-          const seats = groups[i].querySelectorAll<HTMLElement>(".land-outer");
-          seats.forEach((seat, k) => {
-            const card = chapter.cards[k];
-            if (!card) return;
-            gsap.set(seat, {
-              x: `${card.x}vw`,
-              y: `${card.y}vh`,
-              rotation: card.r,
-              rotationY: card.ry,
-              z: card.z,
-              scale: card.s,
-              // Each outer carries its own perspective, so rotationY reads
-              // as a curved wall even through the nested wrappers.
-              transformPerspective: 1500,
-            });
-          });
-        });
+        const N = CHAPTERS.length;
+        const byId = (rects: CardRect[], id: number) =>
+          rects.find((r) => r.id === id);
+
+        const buildGeo = () => {
+          const W = window.innerWidth;
+          const H = window.innerHeight;
+          const rects = CHAPTERS.map((_, ch) => layoutRects(ch, W, H));
+          const base = new Map<number, { w: number; h: number }>();
+          for (const card of CARDS) base.set(card.id, cardBasePx(card.id, W, H));
+          // Caption rests on the video chapter's film card (card 6).
+          const film = byId(rects[VIDEO_IDX], 6);
+          geo.current = {
+            W,
+            H,
+            rects,
+            base,
+            capW: film ? film.wpx : W * 0.5,
+            capH: 0,
+          };
+        };
+
+        const applySizes = () => {
+          const g = geo.current;
+          if (!g) return;
+          for (const card of CARDS) {
+            const b = g.base.get(card.id);
+            const outer = outerEls.current.get(card.id);
+            if (b && outer) {
+              outer.style.width = `${b.w}px`;
+              outer.style.height = `${b.h}px`;
+            }
+          }
+          const cap = capEl.current;
+          if (cap) {
+            cap.style.width = `${g.capW}px`;
+            g.capH = cap.offsetHeight || 110;
+          }
+          const head = headEl.current;
+          if (head) {
+            // Thumb row geometry at rest; the head tracks it per frame.
+            const rest = g.rects[VIDEO_IDX];
+            const first = byId(rest, 3);
+            const last = byId(rest, 4);
+            head.style.height = `${g.H * 0.17}px`;
+            if (first && last) {
+              const run =
+                last.cx + last.wpx / 2 - (first.cx - first.wpx / 2);
+              head.style.setProperty("--run", `${run}px`);
+            }
+          }
+        };
 
         const floats: gsap.core.Tween[] = [];
         if (window.matchMedia("(pointer: fine)").matches) {
-          q<HTMLElement>(".land-ch-0 .land-mid").forEach((mid, k) => {
+          for (const card of CARDS) {
+            const outer = outerEls.current.get(card.id);
+            const mid = outer?.querySelector<HTMLElement>(".land-mid");
+            if (!mid) continue;
             floats.push(
               gsap.to(mid, {
-                y: `+=${1 + (k % 3) * 0.4}`,
-                duration: 2.2 + (k % 4) * 0.3,
+                y: `+=${1 + (card.id % 3) * 0.4}`,
+                duration: 2.2 + (card.id % 4) * 0.3,
                 yoyo: true,
                 repeat: -1,
                 ease: "sine.inOut",
-                delay: k * 0.16,
+                delay: card.id * 0.16,
               }),
             );
-          });
+          }
         }
-        const setters = q<HTMLElement>(".land-ch-0 .land-mid").map((mid) => ({
-          depth: Number(mid.parentElement?.dataset.depth ?? 0.5),
-          xTo: gsap.quickTo(mid, "x", { duration: 0.7, ease: "power3.out" }),
-        }));
+        const setters = CARDS.map((card) => {
+          const outer = outerEls.current.get(card.id);
+          const mid = outer?.querySelector<HTMLElement>(".land-mid");
+          return {
+            depth: Number(outer?.dataset.depth ?? 0.5),
+            xTo: mid
+              ? gsap.quickTo(mid, "x", { duration: 0.7, ease: "power3.out" })
+              : () => {},
+          };
+        });
         const stage = scope.querySelector<HTMLElement>(".land-stage");
         const onPointer = (e: globalThis.PointerEvent) => {
-          if (active.current !== 0) return;
+          if (vis.current.round !== 0) return;
           const nx = e.clientX / window.innerWidth - 0.5;
           setters.forEach(({ depth, xTo }) => xTo(nx * 34 * depth));
         };
+
+        const applyFrame = (raw: number) => {
+          const g = geo.current;
+          if (!g) return;
+          const { W, H, rects } = g;
+          const s = Math.min(N - 1, Math.max(0, raw));
+          const i = Math.min(N - 2, Math.floor(s));
+          const f = Math.min(1, Math.max(0, s - i));
+          const e = segmentEase(f);
+          const ri = Math.round(s);
+          const v = vis.current;
+
+          // Tint cross-fade between the two chapters in transition.
+          tintEls.current.forEach((el, k) => {
+            if (!el) return;
+            const o = k === i ? 1 - e : k === i + 1 ? e : 0;
+            el.style.opacity = String(o);
+            el.style.visibility = o < 0.01 ? "hidden" : "visible";
+          });
+
+          let thumb: { cx: number; cy: number; w: number; h: number } | null =
+            null;
+          let film: { cx: number; cy: number; w: number; h: number } | null =
+            null;
+          for (const card of CARDS) {
+            const A = byId(rects[i], card.id);
+            const B = byId(rects[i + 1], card.id);
+            const outer = outerEls.current.get(card.id);
+            const counter = counterEls.current.get(card.id);
+            if (!A || !B || !outer || !counter) continue;
+            // Prototype frame(): per-card stagger, arc between layouts,
+            // push-out from the hero. Transforms and opacity only.
+            const st = smooth(stagger(e, card.id));
+            const w = lerp(A.wpx, B.wpx, st);
+            const h = lerp(A.hpx, B.hpx, st);
+            const cx = lerp(A.cx, B.cx, st);
+            const cy = lerp(A.cy, B.cy, st);
+            const arc = Math.sin(st * Math.PI) * (A.o && B.o ? -26 : 0);
+            const push =
+              i === 0 && st === 0
+                ? f * 2.2 * (A.x < 50 ? -1 : 1) * (W / 100)
+                : 0;
+            const base = g.base.get(card.id);
+            const sx = base && base.w ? w / base.w : 1;
+            const sy = base && base.h ? h / base.h : 1;
+            gsap.set(outer, {
+              x: cx + push,
+              y: cy + arc,
+              xPercent: -50,
+              yPercent: -50,
+              scaleX: sx,
+              scaleY: sy,
+              rotation: lerp(A.rz, B.rz, st),
+              rotationY: lerp(A.ry, B.ry, st),
+              z: lerp(A.tz, B.tz, st),
+              transformPerspective: 1500,
+            });
+            // Counter-scale so the picture never stretches; the wrapper
+            // clips, so the card visibly reshapes around a steady picture.
+            gsap.set(counter, { scaleX: 1 / sx, scaleY: 1 / sy });
+            const o = lerp(A.o, B.o, st);
+            const shown = o >= 0.01;
+            outer.style.opacity = String(o);
+            if ((v.card.get(card.id) ?? true) !== shown) {
+              v.card.set(card.id, shown);
+              outer.style.visibility = shown ? "visible" : "hidden";
+            }
+            if (card.id === 6) film = { cx, cy, w, h };
+            if (card.id === 3) thumb = { cx, cy, w, h };
+            // Tag labels near the chapter rest, as in the prototype. Flags
+            // are siblings of the clipped outer and track the card's
+            // computed rect with transform only, so the counter-scale can
+            // never push them outside the visible card.
+            const flag = flagEls.current.get(card.id);
+            if (flag) {
+              const { text: tag, hit } = cardTag(ri, card.id);
+              const near = nearRest(s);
+              if (flagText.current.get(card.id) !== tag) {
+                flagText.current.set(card.id, tag);
+                flag.textContent = tag;
+                flag.classList.toggle("hit", hit);
+                flag.classList.toggle("shot", !hit && tag !== "");
+              }
+              gsap.set(flag, { x: cx - w / 2 + 10, y: cy - h / 2 + 10 });
+              const fShown = Boolean(tag) && near && o >= 0.01;
+              flag.style.opacity = fShown ? "1" : "0";
+              if ((v.flag.get(card.id) ?? true) !== fShown) {
+                v.flag.set(card.id, fShown);
+                flag.style.visibility = fShown ? "visible" : "hidden";
+              }
+            }
+            // Publish secret banners ride their card but show at rest.
+            const secret = secretEls.current.get(card.id);
+            if (secret) {
+              const so = clamp01(1 - Math.abs(s - PUBLISH_IDX) * 2.8);
+              const sShown = so >= 0.01;
+              secret.style.opacity = String(so);
+              if ((v.extra.get(100 + card.id) ?? true) !== sShown) {
+                v.extra.set(100 + card.id, sShown);
+                secret.style.visibility = sShown ? "visible" : "hidden";
+              }
+            }
+          }
+
+          // Chapter boundaries only: z order, rail, pulse, floats.
+          if (v.round !== ri) {
+            v.round = ri;
+            for (const card of CARDS) {
+              const outer = outerEls.current.get(card.id);
+              if (!outer) continue;
+              const A = byId(rects[Math.min(i, N - 1)], card.id);
+              const B = byId(rects[Math.min(i + 1, N - 1)], card.id);
+              const on = (A && A.o) || (B && B.o);
+              outer.style.zIndex = on
+                ? String(CARD_Z_BASE + (LAYOUTS[ri]?.[card.id] ? card.id : 0))
+                : "0";
+            }
+            rail.current.forEach((button, k) => {
+              button?.classList.toggle("on", k === ri);
+            });
+            if (ri === CHANGE_IDX && !v.pulsed) {
+              v.pulsed = true;
+              for (const id of [3, 4, 6]) {
+                outerEls.current.get(id)?.classList.add("go");
+              }
+            }
+            floats.forEach((tween) => (ri === 0 ? tween.play() : tween.pause()));
+          }
+
+          // Copy blocks drift against the scroll, fading with distance.
+          copyEls.current.forEach((el, ch) => {
+            const dist = s - ch;
+            const o = clamp01(1 - Math.abs(dist) * 2.6);
+            gsap.set(el, { y: -dist * 90 });
+            el.style.opacity = String(o);
+            const shown = o >= 0.01;
+            if ((v.copy.get(ch) ?? true) !== shown) {
+              v.copy.set(ch, shown);
+              el.style.visibility = shown ? "visible" : "hidden";
+            }
+          });
+
+          // Panels fade with their chapter; script/tree/browser also drift.
+          extraEls.current.forEach((el, ch) => {
+            const dist = s - ch;
+            const o = clamp01(1 - Math.abs(dist) * 2.8);
+            const feature = CHAPTERS[ch].feature;
+            if (
+              feature === "script" ||
+              feature === "tree" ||
+              feature === "browser"
+            ) {
+              gsap.set(el, { y: -dist * 70 });
+            }
+            el.style.opacity = String(o);
+            const shown = o >= 0.01;
+            if ((v.extra.get(ch) ?? true) !== shown) {
+              v.extra.set(ch, shown);
+              el.style.visibility = shown ? "visible" : "hidden";
+            }
+          });
+
+          // Video caption tracks the film card; playhead tracks the thumbs.
+          const cap = capEl.current;
+          if (cap && film) {
+            const co = clamp01(1 - Math.abs(s - VIDEO_IDX) * 2.8);
+            gsap.set(cap, {
+              x: film.cx - g.capW / 2,
+              y: film.cy + film.h / 2 - (g.capH || 110),
+            });
+            cap.style.opacity = String(co);
+            const shown = co >= 0.01;
+            if (v.cap !== shown) {
+              v.cap = shown;
+              cap.style.visibility = shown ? "visible" : "hidden";
+            }
+          }
+          const head = headEl.current;
+          if (head && thumb) {
+            const ho = clamp01(1 - Math.abs(s - VIDEO_IDX) * 2.8);
+            gsap.set(head, {
+              x: thumb.cx - thumb.w / 2,
+              y: thumb.cy - thumb.h / 2 - H * 0.01,
+            });
+            head.style.opacity = String(ho);
+            const shown = ho >= 0.01;
+            if (v.head !== shown) {
+              v.head = shown;
+              head.style.visibility = shown ? "visible" : "hidden";
+            }
+          }
+
+          const hero = heroEl.current;
+          if (hero) {
+            const ho = clamp01(1 - s * 3.2);
+            hero.style.opacity = String(ho);
+            const shown = s <= 0.32;
+            if (v.hero !== shown) {
+              v.hero = shown;
+              hero.style.visibility = shown ? "visible" : "hidden";
+            }
+          }
+          const hint = hintEl.current;
+          if (hint) {
+            const ho = clamp01(1 - raw * 5);
+            hint.style.opacity = String(ho);
+            const shown = ho >= 0.01;
+            if (v.hint !== shown) {
+              v.hint = shown;
+              hint.style.visibility = shown ? "visible" : "hidden";
+            }
+          }
+          const close = closeEl.current;
+          if (close) {
+            const co = clamp01(1 - Math.abs(s - (N - 1)) * 3);
+            close.style.opacity = String(co);
+            const shown = co >= 0.01;
+            if (v.close !== shown) {
+              v.close = shown;
+              close.style.visibility = shown ? "visible" : "hidden";
+            }
+          }
+        };
+
+        buildGeo();
+        applySizes();
 
         const tl = gsap.timeline({
           defaults: { ease: "none" },
           scrollTrigger: {
             trigger: ".land-pin",
             start: "top top",
-            end: `+=${(CHAPTERS.length - 1) * 110}%`,
+            end: `+=${(N - 1) * 110}%`,
             pin: true,
             scrub: 1,
             anticipatePin: 1,
             onUpdate: (self) => {
-              const index = Math.round(self.progress * (CHAPTERS.length - 1));
-              setRail(index);
-              const run = index === 0;
-              floats.forEach((f) => (run ? f.play() : f.pause()));
-              if (index === 5 && !pulsed.current) {
-                pulsed.current = true;
-                scope
-                  .querySelectorAll(".land-pulse")
-                  .forEach((el) => el.classList.add("go"));
-              }
+              progress.current = self.progress * (N - 1);
+              applyFrame(progress.current);
             },
           },
         });
+        tl.to({}, { duration: N - 1 });
         trigger.current = tl.scrollTrigger as ScrollTrigger;
-        setRail(0);
+        progress.current = 0;
+        applyFrame(0);
 
-        const layerFor = (i: number) =>
-          scope.querySelector<HTMLElement>(
-            `.land-tint[data-tint="${CSS.escape(CHAPTERS[i].tint)}"]`,
-          );
-
-        for (let i = 1; i < CHAPTERS.length; i++) {
-          const prev = groups[i - 1];
-          const curr = groups[i];
-          const prevLayer = layerFor(i - 1);
-          const currLayer = layerFor(i);
-          const pos = tl.duration();
-          tl.set(curr, { zIndex: 10 }, pos);
-          tl.set(prev, { zIndex: 1 }, pos + 0.01);
-          if (prevLayer && currLayer && prevLayer !== currLayer) {
-            tl.to(prevLayer, { opacity: 0, duration: 0.5 }, pos);
-            tl.to(currLayer, { opacity: 1, duration: 0.5 }, pos);
-          }
-          tl.to(prev, { autoAlpha: 0, y: "-4vh", duration: 0.45 }, pos);
-          tl.fromTo(
-            curr,
-            { autoAlpha: 0, y: "4vh" },
-            { autoAlpha: 1, y: "0vh", duration: 0.45 },
-            pos + 0.05,
-          );
-          const cards = curr.querySelectorAll(
-            ".land-outer:not([data-fade])",
-          );
-          if (cards.length) {
-            tl.from(
-              cards,
-              {
-                opacity: 0,
-                y: "+=10vh",
-                rotation: "+=5",
-                duration: 0.5,
-                stagger: 0.06,
-              },
-              pos + 0.1,
-            );
-          }
-          if (CHAPTERS[i].id === "video") {
-            // The story art sits on the player's seat, then fades out as
-            // the player fades in, leaving the player and the timeline.
-            const out = curr.querySelector("[data-fade='out']");
-            const inn = curr.querySelector("[data-fade='in']");
-            if (out && inn) {
-              tl.fromTo(
-                out,
-                { opacity: 1 },
-                { opacity: 0, duration: 0.3 },
-                pos + 0.35,
-              );
-              tl.fromTo(
-                inn,
-                { opacity: 0 },
-                { opacity: 1, duration: 0.3 },
-                pos + 0.35,
-              );
-            }
-          }
-          const kids = curr.querySelectorAll(
-            ".land-copy > *, .land-extra, .land-hero > *",
-          );
-          if (kids.length) {
-            tl.from(
-              kids,
-              { opacity: 0, y: 26, duration: 0.4, stagger: 0.08 },
-              pos + 0.15,
-            );
-          }
-          tl.to({}, { duration: 0.55 });
-        }
+        const onResize = () => {
+          buildGeo();
+          applySizes();
+          applyFrame(progress.current);
+          ScrollTrigger.refresh();
+        };
+        window.addEventListener("resize", onResize);
 
         // Load-in: deal the gallery, rise the headline.
         const intro = gsap.timeline({ delay: 0.1 });
-        intro.from(q(".land-ch-0 .land-inner"), {
-          y: 60,
-          opacity: 0,
+        intro.from(q(".land-hero .hero-line > span"), {
+          yPercent: 110,
           duration: 0.9,
           ease: "power3.out",
-          stagger: 0.07,
+          stagger: 0.1,
         });
-        intro.from(
-          q(".hero-line span"),
-          { yPercent: 110, duration: 0.9, ease: "power3.out", stagger: 0.1 },
-          0.15,
-        );
         intro.from(
           q(".land-hero-fade"),
           { opacity: 0, y: 18, duration: 0.7, ease: "power3.out", stagger: 0.1 },
-          0.4,
+          0.15,
+        );
+        intro.from(
+          q(".land-inner"),
+          {
+            y: 60,
+            opacity: 0,
+            duration: 0.9,
+            ease: "power3.out",
+            stagger: 0.07,
+          },
+          0.1,
         );
 
         if (window.matchMedia("(pointer: fine)").matches && stage) {
@@ -463,8 +684,9 @@ export default function LandingPage() {
         }
 
         return () => {
+          window.removeEventListener("resize", onResize);
           stage?.removeEventListener("pointermove", onPointer);
-          floats.forEach((f) => f.kill());
+          floats.forEach((tween) => tween.kill());
           trigger.current = null;
           lenis.current = null;
           l.destroy();
@@ -495,8 +717,6 @@ export default function LandingPage() {
     { scope: root },
   );
 
-  const uniqueTints = Array.from(new Set(CHAPTERS.map((c) => c.tint)));
-
   return (
     <div ref={root} className="land">
       <header className="land-bar">
@@ -515,68 +735,118 @@ export default function LandingPage() {
 
       <div className="land-pin">
         <div className="land-stage">
-          {uniqueTints.map((tint, i) => (
+          {CHAPTERS.map((chapter, k) => (
             <div
-              key={tint}
+              key={chapter.id}
               className="land-tint"
-              data-tint={tint}
-              style={{ background: tint, opacity: i === 0 ? 1 : 0 }}
+              data-tint={chapter.tint}
+              ref={(el) => {
+                tintEls.current[k] = el;
+              }}
+              style={{ background: chapter.tint, opacity: 0 }}
             />
           ))}
-          {CHAPTERS.map((chapter, i) =>
-            chapter.id === "start" ? (
-              <section key={chapter.id} className={`land-ch land-ch-${i}`} aria-label="Intro">
-                {chapter.cards.map((card, k) => (
-                  <LandingCard key={`${card.src}-${k}`} card={card} caption={card.kind === "player" ? VIDEO_CAPTION : undefined} />
-                ))}
-                <div className="land-hero">
-                  <h1 className="big">
-                    {HERO_HEADING.map((line) => (
-                      <span key={line} className="hero-line">
-                        <span>{line}</span>
-                      </span>
-                    ))}
-                  </h1>
-                  <p className="lede land-hero-fade">{HERO_LEDE}</p>
-                  <div className="doors land-hero-fade">
-                    <MagPill href="/projects/new">Start your story</MagPill>
-                    <MagPill light onClick={exploreSample}>
-                      Explore a sample story
-                    </MagPill>
-                  </div>
+          {CARDS.map((card) => (
+            <LandingCard
+              key={card.id}
+              card={card}
+              secret={PUBLISH_SECRETS[card.id]}
+              outerRef={(el) => {
+                if (el) outerEls.current.set(card.id, el);
+                else outerEls.current.delete(card.id);
+              }}
+              counterRef={(el) => {
+                if (el) counterEls.current.set(card.id, el);
+                else counterEls.current.delete(card.id);
+              }}
+              secretRef={(el) => {
+                if (el) secretEls.current.set(card.id, el);
+                else secretEls.current.delete(card.id);
+              }}
+            />
+          ))}
+          {CARDS.map((card) => (
+            <span
+              key={`flag-${card.id}`}
+              ref={(el) => {
+                if (el) flagEls.current.set(card.id, el);
+                else flagEls.current.delete(card.id);
+              }}
+              className="land-flag"
+              aria-hidden="true"
+            />
+          ))}
+          {CHAPTERS.map((chapter, ch) =>
+            chapter.heading ? (
+              <div
+                key={chapter.id}
+                ref={(el) => {
+                  if (el) copyEls.current.set(ch, el);
+                  else copyEls.current.delete(ch);
+                }}
+                className={`land-copywrap${chapter.low ? " low" : ""}`}
+              >
+                <div className={`land-copy ${chapter.side ?? ""}`}>
+                  {chapter.soon ? (
+                    <span className="soon">Coming next</span>
+                  ) : (
+                    <div className="kicker">{chapter.kicker}</div>
+                  )}
+                  <h2>{chapter.heading}</h2>
+                  <p>{chapter.body}</p>
                 </div>
-                <div className="land-hint land-hero-fade">
-                  Scroll<i />
-                </div>
-              </section>
-            ) : chapter.id === "begin" ? (
-              <section key={chapter.id} className={`land-ch land-ch-${i}`} aria-label="Begin">
-                {chapter.cards.map((card, k) => (
-                  <LandingCard key={`${card.src}-${k}`} card={card} />
-                ))}
-                <div className="land-hero">
-                  <h2 className="big">
-                    {CLOSE_HEADING.map((line) => (
-                      <span key={line} className="hero-line">
-                        <span>{line}</span>
-                      </span>
-                    ))}
-                  </h2>
-                  <div className="doors" style={{ marginTop: 26 }}>
-                    <MagPill href="/projects/new">Start your story</MagPill>
-                  </div>
-                </div>
-              </section>
-            ) : (
-              <section key={chapter.id} className={`land-ch land-ch-${i}`} aria-label={chapter.label}>
-                {chapter.cards.map((card, k) => (
-                  <LandingCard key={`${card.src}-${k}`} card={card} caption={card.kind === "player" ? VIDEO_CAPTION : undefined} />
-                ))}
-                <ChapterExtras chapter={chapter} />
-                <ChapterCopy chapter={chapter} />
-              </section>
-            ),
+              </div>
+            ) : null,
           )}
+          {CHAPTERS.map((chapter, ch) =>
+            chapter.feature !== "none" && chapter.feature !== "video" ? (
+              <ChapterExtras
+                key={chapter.id}
+                chapter={chapter}
+                panelRef={(el) => {
+                  if (el) extraEls.current.set(ch, el);
+                  else extraEls.current.delete(ch);
+                }}
+              />
+            ) : null,
+          )}
+          <div ref={capEl} className="land-cap" data-cap>
+            {VIDEO_CAPTION}
+          </div>
+          <div ref={headEl} className="land-head" data-head>
+            <div className="land-playhead" />
+          </div>
+          <div ref={heroEl} className="land-hero">
+            <h1 className="big">
+              {HERO_HEADING.map((line) => (
+                <span key={line} className="hero-line">
+                  <span>{line}</span>
+                </span>
+              ))}
+            </h1>
+            <p className="lede land-hero-fade">{HERO_LEDE}</p>
+            <div className="doors land-hero-fade">
+              <MagPill href="/projects/new">Start your story</MagPill>
+              <MagPill light onClick={exploreSample}>
+                Explore a sample story
+              </MagPill>
+            </div>
+          </div>
+          <div ref={hintEl} className="land-hint">
+            Scroll<i />
+          </div>
+          <div ref={closeEl} className="land-hero land-close">
+            <h2 className="big">
+              {CLOSE_HEADING.map((line) => (
+                <span key={line} className="hero-line">
+                  <span>{line}</span>
+                </span>
+              ))}
+            </h2>
+            <div className="doors" style={{ marginTop: 26 }}>
+              <MagPill href="/projects/new">Start your story</MagPill>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -598,7 +868,7 @@ export default function LandingPage() {
       </nav>
 
       <div className="land-stack">
-        <section className="stack-reveal stack-hero">
+        <section className="stack-reveal stack-hero" data-stack="start">
           <h1 className="big">
             One story.
             <br />
@@ -614,34 +884,28 @@ export default function LandingPage() {
             </button>
           </div>
         </section>
-        {CHAPTERS.filter((c) => c.heading).map((chapter) => {
-          const img =
-            chapter.cards.find((c) => c.kind === "art" || c.kind === "sheet")
-              ?.src ?? "/anukili/storm.webp";
-          const alt =
-            chapter.cards.find((c) => c.kind === "art" || c.kind === "sheet")
-              ?.alt ?? "Story art";
-          return (
-            <section key={chapter.id} className="stack-reveal">
-              <Image
-                src={img}
-                alt={alt}
-                width={800}
-                height={533}
-                quality={75}
-                loading="lazy"
-                decoding="async"
-              />
-              {chapter.soon ? <span className="soon">Coming next</span> : null}
-              <h2>{chapter.heading}</h2>
-              <p>{chapter.body}</p>
-            </section>
-          );
-        })}
-        <section className="stack-reveal">
-          <h2>
-            Your story is bigger than one screen.
-          </h2>
+        {CHAPTERS.filter((c) => c.heading).map((chapter) => (
+          <section
+            key={chapter.id}
+            className="stack-reveal"
+            data-stack={chapter.id}
+          >
+            <Image
+              src={`/anukili/${chapter.img}.webp`}
+              alt={chapter.heading ?? chapter.label}
+              width={800}
+              height={533}
+              quality={75}
+              loading="lazy"
+              decoding="async"
+            />
+            {chapter.soon ? <span className="soon">Coming next</span> : null}
+            <h2>{chapter.heading}</h2>
+            <p>{chapter.body}</p>
+          </section>
+        ))}
+        <section className="stack-reveal" data-stack="begin">
+          <h2>Your story is bigger than one screen.</h2>
           <div className="doors">
             <Link className="pill" href="/projects/new">
               Start your story

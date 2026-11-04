@@ -695,12 +695,14 @@ describe("agent package storyboards", () => {
       "test-story-series/scenes/part-1/storyboard/frame-1.webp",
     );
     expect(sketch?.missing).toBe(false);
+    // The frame without art was never drawn: no file, no warning.
     const missing = files.find(
       (f) =>
         f.type === "storyboard-sketch" &&
         f.path.endsWith("storyboard/frame-2.webp"),
     );
-    expect(missing?.missing).toBe(true);
+    expect(missing).toBeUndefined();
+    expect(files.some((f) => f.missing)).toBe(false);
   });
 
   it("respects the channel rule: no foreign storyboards", () => {

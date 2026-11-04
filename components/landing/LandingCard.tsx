@@ -1,43 +1,39 @@
 "use client";
 
 import Image from "next/image";
-import type { CSSProperties, PointerEvent } from "react";
-import type { LandingCard as LandingCardData } from "@/lib/landing";
+import type { PointerEvent } from "react";
+import type { CardDef } from "@/lib/landing";
 import { pointerRatio, tiltBack, tiltTo, useFinePointer } from "./effects";
 
-const SIZES: Record<LandingCardData["kind"], { w: number; h: number }> = {
-  art: { w: 600, h: 800 },
-  sheet: { w: 520, h: 780 },
-  player: { w: 640, h: 360 },
-  thumb: { w: 320, h: 180 },
-};
-
-/** Display width of each kind, so the browser picks a matching resource. */
-const DISPLAY_WIDTH: Record<LandingCardData["kind"], string> = {
-  art: "300px",
-  sheet: "270px",
-  player: "620px",
-  thumb: "170px",
-};
-
 /**
- * One landing card. Three nested layers so scroll, pointer and hover
- * effects never fight over one transform:
- * - outer: scroll engine (scrubbed timeline)
- * - middle: pointer parallax and hero float
+ * One persistent landing card. Four nested layers so effects never fight
+ * over one transform:
+ * - outer: scroll engine (x, y, scaleX/Y, rotation, rotationY, opacity)
+ * - mid: pointer parallax and hero float
+ * - counter: inverse scale (1/scaleX, 1/scaleY) so the picture never stretches
  * - inner: hover lift and tilt
+ *
+ * The outer clips (overflow hidden), so as it morphs from portrait to wide
+ * the picture is cropped, never distorted. Tag badges cannot live in here:
+ * the counter-scale pushes the inner's top-left outside the clipped window,
+ * so they render as siblings of the outer (see LandingPage) and track the
+ * card's computed rect with transform only. The secret banner rides on the
+ * outer and settles exact at the publish rest.
  */
 export default function LandingCard({
   card,
-  eager = true,
-  caption,
+  secret,
+  outerRef,
+  counterRef,
+  secretRef,
 }: {
-  card: LandingCardData;
-  eager?: boolean;
-  caption?: string;
+  card: CardDef;
+  secret?: { channel: string; text: string; tint: string };
+  outerRef?: (el: HTMLDivElement | null) => void;
+  counterRef?: (el: HTMLDivElement | null) => void;
+  secretRef?: (el: HTMLDivElement | null) => void;
 }) {
   const fine = useFinePointer();
-  const { w, h } = SIZES[card.kind];
 
   const onMove = (e: PointerEvent<HTMLDivElement>) => {
     const { px, py } = pointerRatio(e.currentTarget, e.clientX, e.clientY);
@@ -49,41 +45,41 @@ export default function LandingCard({
 
   return (
     <div
-      className={`land-outer land-${card.kind}`}
-      data-depth={card.depth}
-      data-fade={card.fade}
-      style={{ "--seat-r": `${card.r}deg` } as CSSProperties}
+      ref={outerRef}
+      className="land-outer"
+      data-card={card.id}
+      data-depth={0.4 + (card.id % 4) * 0.2}
     >
       <div className="land-mid">
-        <div
-          className={`land-inner${card.pulse ? " land-pulse" : ""}`}
-          onPointerMove={fine ? onMove : undefined}
-          onPointerLeave={fine ? onLeave : undefined}
-        >
-          <Image
-            src={card.src}
-            alt={card.alt}
-            width={w}
-            height={h}
-            sizes={`(max-width: 900px) 100vw, ${DISPLAY_WIDTH[card.kind]}`}
-            quality={75}
-            loading={eager ? "eager" : "lazy"}
-            decoding="async"
-            draggable={false}
-          />
-          {card.flag ? <span className="land-flag">{card.flag}</span> : null}
-          {caption ? <span className="land-cap">{caption}</span> : null}
-        </div>
-        {card.secret ? (
+        <div ref={counterRef} className="land-counter">
           <div
-            className="land-secret"
-            style={{ background: card.secret.tint }}
+            className="land-inner"
+            onPointerMove={fine ? onMove : undefined}
+            onPointerLeave={fine ? onLeave : undefined}
           >
-            <b>{card.secret.channel}</b>
-            {card.secret.text}
+            <Image
+              src={card.src}
+              alt={card.alt}
+              fill
+              sizes="(max-width: 900px) 100vw, 800px"
+              quality={75}
+              loading="eager"
+              decoding="async"
+              draggable={false}
+            />
           </div>
-        ) : null}
+        </div>
       </div>
+      {secret ? (
+        <div
+          ref={secretRef}
+          className="land-secret"
+          style={{ background: secret.tint }}
+        >
+          <b>{secret.channel}</b>
+          {secret.text}
+        </div>
+      ) : null}
     </div>
   );
 }

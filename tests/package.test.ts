@@ -135,6 +135,15 @@ function makeWorld(): World {
         reveals: [GAME_SECRET],
         additions: ["A heron watches."],
       },
+      {
+        partId: "part-1",
+        channelId: "series",
+        script: "INT. RIVER — DAWN. Ada arrives.",
+        shots: ["Ada on the riverbank.", "The baby stirs.", "Dawn breaks."],
+        posts: ["Something begins.", "Dawn is coming.", "Watch closely."],
+        reveals: [SERIES_SECRET],
+        additions: ["A heron watches."],
+      },
     ],
   });
 }
@@ -168,11 +177,11 @@ describe("agent package secret rule", () => {
   });
 
   it("excludes other channels' beats from the timeline and scenes", () => {
-    const files = planAgentFiles(makeWorld(), "game");
+    const files = planAgentFiles(makeWorld(), "series");
     const timeline = files.find((f) => f.type === "timeline");
-    expect(JSON.stringify(timeline?.content)).toContain("First ripple");
-    expect(JSON.stringify(timeline?.content)).not.toContain("Arrival");
-    // Only part-1 is covered by the game channel.
+    expect(JSON.stringify(timeline?.content)).toContain("Arrival");
+    expect(JSON.stringify(timeline?.content)).not.toContain("First ripple");
+    // Only part-1 is covered by the series channel.
     const briefs = files
       .filter((f) => f.type === "scene-brief")
       .map((f) => f.path);
@@ -181,19 +190,19 @@ describe("agent package secret rule", () => {
   });
 
   it("marks packs suggested and marks their additions in the file", () => {
-    const files = planAgentFiles(makeWorld(), "game");
+    const files = planAgentFiles(makeWorld(), "series");
     const pack = files.find((f) => f.type === "pack");
     expect(pack?.missing).toBe(false);
     expect(pack?.suggested).toBe(true);
     expect(pack?.content).toContain("suggested addition");
   });
 
-  it("leaves missing files out and says so in the manifest", () => {
-    const files = planAgentFiles(makeWorld(), "game");
-    // part-2 art, the left cutout, and no pack for part-2... part-2 is
-    // uncovered so only these are missing here.
+  it("leaves unmade work out instead of reporting missing files", () => {
+    const files = planAgentFiles(makeWorld(), "series");
+    // The left cutout was never cut and part-2 is uncovered: neither
+    // reports as missing. The manifest lists only real files.
     const missing = files.filter((f) => f.missing);
-    expect(missing.length).toBeGreaterThan(0);
+    expect(missing).toHaveLength(0);
     const manifest = files.find((f) => f.type === "manifest");
     const parsed = JSON.parse(manifest?.content as string) as {
       story: string;
@@ -208,23 +217,24 @@ describe("agent package secret rule", () => {
       }>;
     };
     expect(parsed.story).toBe("test-story");
-    expect(parsed.channel).toBe("game");
+    expect(parsed.channel).toBe("series");
     expect(parsed.files).toHaveLength(files.length - 1);
     for (const entry of parsed.files) {
       expect(typeof entry.path).toBe("string");
       expect(typeof entry.type).toBe("string");
       expect(typeof entry.suggested).toBe("boolean");
-      expect(typeof entry.missing).toBe("boolean");
+      expect(entry.missing).toBe(false);
     }
     const leftCutout = parsed.files.find((f) =>
       f.path.endsWith("cutouts/left.png"),
     );
-    expect(leftCutout?.missing).toBe(true);
+    expect(leftCutout).toBeUndefined();
     const sheet = parsed.files.find((f) =>
       f.path.endsWith("sheet/front.webp"),
     );
     expect(sheet?.character).toBe("ada");
-    expect(sheet?.missing).toBe(false);
+    const tree = packageTree(files);
+    expect(tree).not.toContain("missing");
   });
 
   it("builds a real ZIP whose tree matches its contents", async () => {
@@ -319,10 +329,12 @@ describe("agent package storyboards", () => {
         f.path.endsWith("storyboard/frame-1.webp"),
     );
     expect(sketch?.missing).toBe(false);
+    // The frame without art was never drawn: no file, no warning.
     const missing = files.find((f) =>
       f.path.endsWith("storyboard/frame-2.webp"),
     );
-    expect(missing?.missing).toBe(true);
+    expect(missing).toBeUndefined();
+    expect(files.some((f) => f.missing)).toBe(false);
   });
 
   it("keeps storyboards to their own channel", () => {
