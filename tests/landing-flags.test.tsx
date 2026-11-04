@@ -3,7 +3,7 @@ import { join } from "node:path";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { CARDS } from "@/lib/landing";
+import { CARDS, maxCardZ } from "@/lib/landing";
 import LandingCard from "@/components/landing/LandingCard";
 
 const css = () =>
@@ -41,6 +41,19 @@ describe("landing tag flags", () => {
     // Hidden while the card travels: shown only near the chapter rest.
     expect(source).toContain("nearRest(s)");
     expect(source).toContain("flag.style.visibility");
+  });
+
+  it("paints flags above every card but below the rail and top bar", () => {
+    const zOf = (name: string): number => {
+      const body = ruleBody(name);
+      const z = body.match(/z-index\s*:\s*(\d+)/)?.[1];
+      expect(z, `${name} sets a z-index`).toBeDefined();
+      return Number(z);
+    };
+    const flag = zOf(".land-flag");
+    expect(flag).toBeGreaterThan(maxCardZ());
+    expect(flag).toBeLessThan(zOf(".land-rail"));
+    expect(flag).toBeLessThan(zOf(".land-bar"));
   });
 
   it("keeps the reshape clipping on the outer only", () => {

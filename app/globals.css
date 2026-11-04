@@ -1783,7 +1783,9 @@ p {
   opacity: 0;
   visibility: hidden;
   will-change: transform, opacity;
-  z-index: 3;
+  /* Above the highest card z the engine can set (2 + card 12 = 14), so
+     flags always paint over their card; below the rail (40) and bar (50). */
+  z-index: 20;
 }
 .land-flag.hit {
   background: var(--clay);

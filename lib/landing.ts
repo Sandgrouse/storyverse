@@ -546,6 +546,27 @@ export function layoutRects(
  * Largest size a card ever needs, in px at a W/H viewport. The engine
  * renders each card at this size once and morphs with scale only.
  */
+/**
+ * Base z-index the scroll engine (components/landing/LandingPage.tsx)
+ * assigns a seated card as `CARD_Z_BASE + card.id`, or 0 when hidden.
+ */
+export const CARD_Z_BASE = 2;
+
+/**
+ * Highest z-index the scroll engine can assign a card: the base plus the
+ * highest seated card id. Tag flags (.land-flag) must stay above this, and
+ * below the right-hand rail (40) and the top bar (50) in app/globals.css.
+ */
+export function maxCardZ(): number {
+  let max = 0;
+  for (const layout of LAYOUTS) {
+    for (const id of Object.keys(layout)) {
+      max = Math.max(max, CARD_Z_BASE + Number(id));
+    }
+  }
+  return max;
+}
+
 export function cardBasePx(
   id: number,
   viewportW: number,

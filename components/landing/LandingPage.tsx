@@ -13,6 +13,7 @@ import {
   BROWSER_TITLE,
   BROWSER_URL,
   CARDS,
+  CARD_Z_BASE,
   CHAPTERS,
   CHANGE_LINE,
   CLOSE_HEADING,
@@ -512,7 +513,7 @@ export default function LandingPage() {
               const B = byId(rects[Math.min(i + 1, N - 1)], card.id);
               const on = (A && A.o) || (B && B.o);
               outer.style.zIndex = on
-                ? String(2 + (LAYOUTS[ri]?.[card.id] ? card.id : 0))
+                ? String(CARD_Z_BASE + (LAYOUTS[ri]?.[card.id] ? card.id : 0))
                 : "0";
             }
             rail.current.forEach((button, k) => {
