@@ -14,6 +14,7 @@ import {
   upstreamMessage,
   voiceErrorFor,
 } from "@/lib/voice";
+import { requireOwnerCode } from "@/lib/voice-owner";
 
 export const maxDuration = 60;
 
@@ -57,14 +58,18 @@ export async function POST(req: Request) {
     return errorResponse(503, "NO_VOICE_KEY", NO_VOICE_KEY_MESSAGE);
   }
 
-  // Premade voices only: the id must be on the listed voices. Uses the
-  // cached list, fetching it once when the cache is empty.
+  // Premade voices speak without the owner code. Anything else is a
+  // custom voice and needs the code, so a stranger can never spend the
+  // owner's voice slots.
   const premade = await loadPremadeVoices(apiKey);
   if (!premade.ok) {
     return errorResponse(premade.status, "VOICE_FAILED", premade.message);
   }
   if (!premade.voices.some((voice) => voice.id === voiceId)) {
-    return errorResponse(400, "UNKNOWN_VOICE", UNKNOWN_SPEAK_VOICE_MESSAGE);
+    const owner = requireOwnerCode(req);
+    if (!owner.ok) {
+      return errorResponse(owner.status, owner.code, owner.message);
+    }
   }
 
   const charge = await checkBudget("voice-speak", req);

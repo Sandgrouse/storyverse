@@ -7,10 +7,20 @@ export const SheetViewSchema = z.object({
   cutoutPath: z.string().optional(),
 });
 
+export const VoiceConsentSchema = z.object({
+  by: z.string().optional(),
+  text: z.string(),
+  at: z.string(),
+});
+
 export const CharacterVoiceSchema = z.object({
   id: z.string(),
   name: z.string(),
   reason: z.string().optional(),
+  kind: z.enum(["premade", "custom"]).optional(),
+  /** Where the custom voice came from: recording, upload or artist. */
+  source: z.string().optional(),
+  consent: VoiceConsentSchema.optional(),
 });
 
 export const CharacterLineSchema = z.object({
@@ -166,6 +176,7 @@ export const RippleResultSchema = z.object({
 });
 
 export type SheetView = z.infer<typeof SheetViewSchema>;
+export type VoiceConsent = z.infer<typeof VoiceConsentSchema>;
 export type CharacterVoice = z.infer<typeof CharacterVoiceSchema>;
 export type CharacterLine = z.infer<typeof CharacterLineSchema>;
 export type Character = z.infer<typeof CharacterSchema>;
