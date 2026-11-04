@@ -37,6 +37,10 @@ button {
   border: 0;
   cursor: pointer;
 }
+a {
+  color: inherit;
+  text-decoration: none;
+}
 button:focus-visible,
 input:focus-visible {
   outline: 2px solid var(--clay);

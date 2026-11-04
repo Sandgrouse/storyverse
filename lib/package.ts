@@ -19,6 +19,8 @@ export type PackageFileType =
   | "character-canon"
   | "sheet"
   | "cutout"
+  | "voice"
+  | "voice-audio"
   | "scene-art"
   | "scene-brief"
   | "pack";
@@ -206,6 +208,31 @@ export function sceneBrief(
   return lines.join("\n");
 }
 
+/** A character's voice index: which voice speaks, and each saved line. */
+export function voiceIndexJson(character: {
+  id: string;
+  name: string;
+  voice?: { id: string; name: string };
+  lines?: Array<{ id: string; text: string }>;
+}): string {
+  return (
+    `${JSON.stringify(
+      {
+        character: character.id,
+        name: character.name,
+        voiceId: character.voice?.id ?? null,
+        voiceName: character.voice?.name ?? null,
+        lines: (character.lines ?? []).map((line) => ({
+          id: line.id,
+          text: line.text,
+        })),
+      },
+      null,
+      2,
+    )}\n`
+  );
+}
+
 /** Decode a `data:<mime>;base64,...` URL to bytes. Null when not one. */
 export function dataUrlToBytes(
   dataUrl: string,
@@ -314,6 +341,28 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
           { character: character.id },
         ),
       );
+    }
+    const voiceLines = source?.lines ?? [];
+    if (source && (source.voice || voiceLines.length > 0)) {
+      files.push({
+        path: `${root}/characters/${character.id}/voice.json`,
+        type: "voice",
+        character: character.id,
+        suggested: false,
+        missing: false,
+        content: voiceIndexJson(source),
+      });
+      for (const line of voiceLines) {
+        const decoded = line.audioPath ? dataUrlToBytes(line.audioPath) : null;
+        files.push({
+          path: `${root}/characters/${character.id}/voice/${line.id}.mp3`,
+          type: "voice-audio",
+          character: character.id,
+          suggested: false,
+          missing: !decoded,
+          ...(decoded ? { content: decoded.bytes } : {}),
+        });
+      }
     }
   }
 

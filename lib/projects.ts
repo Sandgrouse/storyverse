@@ -335,6 +335,11 @@ export function mergeWorldAssets(oldWorld: World, nextWorld: World): World {
       return {
         ...character,
         artPath: character.artPath ? character.artPath : old.artPath,
+        voice: character.voice ?? old.voice,
+        lines:
+          character.lines && character.lines.length > 0
+            ? character.lines
+            : old.lines,
         sheet:
           character.sheet.length > 0
             ? character.sheet.map((view) => {

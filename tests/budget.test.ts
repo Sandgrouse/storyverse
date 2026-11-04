@@ -84,6 +84,8 @@ describe("budget caps", () => {
       "sheet-view": 1,
       scene: 2,
       cutout: 1,
+      "voice-suggest": 1,
+      "voice-speak": 2,
     });
   });
 

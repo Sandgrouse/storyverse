@@ -62,6 +62,10 @@ describe("no key in the client bundle", () => {
         `${file} must not reference MODEL_API_KEY`,
       ).toBe(false);
       expect(
+        text.includes("ELEVENLABS_API_KEY"),
+        `${file} must not reference ELEVENLABS_API_KEY`,
+      ).toBe(false);
+      expect(
         /NEXT_PUBLIC_/.test(text),
         `${file} must not reference a NEXT_PUBLIC_ key`,
       ).toBe(false);

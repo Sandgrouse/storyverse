@@ -23,6 +23,8 @@ export const ROUTE_COSTS = {
   "sheet-view": 1,
   scene: 2,
   cutout: 1,
+  "voice-suggest": 1,
+  "voice-speak": 2,
 } as const;
 
 export type BudgetRoute = keyof typeof ROUTE_COSTS;
