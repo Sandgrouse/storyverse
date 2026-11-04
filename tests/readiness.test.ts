@@ -212,6 +212,26 @@ describe("channel readiness", () => {
     expect(todo.every((item) => !item.done)).toBe(true);
     expect(todo.some((item) => item.href.includes("/script?"))).toBe(true);
   });
+
+  it("never lists storyboards or video for a game channel", () => {
+    const card = channelReadiness(makeWorld(), "test-story", "game");
+    expect(card.items.map((item) => item.kind)).not.toContain("storyboard");
+    expect(card.items.map((item) => item.kind)).not.toContain("video");
+    const kinds = card.items.map((item) => item.kind).sort();
+    expect(kinds).toEqual(["art", "design", "sheets"]);
+    const labels = card.items.map((item) => item.label);
+    expect(labels).toContain("Design: Beginnings");
+    expect(card.made).toBe(1);
+    expect(card.total).toBe(3);
+    // The game design counts as written work: the script link stays.
+    const design = card.items.find((item) => item.kind === "design");
+    expect(design?.href).toBe(
+      "/projects/test-story/script?channel=game&part=part-1",
+    );
+    expect(notMadeYet(makeWorld(), "test-story").filter((item) =>
+      item.href.includes("channel=game"),
+    ).map((item) => item.kind)).not.toContain("storyboard");
+  });
 });
 
 describe("missing-file fix", () => {
