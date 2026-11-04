@@ -16,7 +16,7 @@ Storyverse holds one master copy of a story world and shows how it plays across 
 pnpm install
 ```
 
-Set `MODEL_API_KEY` (and optionally `ELEVENLABS_API_KEY` for character voices), then:
+Set `MODEL_API_KEY` (and optionally `ELEVENLABS_API_KEY` for character voices and `VOICE_OWNER_CODE` for custom voices), then:
 
 ```sh
 pnpm dev
@@ -35,5 +35,14 @@ Without a key the app runs in sample mode: the seeded story stays fully browsabl
 This project uses `@meta-sam/parser` under the SAM License. See the license terms at [https://dev.meta.ai/](https://dev.meta.ai/).
 
 Character voices are spoken by the [ElevenLabs](https://elevenlabs.io/) text-to-speech API; the app sends it only the chosen voice and the line to speak.
+
+## Custom voices
+
+A project owner can make a custom ElevenLabs voice for a character from their own recording, an uploaded sample, or recordings from a voice artist reached by a link (`/voice/[token]`).
+
+- **Owner code.** Custom voices spend the owner's ElevenLabs voice slots, so creating invites, listing or deleting submissions, creating a custom voice, and speaking with one all need the header `x-voice-owner-code` (server only, `VOICE_OWNER_CODE`). After 10 wrong codes from one address in an hour the server returns 429. The drawer keeps the entered code in `sessionStorage`, never in the world or the URL.
+- **Consent.** Recording and uploading stay disabled until the owner ticks "I have the right and the speaker's consent to create an AI voice from this audio." Artists give their name and tick their own consent on the artist page; the owner sees that record beside each take, and it is stored on the character's voice.
+- **Reading lines.** `POST /api/voice/lines` has Muse Spark write 8 to 12 lines from the story material (about 90 seconds, varied emotion). Secrets never reach the prompt.
+- **Storage.** Audio lives in Vercel Blob in production and under `.data/voice/` locally. Files are at most 4MB of audio, 12 per character per invite, and invites expire after 14 days.
 
 The scrolling landing page uses [GSAP](https://gsap.com/) (`gsap` and `@gsap/react`) under the GSAP Standard License (free of charge; see [https://gsap.com/standard-license](https://gsap.com/standard-license)) and [Lenis](https://lenis.darkroom.engineering/) (`lenis`) under the MIT License.

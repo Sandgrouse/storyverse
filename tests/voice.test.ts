@@ -335,12 +335,13 @@ describe("voice speak", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("rejects a voice id that isn't listed", async () => {
+  it("needs the owner code for a voice that isn't listed", async () => {
+    vi.stubEnv("VOICE_OWNER_CODE", "owner-secret");
     const fetchMock = vi.fn(async (url: unknown) => {
       if (String(url).includes("/v2/voices")) {
         return new Response(JSON.stringify(upstreamVoices()), { status: 200 });
       }
-      throw new Error(`must not speak an unlisted voice: ${String(url)}`);
+      throw new Error(`must not speak a custom voice without the code: ${String(url)}`);
     });
     vi.stubGlobal("fetch", fetchMock);
     const res = await speakPOST(
@@ -349,9 +350,12 @@ describe("voice speak", () => {
         text: "Hi.",
       }),
     );
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
     expect(await res.json()).toEqual({
-      error: { code: "UNKNOWN_VOICE", message: "Choose one of the listed voices." },
+      error: {
+        code: "OWNER_CODE_REQUIRED",
+        message: "Custom voices are for this project's owner.",
+      },
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/v2/voices");

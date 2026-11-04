@@ -21,6 +21,7 @@ import {
 import { stripImageData } from "@/lib/story";
 import type { PremadeVoice } from "@/lib/voice";
 import type { CharacterVoice } from "@/lib/world/schemas";
+import CustomVoice from "@/components/voice/CustomVoice";
 
 type Props = {
   world: World;
@@ -144,7 +145,12 @@ function VoiceSection({
   const storedVoice = character.voice;
   const lines = character.lines ?? [];
   const selectedId = pickedId ?? storedVoice?.id ?? null;
-  const selected = voices?.find((v) => v.id === selectedId) ?? null;
+  const customOption =
+    storedVoice?.kind === "custom"
+      ? { id: storedVoice.id, name: `${storedVoice.name} (custom)`, labels: {}, previewUrl: "" }
+      : null;
+  const orderedVoices: PremadeVoice[] = [...(customOption ? [customOption] : []), ...(voices ?? [])];
+  const selected = orderedVoices.find((v) => v.id === selectedId) ?? null;
   const tabIndex = open ? 0 : -1;
 
   const stopAudio = () => {
@@ -228,6 +234,12 @@ function VoiceSection({
   };
 
   const chooseVoice = (id: string) => {
+    if (customOption && id === customOption.id && storedVoice) {
+      setPickedId(id);
+      setReason(null);
+      onWorld(withVoice(world, character.id, storedVoice));
+      return;
+    }
     const match = voices?.find((voice) => voice.id === id);
     if (!match) return;
     setPickedId(id);
@@ -240,10 +252,20 @@ function VoiceSection({
     if (speaking || !selectedId || text.length === 0 || text.length > 300) return;
     setSpeaking(true);
     setSpeakError(null);
+    const isCustom = customOption?.id === selectedId;
+    let ownerCode = "";
+    try {
+      ownerCode = sessionStorage.getItem("voice-owner-code") ?? "";
+    } catch {
+      ownerCode = "";
+    }
     try {
       const res = await fetch("/api/voice/speak", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(isCustom ? { "x-voice-owner-code": ownerCode } : {}),
+        },
         body: JSON.stringify({ voiceId: selectedId, text }),
       });
       const json: unknown = await res.json().catch(() => null);
@@ -351,7 +373,7 @@ function VoiceSection({
                 maxWidth: "100%",
               }}
             >
-              {voices?.map((voice) => (
+              {orderedVoices.map((voice) => (
                 <option key={voice.id} value={voice.id}>
                   {voice.name}
                 </option>
@@ -938,6 +960,14 @@ export default function CastDrawer({ world, open, onClose, onWorld }: Props) {
           key={selected.id}
           world={world}
           open={open}
+          character={selected}
+          onWorld={onWorld}
+        />
+      )}
+      {selected && (
+        <CustomVoice
+          key={`custom-${selected.id}`}
+          world={world}
           character={selected}
           onWorld={onWorld}
         />
