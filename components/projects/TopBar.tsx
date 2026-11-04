@@ -9,6 +9,7 @@ import { getEntry } from "@/lib/projects";
 const SECTIONS = [
   { id: "story", label: "Story" },
   { id: "characters", label: "Characters" },
+  { id: "script", label: "Script" },
   { id: "package", label: "Agent package" },
 ] as const;
 
@@ -27,9 +28,17 @@ export default function TopBar() {
     setTitle(getEntry(params.id)?.title ?? "");
   }, [params.id, pathname]);
 
-  const section = params.section ? sectionFor(params.section) : null;
+  const tail = pathname.split("/").filter(Boolean).pop();
+  const section = params.section
+    ? sectionFor(params.section)
+    : tail === "script"
+      ? "script"
+      : null;
   const showSections =
-    section === "story" || section === "characters" || section === "package";
+    section === "story" ||
+    section === "characters" ||
+    section === "script" ||
+    section === "package";
 
   return (
     <header className="topbar">

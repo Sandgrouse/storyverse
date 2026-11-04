@@ -327,8 +327,19 @@ export function mergeWorldAssets(oldWorld: World, nextWorld: World): World {
     }
   }
   const beatsById = new Map(oldWorld.beats.map((beat) => [beat.id, beat]));
+  const scriptsByKey = new Map(
+    nextWorld.scripts.map((script) => [
+      `${script.channelId}::${script.partId}`,
+      script,
+    ]),
+  );
+  for (const script of oldWorld.scripts ?? []) {
+    const key = `${script.channelId}::${script.partId}`;
+    if (!scriptsByKey.has(key)) scriptsByKey.set(key, script);
+  }
   return {
     ...nextWorld,
+    scripts: [...scriptsByKey.values()],
     characters: nextWorld.characters.map((character) => {
       const old = charactersByName.get(lower(character.name));
       if (!old) return character;

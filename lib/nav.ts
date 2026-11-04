@@ -23,6 +23,7 @@ export function backFor(pathname: string): string | null {
   ) {
     return `/projects/${id}/channels`;
   }
+  if (page === "script") return `/projects/${id}/story`;
   if (page === "material") return `/projects/${id}/understood`;
   if (page === "reading") return `/projects/${id}/material`;
   return `/projects/${id}/story`;
@@ -42,12 +43,18 @@ export function shouldRedirectFromReading(options: {
   return options.ready && options.empty && !options.leaving;
 }
 
-export type WorldSection = "story" | "characters" | "story-pack" | "package";
+export type WorldSection =
+  | "story"
+  | "characters"
+  | "script"
+  | "story-pack"
+  | "package";
 
 /** Drawer section from a catch-all param, defaulting to the story. */
 export function sectionFor(section: string[] | undefined): WorldSection {
   if (!section || section.length === 0 || section[0] === "story") return "story";
   if (section[0] === "characters") return "characters";
+  if (section[0] === "script") return "script";
   if (section[0] === "story-pack") return "story-pack";
   if (section[0] === "package") return "package";
   return "story";
