@@ -22,7 +22,7 @@ function drawerFor(section: string[] | undefined): {
 }
 
 /**
- * One client page for the Story, Characters, Story Pack and Package
+ * One client page for the Story, Characters, Scene notes and Package
  * paths, so World scene state such as a running ripple survives moving
  * between those sections. Opening or closing a drawer changes the URL.
  */

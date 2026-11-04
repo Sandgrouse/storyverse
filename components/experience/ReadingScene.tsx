@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { World } from "@/lib/world/schemas";
 import { ReadModelOutputSchema, type ReadModelOutput } from "@/lib/read";
 import { buildWorld } from "@/lib/story";
+import CanonBook from "./CanonBook";
 import { toPlanBeats, toPlanChannels, toPlanSecrets } from "@/lib/plan";
 import type { ClientFile } from "@/components/projects/DraftContext";
 
@@ -301,6 +302,36 @@ export default function ReadingScene({
     setPhase("reading");
     setRetryKey((k) => k + 1);
   };
+
+  // Once Muse finishes, this same page is the book: contents, a scrollable
+  // page, highlighted names, and the characters and places panel.
+  if (finished && result) {
+    return (
+      <>
+        <CanonBook world={result.world} />
+        <div className="canon-foot">
+          <span>
+            {backHref ? (
+              <Link className="quiet" href={backHref}>
+                Back
+              </Link>
+            ) : null}
+          </span>
+          <span className="canon-status">
+            {isSample || sample ? "Sample · " : ""}
+            {status}
+          </span>
+          <button
+            type="button"
+            className="pill"
+            onClick={() => onDone(result.world, result.sample)}
+          >
+            See what I found
+          </button>
+        </div>
+      </>
+    );
+  }
 
   return (
     <section className="scene on" id="reading">
