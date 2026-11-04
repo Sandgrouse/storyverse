@@ -1,21 +1,12 @@
-import ArrivalHome from "@/components/projects/ArrivalHome";
-import { createLocalStorage } from "@/lib/storage/local";
+import type { Metadata } from "next";
+import LandingPage from "@/components/landing/LandingPage";
 
-export default async function HomePage() {
-  const world = await createLocalStorage().getWorld();
-  const seen = new Set<string>();
-  const images: string[] = [];
-  for (const part of world.parts) {
-    if (part.imagePath && !seen.has(part.imagePath)) {
-      seen.add(part.imagePath);
-      images.push(part.imagePath);
-    }
-  }
-  for (const character of world.characters) {
-    if (character.artPath && !seen.has(character.artPath)) {
-      seen.add(character.artPath);
-      images.push(character.artPath);
-    }
-  }
-  return <ArrivalHome images={images} />;
+export const metadata: Metadata = {
+  title: "Storyverse — One story. Every screen.",
+  description:
+    "Build your story once. Publish it as a series, a game, shorts and more.",
+};
+
+export default function HomePage() {
+  return <LandingPage />;
 }
