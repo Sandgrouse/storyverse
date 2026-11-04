@@ -22,6 +22,8 @@ export const ROUTE_COSTS = {
   pack: 1,
   "sheet-view": 1,
   scene: 2,
+  "script-draft": 1,
+  "script-check": 1,
   cutout: 1,
   "voice-suggest": 1,
   "voice-speak": 2,

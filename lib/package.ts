@@ -23,6 +23,7 @@ export type PackageFileType =
   | "voice-audio"
   | "scene-art"
   | "scene-brief"
+  | "script"
   | "pack";
 
 export type PackageFile = {
@@ -65,6 +66,7 @@ export function channelWorld(world: World, channelId: string): World {
     ),
     beats: world.beats.filter((beat) => beat.channelId === channelId),
     packs: world.packs.filter((pack) => pack.channelId === channelId),
+    scripts: world.scripts.filter((script) => script.channelId === channelId),
     characters: world.characters.map((character) => ({
       ...character,
       secret: undefined,
@@ -401,6 +403,17 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
         missing: true,
       });
     }
+  }
+
+  for (const script of filtered.scripts) {
+    files.push({
+      path: `${root}/scripts/${script.partId}.txt`,
+      type: "script",
+      part: script.partId,
+      suggested: false,
+      missing: false,
+      content: script.text,
+    });
   }
 
   const manifest: ManifestEntry[] = files.map((file) => ({

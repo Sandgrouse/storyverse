@@ -1,0 +1,232 @@
+/* Script page: the Script view of docs/design/studio.html. All new CSS
+   for this page lives here; nothing else imports it. */
+
+.script-layout {
+  display: grid;
+  grid-template-columns: 250px 1fr 300px;
+  min-height: 100vh;
+  padding-top: 76px;
+}
+
+.script-side {
+  padding: 22px 18px;
+  overflow: auto;
+}
+
+.script-group {
+  margin-bottom: 18px;
+}
+
+.script-group h4 {
+  margin: 0 0 6px;
+  font: 500 12px var(--sans);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.script-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.script-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  transition: background 0.2s, transform 0.25s var(--ease);
+}
+
+.script-item:hover {
+  background: rgba(251, 248, 241, 0.8);
+  transform: translateX(2px);
+}
+
+.script-item.on {
+  background: var(--sheet);
+  box-shadow: 0 1px 0 var(--rule);
+}
+
+.script-desk {
+  overflow: auto;
+  padding: 26px 20px 60px;
+}
+
+.script-page {
+  position: relative;
+  max-width: 660px;
+  min-height: 72vh;
+  margin: 0 auto;
+  background: var(--sheet);
+  border-radius: 6px;
+  box-shadow: var(--lift);
+}
+
+/* The mirrored backdrop and the textarea share every text metric, so
+   highlights sit exactly under the typed words. */
+.script-backdrop,
+.script-area {
+  font: 400 15px/1.65 "Courier New", monospace;
+  padding: 52px 62px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  border: 0;
+}
+
+.script-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--ink);
+  pointer-events: none;
+  user-select: none;
+}
+
+.script-backdrop mark {
+  background: var(--clay-soft);
+  color: inherit;
+  border-bottom: 1.5px solid var(--clay);
+  padding: 0 1px;
+}
+
+.script-backdrop mark.bad {
+  background: rgba(198, 79, 38, 0.28);
+}
+
+.script-area {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 72vh;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--ink);
+  outline: 0;
+}
+
+.script-area::selection {
+  background: rgba(198, 79, 38, 0.25);
+  color: transparent;
+}
+
+.script-area::placeholder {
+  color: var(--soft);
+}
+
+.script-tools {
+  padding: 22px 20px;
+  overflow: auto;
+  border-left: 1px solid var(--rule);
+}
+
+.script-tool {
+  margin-bottom: 22px;
+}
+
+.script-tool h3 {
+  font: 400 21px/1.15 var(--serif);
+  margin-bottom: 6px;
+}
+
+.script-kicker {
+  color: var(--clay);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.script-sub {
+  color: var(--soft);
+  font-size: 13px;
+}
+
+.script-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.script-note {
+  margin-top: 10px;
+  color: var(--soft);
+  font-size: 13px;
+}
+
+.script-flag {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--clay-soft);
+  margin-top: 8px;
+}
+
+.script-flag b {
+  font-weight: 500;
+}
+
+.script-flag .script-fix {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+
+.script-face {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.script-face i {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: 50% 12%;
+  background-color: rgba(31, 27, 22, 0.08);
+  flex: none;
+}
+
+.script-play {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--sheet);
+  font-size: 9px;
+  transition: transform 0.2s var(--ease);
+}
+
+.script-play:hover {
+  transform: scale(1.12);
+}
+
+.script-play[disabled] {
+  opacity: 0.3;
+  cursor: default;
+  transform: none;
+}
+
+.script-empty {
+  padding: 120px 34px;
+  text-align: center;
+  color: var(--soft);
+}
+
+@media (max-width: 1100px) {
+  .script-layout {
+    grid-template-columns: 1fr;
+  }
+  .script-tools {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+  }
+}
