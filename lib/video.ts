@@ -37,8 +37,6 @@ export const VIDEO_PLAN_JSON_SCHEMA = {
     title: { type: "string" },
     shots: {
       type: "array",
-      minItems: 4,
-      maxItems: 6,
       items: {
         type: "object",
         properties: {
@@ -47,16 +45,21 @@ export const VIDEO_PLAN_JSON_SCHEMA = {
           durationSec: { type: "number" },
           motion: { type: "string", enum: ["push", "pan", "still"] },
           voice: {
-            type: "object",
-            properties: {
-              characterId: { type: "string" },
-              text: { type: "string" },
-            },
-            required: ["characterId", "text"],
-            additionalProperties: false,
+            anyOf: [
+              {
+                type: "object",
+                properties: {
+                  characterId: { type: "string" },
+                  text: { type: "string" },
+                },
+                required: ["characterId", "text"],
+                additionalProperties: false,
+              },
+              { type: "null" },
+            ],
           },
         },
-        required: ["imagePath", "caption", "durationSec", "motion"],
+        required: ["imagePath", "caption", "durationSec", "motion", "voice"],
         additionalProperties: false,
       },
     },
@@ -73,22 +76,27 @@ export const VideoPlanRequestSchema = z.object({
 
 export type VideoPlanRequest = z.infer<typeof VideoPlanRequestSchema>;
 
+/**
+ * The model always sends every key (strict structured output), so voice
+ * arrives as an object or null. Limits are validated in code, not here,
+ * so one long caption or slow shot never fails the whole plan.
+ */
 export const VideoPlanVoiceSchema = z.object({
-  characterId: z.string().min(1),
-  text: z.string().min(1).max(160),
+  characterId: z.string(),
+  text: z.string(),
 });
 
 export const VideoPlanShotSchema = z.object({
-  imagePath: z.string().min(1),
-  caption: z.string().min(1).max(90),
-  durationSec: z.number().min(PLAN_SHOT_MIN_SEC).max(PLAN_SHOT_MAX_SEC),
+  imagePath: z.string(),
+  caption: z.string(),
+  durationSec: z.number(),
   motion: z.enum(["push", "pan", "still"]),
-  voice: VideoPlanVoiceSchema.optional(),
+  voice: VideoPlanVoiceSchema.nullable().optional(),
 });
 
 export const VideoPlanModelOutputSchema = z.object({
   title: z.string().min(1).max(80),
-  shots: z.array(VideoPlanShotSchema).min(4).max(6),
+  shots: z.array(VideoPlanShotSchema),
 });
 
 export type VideoPlanModelOutput = z.infer<typeof VideoPlanModelOutputSchema>;
@@ -96,7 +104,17 @@ export type VideoPlanModelOutput = z.infer<typeof VideoPlanModelOutputSchema>;
 export const VIDEO_PLAN_NO_KEY_MESSAGE =
   "Shot plans aren't available on this server.";
 
-export const VIDEO_PLAN_FAILED_MESSAGE = "Planning the shots failed.";
+export const VIDEO_PLAN_FAILED_MESSAGE =
+  "Muse couldn't plan this scene. Try again, or add shots with +.";
+
+/** Longest caption a shot keeps, in characters. */
+export const PLAN_CAPTION_MAX = 90;
+
+/** Most shots one plan keeps. */
+export const VIDEO_PLAN_MAX_SHOTS = 6;
+
+/** Fewest usable shots for a plan to succeed. */
+export const VIDEO_PLAN_MIN_USABLE_SHOTS = 2;
 
 /**
  * Every non-empty art path in the world: part art, beat art, then
@@ -198,8 +216,67 @@ export type PlannedShot = {
   caption: string;
   durationSec: number;
   motion: ShortShot["motion"];
-  voice?: { characterId: string; text: string };
+  /** Null from the model means no voice, same as missing. */
+  voice?: { characterId: string; text: string } | null;
 };
+
+/** Shorten a caption to 90 characters, cutting at a word boundary. */
+export function truncateCaption(caption: string): string {
+  const text = caption.trim();
+  if (text.length <= PLAN_CAPTION_MAX) return text;
+  const cut = text.slice(0, PLAN_CAPTION_MAX);
+  const space = cut.lastIndexOf(" ");
+  const kept = (space > 0 ? cut.slice(0, space) : cut).trimEnd();
+  return kept.length > 0 ? kept : cut.trimEnd();
+}
+
+/** Clamp a shot duration to 3 to 7 seconds. Null when it is no number. */
+export function clampShotDuration(durationSec: number): number | null {
+  if (typeof durationSec !== "number" || !Number.isFinite(durationSec)) {
+    return null;
+  }
+  return Math.min(
+    PLAN_SHOT_MAX_SEC,
+    Math.max(PLAN_SHOT_MIN_SEC, durationSec),
+  );
+}
+
+/**
+ * Turn raw model shots into usable planned shots: drop empty captions
+ * and bad durations, clamp the rest, map null voice to no voice, keep
+ * at most 6. The caller fails the plan when fewer than 2 remain.
+ */
+export function sanitizePlannedShots(
+  modelShots: Array<{
+    imagePath: string;
+    caption: string;
+    durationSec: number;
+    motion: ShortShot["motion"];
+    voice?: { characterId: string; text: string } | null;
+  }>,
+): PlannedShot[] {
+  const usable: PlannedShot[] = [];
+  for (const shot of modelShots) {
+    const caption = truncateCaption(shot.caption ?? "");
+    const durationSec = clampShotDuration(shot.durationSec);
+    if (caption.length === 0 || durationSec === null) continue;
+    const voice =
+      shot.voice &&
+      shot.voice.characterId.trim().length > 0 &&
+      shot.voice.text.trim().length > 0
+        ? { characterId: shot.voice.characterId, text: shot.voice.text }
+        : undefined;
+    usable.push({
+      imagePath: shot.imagePath ?? "",
+      caption,
+      durationSec,
+      motion: shot.motion,
+      ...(voice ? { voice } : {}),
+    });
+    if (usable.length >= VIDEO_PLAN_MAX_SHOTS) break;
+  }
+  return usable;
+}
 
 /**
  * Turn validated model shots into stored shots. An image that is not

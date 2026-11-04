@@ -7,11 +7,13 @@ import {
   VIDEO_PLAN_FAILED_MESSAGE,
   VIDEO_PLAN_INSTRUCTIONS,
   VIDEO_PLAN_JSON_SCHEMA,
+  VIDEO_PLAN_MIN_USABLE_SHOTS,
   VIDEO_PLAN_NO_KEY_MESSAGE,
   VIDEO_PLAN_SCHEMA_NAME,
   VideoPlanModelOutputSchema,
   VideoPlanRequestSchema,
   planToShort,
+  sanitizePlannedShots,
   toPlannedShots,
   videoPlanInput,
 } from "@/lib/video";
@@ -96,11 +98,15 @@ export async function POST(req: Request) {
       },
       VideoPlanModelOutputSchema,
     );
+    const usable = sanitizePlannedShots(model.shots);
+    if (usable.length < VIDEO_PLAN_MIN_USABLE_SHOTS) {
+      throw new Error("The model returned too few usable shots.");
+    }
     const short = planToShort({
       channelId,
       partId,
       title: model.title,
-      shots: toPlannedShots(model.shots, world, partId),
+      shots: toPlannedShots(usable, world, partId),
     });
     return NextResponse.json({ short });
   } catch (error) {

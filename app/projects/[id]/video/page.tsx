@@ -19,6 +19,7 @@ import {
   EDIT_SHOT_MAX_SEC,
   EDIT_SHOT_MIN_SEC,
   VIDEO_FPS,
+  VIDEO_PLAN_FAILED_MESSAGE,
   availableArtPaths,
   clockLabel,
   moveShot,
@@ -96,11 +97,13 @@ function audioForShot(world: World, shot: ShortShot): string | undefined {
   return audioPath;
 }
 
+type PlanButton = "panel" | "timeline";
+
 type PlanState =
   | { kind: "idle" }
   | { kind: "confirm" }
   | { kind: "working" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; source: PlanButton };
 
 type ExportState =
   | { kind: "idle"; note?: string }
@@ -201,6 +204,9 @@ function VideoPageInner() {
     audioSrc: audioForShot(world, shot),
   }));
   const art = availableArtPaths(world);
+  const usedArt = new Set(
+    shots.map((shot) => shot.imagePath).filter((path) => path.length > 0),
+  );
   const sceneCharacters = (part?.characterIds ?? [])
     .map((id) => world.characters.find((c) => c.id === id))
     .filter((c) => c !== undefined);
@@ -248,7 +254,7 @@ function VideoPageInner() {
     return created;
   };
 
-  const runPlan = async () => {
+  const runPlan = async (source: PlanButton) => {
     if (plan.kind === "working") return;
     const base = worldRef.current;
     if (!base) return;
@@ -264,12 +270,14 @@ function VideoPageInner() {
         }),
       });
       if (!res.ok) {
-        throw new Error(await responseMessage(res, "Planning the shots failed."));
+        throw new Error(
+          await responseMessage(res, VIDEO_PLAN_FAILED_MESSAGE),
+        );
       }
       const json = (await res.json()) as { short?: unknown };
       const parsed = ShortSchema.safeParse(json.short);
       if (!parsed.success) {
-        throw new Error("Planning the shots failed.");
+        throw new Error(VIDEO_PLAN_FAILED_MESSAGE);
       }
       const live = worldRef.current;
       if (live) updateWorld(upsertShort(live, parsed.data));
@@ -278,18 +286,20 @@ function VideoPageInner() {
     } catch (e) {
       setPlan({
         kind: "error",
-        message: e instanceof Error ? e.message : "Planning the shots failed.",
+        message:
+          e instanceof Error ? e.message : VIDEO_PLAN_FAILED_MESSAGE,
+        source,
       });
     }
   };
 
-  const onPlanClick = () => {
+  const onPlanClick = (source: PlanButton) => {
     if (plan.kind === "working") return;
     if (short && short.shots.length > 0) {
       setPlan({ kind: "confirm" });
       return;
     }
-    void runPlan();
+    void runPlan(source);
   };
 
   const redrawShot = async (description?: string) => {
@@ -757,13 +767,13 @@ function VideoPageInner() {
             <div className="video-row">
               <button
                 className="pill sm"
-                onClick={onPlanClick}
+                onClick={() => onPlanClick("panel")}
                 disabled={plan.kind === "working"}
               >
                 {plan.kind === "working" ? "Planning…" : "Plan shots with Muse"}
               </button>
             </div>
-            {plan.kind === "error" ? (
+            {plan.kind === "error" && plan.source === "panel" ? (
               <p className="video-note" role="status">
                 {plan.message}
               </p>
@@ -778,7 +788,7 @@ function VideoPageInner() {
           </span>
           <button
             className="pill light sm"
-            onClick={onPlanClick}
+            onClick={() => onPlanClick("timeline")}
             disabled={plan.kind === "working"}
           >
             {plan.kind === "working" ? "Planning…" : "Plan shots with Muse"}
@@ -788,7 +798,10 @@ function VideoPageInner() {
           <div className="video-flag" style={{ marginBottom: 8 }}>
             <b>Replace this cut?</b>
             <div className="video-row">
-              <button className="pill sm" onClick={() => void runPlan()}>
+              <button
+                className="pill sm"
+                onClick={() => void runPlan("timeline")}
+              >
                 Replace it
               </button>
               <button className="quiet" onClick={() => setPlan({ kind: "idle" })}>
@@ -797,7 +810,7 @@ function VideoPageInner() {
             </div>
           </div>
         ) : null}
-        {plan.kind === "error" ? (
+        {plan.kind === "error" && plan.source === "timeline" ? (
           <p className="video-note" role="status">
             {plan.message}
           </p>
@@ -873,8 +886,16 @@ function VideoPageInner() {
                   className="video-pick"
                   style={{ backgroundImage: `url(${path})` }}
                   onClick={() => addShot(path)}
-                  aria-label={`Use this art for a new shot`}
-                />
+                  aria-label={
+                    usedArt.has(path)
+                      ? "Use this art for a new shot (already in use)"
+                      : "Use this art for a new shot"
+                  }
+                >
+                  {usedArt.has(path) ? (
+                    <span className="video-inuse">In use</span>
+                  ) : null}
+                </button>
               ))}
             </div>
             {art.length === 0 ? (

@@ -327,6 +327,7 @@
 }
 
 .video-pick {
+  position: relative;
   height: 84px;
   border-radius: 8px;
   background-size: cover;
@@ -337,4 +338,16 @@
 .video-pick:hover {
   outline: 2.5px solid var(--clay);
   outline-offset: 2px;
+}
+
+.video-inuse {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  background: rgba(31, 27, 22, 0.78);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 999px;
 }

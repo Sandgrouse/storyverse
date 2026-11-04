@@ -10,15 +10,20 @@ import { mergeWorldAssets } from "@/lib/projects";
 import { upsertScript } from "@/lib/script";
 import { stripImageData } from "@/lib/story";
 import {
+  VIDEO_PLAN_FAILED_MESSAGE,
+  VIDEO_PLAN_JSON_SCHEMA,
   availableArtPaths,
+  clampShotDuration,
   moveShot,
   planToShort,
+  sanitizePlannedShots,
   shortForScene,
   shotFrames,
   shotStartFrames,
   toPlannedShots,
   totalFrames,
   totalSeconds,
+  truncateCaption,
   upsertShort,
   videoPlanInput,
 } from "@/lib/video";
@@ -111,6 +116,7 @@ function shot(caption: string, durationSec = 5) {
     caption,
     durationSec,
     motion: "push" as const,
+    voice: null,
   };
 }
 
@@ -241,7 +247,7 @@ describe("video plan validation and art fallback", () => {
     expect(res.status).toBe(400);
   });
 
-  it("fails cleanly when the model returns too few shots", async () => {
+  it("fails with the friendly message when fewer than 2 shots are usable", async () => {
     mockModel(
       JSON.stringify({ title: "Arrival", shots: [shot("One", 4)] }),
     );
@@ -253,43 +259,88 @@ describe("video plan validation and art fallback", () => {
       }),
     );
     expect(res.status).toBe(500);
+    const json = (await res.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(json.error.message).toBe(VIDEO_PLAN_FAILED_MESSAGE);
   });
 
-  it("fails cleanly when a caption or duration breaks the limits", async () => {
+  it("fails when only one shot survives sanitizing", async () => {
+    mockModel(
+      JSON.stringify({
+        title: "Arrival",
+        shots: [shot("", 4), shot("Only", 4)],
+      }),
+    );
+    const res = await planPOST(
+      post("/api/video/plan", {
+        world: makeWorld(),
+        channelId: "shorts",
+        partId: "part-1",
+      }),
+    );
+    expect(res.status).toBe(500);
+    const json = (await res.json()) as {
+      error: { code: string; message: string };
+    };
+    expect(json.error.message).toBe(VIDEO_PLAN_FAILED_MESSAGE);
+  });
+
+  it("truncates a long caption and clamps a slow shot instead of failing", async () => {
     mockModel(
       JSON.stringify({
         title: "Arrival",
         shots: [
-          shot("A".repeat(91), 4),
-          shot("Two", 4),
-          shot("Three", 4),
+          shot(`Ada walks beside the cold water while the ${"light ".repeat(20)}`, 4),
+          shot("Two", 30),
+          {
+            ...shot("Three", 2),
+            voice: { characterId: "ada", text: "I am here." },
+          },
           shot("Four", 4),
         ],
       }),
     );
-    const tooLong = await planPOST(
+    const res = await planPOST(
       post("/api/video/plan", {
         world: makeWorld(),
         channelId: "shorts",
         partId: "part-1",
       }),
     );
-    expect(tooLong.status).toBe(500);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { short: World["shorts"][number] };
+    expect(json.short.shots).toHaveLength(4);
+    expect(json.short.shots[0].caption.length).toBeLessThanOrEqual(90);
+    expect(json.short.shots[1].durationSec).toBe(7);
+    expect(json.short.shots[2].durationSec).toBe(3);
+    expect(json.short.shots[2].voice).toEqual({
+      characterId: "ada",
+      lineId: "",
+      text: "I am here.",
+    });
+    expect(json.short.shots[3].voice).toBeUndefined();
+  });
 
+  it("keeps at most 6 shots", async () => {
     mockModel(
       JSON.stringify({
         title: "Arrival",
-        shots: [shot("One", 30), shot("Two", 4), shot("Three", 4), shot("Four", 4)],
+        shots: ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"].map(
+          (caption) => shot(caption, 4),
+        ),
       }),
     );
-    const tooSlow = await planPOST(
+    const res = await planPOST(
       post("/api/video/plan", {
         world: makeWorld(),
         channelId: "shorts",
         partId: "part-1",
       }),
     );
-    expect(tooSlow.status).toBe(500);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { short: World["shorts"][number] };
+    expect(json.short.shots).toHaveLength(6);
   });
 
   it("falls back to the part's own art for unknown images", () => {
@@ -367,6 +418,108 @@ describe("video plan validation and art fallback", () => {
       }),
     );
     expect(res.status).toBe(503);
+  });
+});
+
+describe("video plan schema contract", () => {
+  it("lists every property in required, for every object", () => {
+    const gaps: string[] = [];
+    const walk = (node: unknown, path: string): void => {
+      if (node === null || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      const properties = record.properties;
+      if (
+        record.type === "object" &&
+        properties !== null &&
+        typeof properties === "object"
+      ) {
+        const keys = Object.keys(properties);
+        const required = record.required;
+        if (
+          !Array.isArray(required) ||
+          keys.some((key) => !required.includes(key))
+        ) {
+          gaps.push(path);
+        }
+        for (const key of keys) {
+          walk((properties as Record<string, unknown>)[key], `${path}.${key}`);
+        }
+      }
+      const items = record.items;
+      if (
+        record.type === "array" &&
+        items !== null &&
+        typeof items === "object"
+      ) {
+        walk(items, `${path}[]`);
+      }
+      if (Array.isArray(record.anyOf)) {
+        record.anyOf.forEach((branch, index) => {
+          walk(branch, `${path}#${index}`);
+        });
+      }
+    };
+    walk(VIDEO_PLAN_JSON_SCHEMA, "$");
+    expect(gaps).toEqual([]);
+  });
+
+  it("sends voice as required and nullable, with no shot-count limits", () => {
+    const shots = VIDEO_PLAN_JSON_SCHEMA.properties.shots;
+    expect("minItems" in shots).toBe(false);
+    expect("maxItems" in shots).toBe(false);
+    expect(shots.items.required).toContain("voice");
+    expect(shots.items.properties.voice.anyOf[1]).toEqual({ type: "null" });
+  });
+});
+
+describe("video plan sanitizing", () => {
+  it("leaves a short caption alone", () => {
+    expect(truncateCaption("Ada arrives.")).toBe("Ada arrives.");
+  });
+
+  it("cuts a long caption at a word boundary", () => {
+    const caption =
+      `Ada walks beside the cold water while the ${"light ".repeat(20)}`.trim();
+    expect(caption.length).toBeGreaterThan(90);
+    const cut = truncateCaption(caption);
+    expect(cut.length).toBeLessThanOrEqual(90);
+    expect(caption.startsWith(cut)).toBe(true);
+    expect(cut).not.toMatch(/\s$/);
+    expect(caption[cut.length]).toBe(" ");
+  });
+
+  it("hard-cuts a caption with no word boundary", () => {
+    expect(truncateCaption("A".repeat(200))).toBe("A".repeat(90));
+  });
+
+  it("clamps durations to 3 to 7 seconds", () => {
+    expect(clampShotDuration(30)).toBe(7);
+    expect(clampShotDuration(1)).toBe(3);
+    expect(clampShotDuration(5)).toBe(5);
+    expect(clampShotDuration(Number.NaN)).toBeNull();
+  });
+
+  it("maps null voice to no voice and drops an empty voice", () => {
+    const usable = sanitizePlannedShots([
+      { ...shot("One", 4), voice: null },
+      { ...shot("Two", 4), voice: { characterId: "", text: "" } },
+    ]);
+    expect(usable).toHaveLength(2);
+    expect(usable[0]?.voice).toBeUndefined();
+    expect(usable[1]?.voice).toBeUndefined();
+  });
+
+  it("keeps a real voice line", () => {
+    const usable = sanitizePlannedShots([
+      {
+        ...shot("Ada speaks", 4),
+        voice: { characterId: "ada", text: "I am here." },
+      },
+    ]);
+    expect(usable[0]?.voice).toEqual({
+      characterId: "ada",
+      text: "I am here.",
+    });
   });
 });
 
