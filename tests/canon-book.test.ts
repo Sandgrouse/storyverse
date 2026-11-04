@@ -16,6 +16,7 @@ import {
   chapterCountFor,
   coverChips,
   highlightPassage,
+  placeArtFor,
 } from "@/lib/canon";
 import { mergeWorldAssets } from "@/lib/projects";
 import { backFor } from "@/lib/nav";
@@ -276,5 +277,43 @@ describe("mergeWorldAssets", () => {
 describe("canon navigation", () => {
   it("sends Back on the canon page to Story", () => {
     expect(backFor("/projects/abc/canon")).toBe("/projects/abc/story");
+  });
+});
+
+describe("place art", () => {
+  const world = {
+    characters: [],
+    locations: [
+      { id: "stream", name: "The stream" },
+      { id: "aguleri", name: "Aguleri" },
+      { id: "nowhere", name: "Nowhere" },
+    ],
+    parts: [
+      { id: "p1", order: 1, title: "One", summary: "Born in Aguleri.", excerpt: "A retelling.", text: "", imagePath: "first-art" },
+      { id: "p2", order: 2, title: "Two", summary: "Walking on.", excerpt: "Still walking.", text: "They reached the stream at dusk.", imagePath: "stream-art" },
+    ],
+  };
+
+  it("uses the art of the first part whose text names the place", () => {
+    expect(placeArtFor({ id: "stream", name: "The stream" }, world)).toBe("stream-art");
+  });
+
+  it("matches a summary when the text does not name the place", () => {
+    expect(placeArtFor({ id: "aguleri", name: "Aguleri" }, world)).toBe("first-art");
+  });
+
+  it("falls back to the first part's art when no part names the place", () => {
+    expect(placeArtFor({ id: "nowhere", name: "Nowhere" }, world)).toBe("first-art");
+  });
+
+  it("matches whole names only, case-insensitively", () => {
+    const streamed = {
+      ...world,
+      parts: [
+        { id: "p1", order: 1, title: "One", summary: "Agulerians streamed past.", excerpt: "", text: "", imagePath: "first-art" },
+      ],
+    };
+    expect(placeArtFor({ id: "stream", name: "The stream" }, streamed)).toBe("first-art");
+    expect(placeArtFor({ id: "aguleri", name: "Aguleri" }, streamed)).toBe("first-art");
   });
 });

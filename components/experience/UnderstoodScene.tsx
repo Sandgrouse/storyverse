@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { Fact, World } from "@/lib/world/schemas";
+import { z } from "zod";
+import { FactSchema, type Fact, type World } from "@/lib/world/schemas";
 
 const SOURCE_LINE: Record<Fact["source"], string> = {
   material: "From your treatment",
@@ -23,6 +24,54 @@ export default function UnderstoodScene({ active = true, world, onWorld, onAddMa
   const [draft, setDraft] = useState("");
   const [editingFact, setEditingFact] = useState<string | null>(null);
   const [factDraft, setFactDraft] = useState("");
+  const [readingBasics, setReadingBasics] = useState(false);
+  const [basicsFailure, setBasicsFailure] = useState("");
+
+  /** The server's message when it has one, so a budget stop reads as one. */
+  const readBasics = async () => {
+    if (readingBasics) return;
+    setReadingBasics(true);
+    setBasicsFailure("");
+    try {
+      const res = await fetch("/api/facts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ world }),
+      });
+      const json: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        const record =
+          json !== null && typeof json === "object"
+            ? (json as Record<string, unknown>)
+            : null;
+        const error =
+          record?.error !== null && typeof record?.error === "object"
+            ? (record.error as Record<string, unknown>)
+            : null;
+        setBasicsFailure(
+          typeof error?.message === "string" && error.message.length > 0
+            ? error.message
+            : "I could not read the story's basics. Try again.",
+        );
+        return;
+      }
+      const record =
+        json !== null && typeof json === "object"
+          ? (json as Record<string, unknown>)
+          : null;
+      const facts = Array.isArray(record?.facts) ? record.facts : null;
+      const parsed = z.array(FactSchema).safeParse(facts);
+      if (!parsed.success) {
+        setBasicsFailure("I could not read the story's basics. Try again.");
+        return;
+      }
+      onWorld({ ...world, facts: parsed.data });
+    } catch {
+      setBasicsFailure("I could not read the story's basics. Try again.");
+    } finally {
+      setReadingBasics(false);
+    }
+  };
 
   const saveFact = (factId: string) => {
     const value = factDraft.trim();
@@ -117,7 +166,7 @@ export default function UnderstoodScene({ active = true, world, onWorld, onAddMa
               <span key={l.id}>{l.name}</span>
             ))}
           </div>
-          {world.facts.length > 0 && (
+          {world.facts.length > 0 ? (
             <div className="facts">
               {world.facts.map((fact) =>
                 fact.value.trim().length === 0 ? (
@@ -230,6 +279,18 @@ export default function UnderstoodScene({ active = true, world, onWorld, onAddMa
                   </div>
                 ),
               )}
+            </div>
+          ) : (
+            <div className="facts">
+              <button
+                type="button"
+                className="pill"
+                onClick={readBasics}
+                disabled={readingBasics}
+              >
+                {readingBasics ? "Reading the basics…" : "Read the story's basics"}
+              </button>
+              {basicsFailure && <p className="status">{basicsFailure}</p>}
             </div>
           )}
           {world.gaps.map((gap) => (

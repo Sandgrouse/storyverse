@@ -8,6 +8,7 @@ import {
   chapterCountFor,
   coverChips,
   highlightPassage,
+  placeArtFor,
 } from "@/lib/canon";
 
 /**
@@ -187,7 +188,12 @@ export default function CanonBook({ world }: { world: World }) {
             const open = focused?.id === entry.id;
             const canonText =
               "canon" in entry ? entry.canon : entry.description;
-            const art = "artPath" in entry ? entry.artPath : "";
+            const art =
+              tab === "c"
+                ? ("artPath" in entry && typeof entry.artPath === "string"
+                    ? entry.artPath
+                    : "")
+                : placeArtFor(entry, world);
             const appears = chapterCountFor(
               entry.id,
               tab === "c" ? "character" : "place",

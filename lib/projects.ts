@@ -185,19 +185,57 @@ export function loadStoredWorld(id: string): World | null {
   }
 }
 
+/**
+ * Fill in what the seed has and an old stored sample lacks: facts when
+ * empty, and each part's text when empty (matched by part id). Everything
+ * the owner edited or made — scripts, storyboards, shorts, voices, lines,
+ * secrets, art, canon changes, facts that are already there — is kept.
+ * Pure: the caller saves the upgraded world back. Never upgrades a
+ * project that is not the sample.
+ */
+export function upgradeSampleWorld(
+  stored: World,
+  seed: World,
+): { world: World; upgraded: boolean } {
+  if (stored.id !== SAMPLE_ID) return { world: stored, upgraded: false };
+  let upgraded = false;
+  let facts = stored.facts;
+  if ((facts ?? []).length === 0 && seed.facts.length > 0) {
+    facts = seed.facts;
+    upgraded = true;
+  }
+  const seedTextById = new Map(seed.parts.map((part) => [part.id, part.text]));
+  let parts = stored.parts;
+  if (stored.parts.some((part) => (part.text ?? "").length === 0)) {
+    parts = stored.parts.map((part) => {
+      if ((part.text ?? "").length > 0) return part;
+      const text = seedTextById.get(part.id) ?? "";
+      if (text.length === 0) return part;
+      upgraded = true;
+      return { ...part, text };
+    });
+  }
+  if (!upgraded) return { world: stored, upgraded: false };
+  return { world: { ...stored, facts: facts ?? [], parts }, upgraded: true };
+}
+
 /** A project with its images filled back in. Null when unknown or invalid. */
 export async function loadProject(
   id: string,
+  seed?: World,
 ): Promise<{ entry: ProjectEntry; world: World } | null> {
   const entry = getEntry(id);
   if (!entry) return null;
   const stored = loadStoredWorld(id);
   if (!stored) return null;
+  const current = seed ? upgradeSampleWorld(stored, seed) : { world: stored, upgraded: false };
+  const base = current.upgraded ? current.world : stored;
+  if (current.upgraded) saveProject(base);
   try {
     const images = await loadImages(id);
-    return { entry, world: restoreImageRefs(stored, images) };
+    return { entry, world: restoreImageRefs(base, images) };
   } catch {
-    return { entry, world: dropStoredRefs(stored) };
+    return { entry, world: dropStoredRefs(base) };
   }
 }
 

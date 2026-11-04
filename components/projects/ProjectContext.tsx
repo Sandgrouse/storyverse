@@ -65,7 +65,7 @@ export function ProjectProvider({
     if (id === SAMPLE_ID && !getEntry(SAMPLE_ID)) {
       saveProject(seedWorld(), { sample: true, title: undefined });
     }
-    void loadProject(id).then((loaded) => {
+    void loadProject(id, seedWorld()).then((loaded) => {
       if (!live) return;
       if (!loaded) {
         setStatus("missing");
