@@ -309,6 +309,107 @@ export function dataUrlToBytes(
   }
 }
 
+/** A shipped art path: exactly one leading `/`, so not `//`. */
+function isPublicArtPath(value: string | undefined): value is string {
+  return (
+    typeof value === "string" &&
+    value.startsWith("/") &&
+    !value.startsWith("//")
+  );
+}
+
+/**
+ * Replace shipped public art paths (`/anukili/fire.webp`) with the data
+ * URLs `load` fetches. The pure planners below only decode data URLs,
+ * so they would drop every public path; inlining first keeps that art
+ * in the package. Covers sheets, cut-outs, part art, storyboard frames
+ * and short shots. A path `load` cannot return as a `data:image/` URL
+ * keeps its value and is left out as it is today. Returns the same
+ * world object when no field needs replacing.
+ */
+export async function inlinePublicArt(
+  world: World,
+  load: (path: string) => Promise<string | null>,
+): Promise<World> {
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  const want = (value: string | undefined): void => {
+    if (isPublicArtPath(value) && !seen.has(value)) {
+      seen.add(value);
+      paths.push(value);
+    }
+  };
+  for (const character of world.characters) {
+    for (const view of character.sheet) {
+      want(view.imagePath);
+      want(view.cutoutPath);
+    }
+  }
+  for (const part of world.parts) {
+    want(part.imagePath);
+  }
+  for (const board of world.storyboards ?? []) {
+    for (const frame of board.frames) {
+      want(frame.imagePath);
+    }
+  }
+  for (const short of world.shorts ?? []) {
+    for (const shot of short.shots) {
+      want(shot.imagePath);
+    }
+  }
+  if (paths.length === 0) return world;
+  const inlined = new Map<string, string>();
+  await Promise.all(
+    paths.map(async (path) => {
+      let dataUrl: string | null;
+      try {
+        dataUrl = await load(path);
+      } catch {
+        return;
+      }
+      if (typeof dataUrl === "string" && dataUrl.startsWith("data:image/")) {
+        inlined.set(path, dataUrl);
+      }
+    }),
+  );
+  if (inlined.size === 0) return world;
+  const imagePathOf = (value: string): string => inlined.get(value) ?? value;
+  return {
+    ...world,
+    characters: world.characters.map((character) => ({
+      ...character,
+      sheet: character.sheet.map((view) => ({
+        ...view,
+        imagePath: imagePathOf(view.imagePath),
+        ...(view.cutoutPath === undefined
+          ? {}
+          : { cutoutPath: imagePathOf(view.cutoutPath) }),
+      })),
+    })),
+    parts: world.parts.map((part) => ({
+      ...part,
+      imagePath: imagePathOf(part.imagePath),
+    })),
+    storyboards: (world.storyboards ?? []).map((board) => ({
+      ...board,
+      frames: board.frames.map((frame) => ({
+        ...frame,
+        ...(frame.imagePath === undefined
+          ? {}
+          : { imagePath: imagePathOf(frame.imagePath) }),
+      })),
+    })),
+    shorts: (world.shorts ?? []).map((short) => ({
+      ...short,
+      shots: short.shots.map((shot) => ({
+        ...shot,
+        imagePath: imagePathOf(shot.imagePath),
+      })),
+    })),
+  };
+}
+
 /**
  * One image file, or null when there is nothing to put in it. An image
  * the owner has not made yet is unfinished work, not a missing file:

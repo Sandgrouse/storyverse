@@ -8,10 +8,12 @@ import {
   fileSizeOf,
   formatFileSize,
   gameDesignSections,
+  inlinePublicArt,
   packageChannelTiles,
   planAgentFiles,
   type PackageFile,
 } from "@/lib/package";
+import { artToDataUrl } from "@/lib/images";
 import { channelReadiness } from "@/lib/readiness";
 import { visualStyleLine } from "@/lib/style";
 import Accordion from "./Accordion";
@@ -204,6 +206,7 @@ export default function PackageDashboard({
   open: boolean;
 }) {
   const [channelId, setChannelId] = useState(world.channels[0]?.id ?? "");
+  const [inlined, setInlined] = useState<World | null>(null);
   const [state, setState] = useState<ExportState>({ kind: "idle" });
   const [view, setView] = useState<View>("map");
   const [mounted, setMounted] = useState(false);
@@ -231,6 +234,22 @@ export default function PackageDashboard({
     setState({ kind: "idle" });
   }, [world]);
 
+  useEffect(() => {
+    let stale = false;
+    setInlined(null);
+    void inlinePublicArt(world, artToDataUrl).then(
+      (next) => {
+        if (!stale) setInlined(next);
+      },
+      () => {
+        if (!stale) setInlined(world);
+      },
+    );
+    return () => {
+      stale = true;
+    };
+  }, [world]);
+
   const chooseView = (next: View) => {
     setView(next);
     try {
@@ -248,8 +267,8 @@ export default function PackageDashboard({
     [world, channelId],
   );
   const files = useMemo(
-    () => (channelId ? planAgentFiles(world, channelId) : []),
-    [world, channelId],
+    () => (channelId ? planAgentFiles(inlined ?? world, channelId) : []),
+    [inlined, world, channelId],
   );
   const tree = useMemo(() => folderTree(files), [files]);
   const channel = world.channels.find((c) => c.id === channelId);
@@ -309,7 +328,8 @@ export default function PackageDashboard({
     if (!channelId || state.kind === "working") return;
     setState({ kind: "working" });
     try {
-      const { blob } = await buildAgentZip(world, channelId);
+      const ready = await inlinePublicArt(world, artToDataUrl);
+      const { blob } = await buildAgentZip(ready, channelId);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
