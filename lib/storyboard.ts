@@ -336,6 +336,23 @@ export function upsertStoryboard(world: World, board: Storyboard): World {
   return { ...world, storyboards: [...rest, board] };
 }
 
+/**
+ * Patch one frame on a board, leaving every other frame untouched.
+ * Pure: returns a new board, so chained patches keep them all.
+ */
+export function patchStoryboardFrame(
+  board: Storyboard,
+  frameId: string,
+  patch: Partial<StoryboardFrame>,
+): Storyboard {
+  return {
+    ...board,
+    frames: board.frames.map((frame) =>
+      frame.id === frameId ? { ...frame, ...patch } : frame,
+    ),
+  };
+}
+
 /** Move one frame to a new index, keeping the rest in order. Pure. */
 export function moveFrame<T>(frames: T[], from: number, to: number): T[] {
   if (from < 0 || from >= frames.length) return frames;

@@ -24,6 +24,7 @@ import {
   STORYBOARD_PLAN_FAILED_MESSAGE,
   boardReferenceIds,
   moveFrame,
+  patchStoryboardFrame,
   storyboardForScene,
   upsertStoryboard,
 } from "@/lib/storyboard";
@@ -149,7 +150,10 @@ function StoryboardPageInner() {
 
   const saveBoard = (next: Storyboard) => {
     const base = worldRef.current;
-    if (base) updateWorld(upsertStoryboard(base, next));
+    if (!base) return;
+    const updated = upsertStoryboard(base, next);
+    worldRef.current = updated;
+    updateWorld(updated);
   };
 
   const ensureBoard = (): Storyboard | null => {
@@ -168,14 +172,13 @@ function StoryboardPageInner() {
   };
 
   const patchFrame = (frameId: string, patch: Partial<StoryboardFrame>) => {
-    const target = board ?? ensureBoard();
+    const base = worldRef.current;
+    const live = base
+      ? storyboardForScene(base, channelId, partId)
+      : undefined;
+    const target = live ?? board ?? ensureBoard();
     if (!target) return;
-    saveBoard({
-      ...target,
-      frames: target.frames.map((frame) =>
-        frame.id === frameId ? { ...frame, ...patch } : frame,
-      ),
-    });
+    saveBoard(patchStoryboardFrame(target, frameId, patch));
   };
 
   const runPlan = async () => {
