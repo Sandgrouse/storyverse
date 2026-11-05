@@ -139,7 +139,7 @@ Every setting is an environment variable, read only on the server. Keys never re
 
 A channel's package includes `AGENT_BRIEF.md`, `manifest.json`, and `canon/` (`world.md`, `timeline.json`, `secrets.json`). It also holds character canon, sheets, cut-outs and voices, plus each scene's brief, art, script and storyboard where you've made them. Only that channel's secret is included, and the others are left out. For a non-game channel, each short also gets an optional `raea/<part>/` folder (`edit.tsx`, `shots.ts`, `media/` art and voice lines, and a README) for creators who have [raea](https://raea.io/) installed and want a faster render of that short on their own machine.
 
-A **game** package instead follows a game studio layout for Godot 4, with `design/` (game concept, narrative, art bible, character files, entity registry), `docs/`, `production/`, `assets/`, `scripts/setup-studio.sh` and `src/`.
+A **game** package instead follows a game studio layout for Godot 4, with `design/` (game concept, narrative, art bible, character files, entity registry), `docs/`, `production/`, `assets/`, `scripts/setup-studio.sh` and `src/`. When the game channel covers at least one scene, it also holds an optional `raea/` starter where the game's character walks through its scenes, for creators who have [raea](https://raea.io/) installed.
 
 ### Custom voices
 
