@@ -221,6 +221,78 @@ export function base64ToRaster(base64: string): Uint8Array {
   return out;
 }
 
+/** Share of the mask area below which an enclosed hole is filled. */
+export const CUTOUT_MAX_HOLE_SHARE = 0.003;
+
+/**
+ * Fill small 4-connected holes of zero pixels that do not touch the
+ * raster edge. Holes larger than maxHoleArea stay as they may be real
+ * background. Returns a new array; the input is unchanged. Iterative,
+ * so large rasters cannot overflow the call stack.
+ */
+export function fillSmallMaskHoles(
+  raster: Uint8Array,
+  width: number,
+  height: number,
+  maxHoleArea: number,
+): Uint8Array {
+  const out = new Uint8Array(raster);
+  if (width <= 0 || height <= 0 || maxHoleArea < 0) return out;
+  if (raster.length < width * height) return out;
+  const visited = new Uint8Array(width * height);
+  const stack: number[] = [];
+  const region: number[] = [];
+  for (let start = 0; start < width * height; start += 1) {
+    if (raster[start] !== 0 || visited[start] !== 0) continue;
+    region.length = 0;
+    stack.length = 0;
+    stack.push(start);
+    visited[start] = 1;
+    let touchesEdge = false;
+    while (stack.length > 0) {
+      const index = stack.pop() as number;
+      region.push(index);
+      const x = index % width;
+      const y = Math.floor(index / width);
+      if (x === 0 || y === 0 || x === width - 1 || y === height - 1) {
+        touchesEdge = true;
+      }
+      if (x > 0) {
+        const next = index - 1;
+        if (raster[next] === 0 && visited[next] === 0) {
+          visited[next] = 1;
+          stack.push(next);
+        }
+      }
+      if (x < width - 1) {
+        const next = index + 1;
+        if (raster[next] === 0 && visited[next] === 0) {
+          visited[next] = 1;
+          stack.push(next);
+        }
+      }
+      if (y > 0) {
+        const next = index - width;
+        if (raster[next] === 0 && visited[next] === 0) {
+          visited[next] = 1;
+          stack.push(next);
+        }
+      }
+      if (y < height - 1) {
+        const next = index + width;
+        if (raster[next] === 0 && visited[next] === 0) {
+          visited[next] = 1;
+          stack.push(next);
+        }
+      }
+    }
+    if (!touchesEdge && region.length <= maxHoleArea) {
+      for (const index of region) out[index] = 255;
+    }
+  }
+  return out;
+}
+
 function loadImage(source: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -281,7 +353,12 @@ export async function compositeCutout(
   if (!ctx) throw new Error("Canvas is not available.");
   ctx.drawImage(img, 0, 0);
   const image = ctx.getImageData(0, 0, width, height);
-  const raster = base64ToRaster(cutout.maskBase64);
+  const raster = fillSmallMaskHoles(
+    base64ToRaster(cutout.maskBase64),
+    cutout.width,
+    cutout.height,
+    Math.floor(cutout.width * cutout.height * CUTOUT_MAX_HOLE_SHARE),
+  );
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const alpha = sampleCutoutMask(

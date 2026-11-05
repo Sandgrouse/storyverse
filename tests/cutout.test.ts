@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as cutoutPOST } from "@/app/api/art/cutout/route";
 import {
+  CUTOUT_MAX_HOLE_SHARE,
   CUTOUT_MODEL,
   CutoutResponseSchema,
   cutoutRequestBody,
+  fillSmallMaskHoles,
   normalizedCutoutEvents,
   readCutoutError,
   sampleCutoutMask,
@@ -302,6 +304,88 @@ describe("sampleCutoutMask", () => {
     expect(
       sampleCutoutMask(raster, maskWidth, maskHeight, bounds, 333, 935),
     ).toBe(1);
+  });
+});
+
+describe("fillSmallMaskHoles", () => {
+  function filled(width: number, height: number): Uint8Array {
+    return new Uint8Array(width * height).fill(1);
+  }
+
+  it("fills a small enclosed hole", () => {
+    const raster = filled(5, 5);
+    raster[2 * 5 + 2] = 0;
+    const out = fillSmallMaskHoles(raster, 5, 5, 1);
+    expect(out[2 * 5 + 2]).toBe(255);
+    expect(Array.from(out.filter((v, i) => i !== 2 * 5 + 2))).toEqual(
+      new Array(24).fill(1),
+    );
+  });
+
+  it("leaves a hole just over the limit unchanged", () => {
+    const raster = filled(5, 5);
+    raster[2 * 5 + 2] = 0;
+    raster[2 * 5 + 3] = 0;
+    const out = fillSmallMaskHoles(raster, 5, 5, 1);
+    expect(out[2 * 5 + 2]).toBe(0);
+    expect(out[2 * 5 + 3]).toBe(0);
+  });
+
+  it("leaves a region touching any edge unchanged", () => {
+    for (const [x, y] of [[0, 2], [4, 2], [2, 0], [2, 4]] as const) {
+      const raster = filled(5, 5);
+      raster[y * 5 + x] = 0;
+      // The zero reaches the edge, so even a limit of 1 must not fill it.
+      expect(fillSmallMaskHoles(raster, 5, 5, 1)[y * 5 + x]).toBe(0);
+    }
+    // A zero path from the middle to the edge is background, not a hole.
+    const raster = filled(5, 5);
+    raster[2 * 5 + 2] = 0;
+    raster[2 * 5 + 1] = 0;
+    raster[2 * 5 + 0] = 0;
+    expect(fillSmallMaskHoles(raster, 5, 5, 10)[2 * 5 + 2]).toBe(0);
+  });
+
+  it("judges two holes separately", () => {
+    const raster = filled(7, 5);
+    raster[2 * 7 + 2] = 0;
+    raster[2 * 7 + 5] = 0;
+    raster[3 * 7 + 5] = 0;
+    const out = fillSmallMaskHoles(raster, 7, 5, 1);
+    expect(out[2 * 7 + 2]).toBe(255);
+    expect(out[2 * 7 + 5]).toBe(0);
+  });
+
+  it("does not change the input array", () => {
+    const raster = filled(5, 5);
+    raster[2 * 5 + 2] = 0;
+    const before = Array.from(raster);
+    const out = fillSmallMaskHoles(raster, 5, 5, 1);
+    expect(Array.from(raster)).toEqual(before);
+    expect(out).not.toBe(raster);
+  });
+
+  it("shares the mask-area limit with compositeCutout", () => {
+    expect(CUTOUT_MAX_HOLE_SHARE).toBe(0.003);
+    expect(Math.floor(100 * 100 * CUTOUT_MAX_HOLE_SHARE)).toBe(30);
+  });
+
+  it("finishes a 2000 by 2000 raster without a stack overflow", () => {
+    const width = 2000;
+    const height = 2000;
+    const raster = new Uint8Array(width * height).fill(1);
+    const center = 1000 * width + 1000;
+    raster[center] = 0;
+    raster[center + 1] = 0;
+    const out = fillSmallMaskHoles(
+      raster,
+      width,
+      height,
+      Math.floor(width * height * CUTOUT_MAX_HOLE_SHARE),
+    );
+    expect(out[center]).toBe(255);
+    expect(out[center + 1]).toBe(255);
+    expect(raster[center]).toBe(0);
   });
 });
 
