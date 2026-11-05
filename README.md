@@ -273,9 +273,7 @@ There's no public deployment of this repo yet, and the production setup above ha
 
 ## Known issues
 
-- **"Sketch the missing frames" keeps only the last sketch.** Use **Sketch this frame** on each frame instead. **Make all frames black and white** uses the same save code and may have the same problem.
 - **Cut-outs can have holes,** especially where clothing or props meet the body. Use **Cut out again** to retry.
-- **Toggle labels on the Video page** sit slightly below their track.
 - **ElevenLabs is untested,** and **voice artist links need a deployed app.** See [Known limitations](docs/KNOWN-LIMITATIONS.md).
 - **`tests/budget.test.ts`** has occasionally timed out in a full test run, and passes when run alone.
 

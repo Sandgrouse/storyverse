@@ -18,6 +18,7 @@ import {
   STORYBOARD_PLAN_JSON_SCHEMA,
   boardReferenceIds,
   moveFrame,
+  patchStoryboardFrame,
   planToStoryboard,
   sanitizePlannedFrames,
   storyboardForScene,
@@ -771,5 +772,71 @@ describe("agent package storyboards", () => {
     expect(parsed.map((entry) => entry.id)).toEqual(
       board.frames.map((entry) => entry.id),
     );
+  });
+});
+
+describe("patchStoryboardFrame", () => {
+  function twoFrameBoard() {
+    const world = makeWorld();
+    return planToStoryboard({
+      channelId: "series",
+      partId: "part-1",
+      title: "Arrival",
+      frames: toPlannedFrames(
+        sanitizePlannedFrames([
+          frame("Ada at the bank."),
+          frame("The water rises."),
+        ]),
+        world,
+        "series",
+      ),
+    });
+  }
+
+  it("changes only the named frame", () => {
+    const board = twoFrameBoard();
+    const next = patchStoryboardFrame(board, "frame-1", {
+      imagePath: "data:image/webp;base64,QUJD",
+    });
+    expect(next.frames[0]?.imagePath).toBe("data:image/webp;base64,QUJD");
+    expect(next.frames[1]?.imagePath).toBeUndefined();
+    expect(next.frames[1]?.action).toBe("The water rises.");
+    // The input board is untouched.
+    expect(board.frames[0]?.imagePath).toBeUndefined();
+  });
+
+  it("keeps both patches when applied one after the other", () => {
+    const board = twoFrameBoard();
+    const afterFirst = patchStoryboardFrame(board, "frame-1", {
+      imagePath: "data:image/webp;base64,QUJD",
+    });
+    const afterBoth = patchStoryboardFrame(afterFirst, "frame-2", {
+      imagePath: "data:image/webp;base64,REVG",
+    });
+    expect(afterBoth.frames[0]?.imagePath).toBe(
+      "data:image/webp;base64,QUJD",
+    );
+    expect(afterBoth.frames[1]?.imagePath).toBe(
+      "data:image/webp;base64,REVG",
+    );
+  });
+
+  it("keeps both patches when each save starts from the live board", () => {
+    let world = upsertStoryboard(makeWorld(), twoFrameBoard());
+    // Mimics the page: each save reads the live board, patches it, and
+    // the saved world becomes the base for the next save in the same tick.
+    const savePatch = (frameId: string, imagePath: string) => {
+      const live = storyboardForScene(world, "series", "part-1");
+      if (!live) throw new Error("missing board");
+      world = upsertStoryboard(
+        world,
+        patchStoryboardFrame(live, frameId, { imagePath }),
+      );
+    };
+    savePatch("frame-1", "data:image/webp;base64,QUJD");
+    savePatch("frame-2", "data:image/webp;base64,REVG");
+    const board = storyboardForScene(world, "series", "part-1");
+    expect(board?.frames[0]?.imagePath).toBe("data:image/webp;base64,QUJD");
+    expect(board?.frames[1]?.imagePath).toBe("data:image/webp;base64,REVG");
   });
 });

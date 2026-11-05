@@ -85,10 +85,15 @@
 
 .video-page .seg {
   display: flex;
+  height: auto;
   padding: 3px;
   border-radius: 99px;
   background: rgba(31, 27, 22, 0.08);
   width: max-content;
+}
+
+.video-page .seg::before {
+  content: none;
 }
 
 .video-page .seg button {
