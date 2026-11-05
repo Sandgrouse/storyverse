@@ -1,7 +1,16 @@
 import JSZip from "jszip";
 import { visualStyleLine } from "@/lib/style";
 import { packToMarkdown } from "@/lib/pack";
+import {
+  RAEA_VIDEO_EDIT,
+  imageIsPortrait,
+  mediaExtension,
+  raeaShotsTs,
+  raeaVideoReadme,
+  type RaeaShot,
+} from "@/lib/raea-video";
 import { hasFullSheet } from "@/lib/readiness";
+import { audioForShot } from "@/lib/video";
 import type { Storyboard, World } from "@/lib/world/schemas";
 
 /**
@@ -43,7 +52,11 @@ export type PackageFileType =
   | "stage"
   | "gitkeep"
   | "agents-readme"
-  | "setup-script";
+  | "setup-script"
+  | "raea-readme"
+  | "raea-edit"
+  | "raea-data"
+  | "raea-media";
 
 export type PackageFile = {
   /** Path inside the ZIP, starting with `<story>-<channel>/`. */
@@ -520,6 +533,105 @@ export function packageChannelTiles(
 }
 
 /**
+ * An raea render folder per short of this non-game channel: `edit.tsx`,
+ * `shots.ts`, a README and the shot art and voice lines under `media/`.
+ * Only shorts of this channel are read, so another channel's captions
+ * never appear. A shot whose image doesn't decode, or has an unknown
+ * image type, is left out and named in the README; a short with no
+ * usable shots gets no folder. Shots sharing one imagePath share one
+ * media file, numbered by first use.
+ */
+function planRaeaFiles(
+  world: World,
+  channelId: string,
+  root: string,
+): PackageFile[] {
+  const files: PackageFile[] = [];
+  for (const short of world.shorts ?? []) {
+    if (short.channelId !== channelId) continue;
+    const base = `${root}/raea/${short.partId}`;
+    const mediaByPath = new Map<string, string>();
+    const media: PackageFile[] = [];
+    const shots: RaeaShot[] = [];
+    const leftOut: number[] = [];
+    short.shots.forEach((shot, index) => {
+      const decoded = shot.imagePath ? dataUrlToBytes(shot.imagePath) : null;
+      const ext = decoded ? mediaExtension(decoded.mime) : null;
+      const imageExt = ext === "webp" || ext === "png" || ext === "jpg" ? ext : null;
+      if (!decoded || !imageExt) {
+        leftOut.push(index + 1);
+        return;
+      }
+      let image = mediaByPath.get(shot.imagePath);
+      if (!image) {
+        image = `shot-${String(mediaByPath.size + 1).padStart(2, "0")}.${imageExt}`;
+        mediaByPath.set(shot.imagePath, image);
+        media.push({
+          path: `${base}/media/${image}`,
+          type: "raea-media",
+          part: short.partId,
+          suggested: false,
+          missing: false,
+          content: decoded.bytes,
+        });
+      }
+      let audio: string | undefined;
+      const line = audioForShot(world, shot);
+      if (line) {
+        const voice = dataUrlToBytes(line);
+        const voiceExt = voice ? mediaExtension(voice.mime) : null;
+        if (voice && (voiceExt === "mp3" || voiceExt === "wav")) {
+          audio = `line-${String(index + 1).padStart(2, "0")}.${voiceExt}`;
+          media.push({
+            path: `${base}/media/${audio}`,
+            type: "raea-media",
+            part: short.partId,
+            suggested: false,
+            missing: false,
+            content: voice.bytes,
+          });
+        }
+      }
+      shots.push({
+        image,
+        caption: shot.caption,
+        durationSec: shot.durationSec,
+        motion: shot.motion,
+        portrait: imageIsPortrait(decoded.bytes),
+        ...(audio ? { audio } : {}),
+      });
+    });
+    if (shots.length === 0) continue;
+    files.push({
+      path: `${base}/README.md`,
+      type: "raea-readme",
+      part: short.partId,
+      suggested: false,
+      missing: false,
+      content: raeaVideoReadme(short.title, leftOut),
+    });
+    files.push({
+      path: `${base}/edit.tsx`,
+      type: "raea-edit",
+      part: short.partId,
+      suggested: false,
+      missing: false,
+      content: RAEA_VIDEO_EDIT,
+    });
+    files.push({
+      path: `${base}/shots.ts`,
+      type: "raea-data",
+      part: short.partId,
+      suggested: false,
+      missing: false,
+      content: raeaShotsTs(shots, short.aspect),
+    });
+    files.push(...media);
+  }
+  return files;
+}
+
+/**
  * Every file the package should hold, including expected-but-missing
  * ones (no content, missing: true). Pure and fully testable.
  */
@@ -679,6 +791,8 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
       );
     }
   }
+
+  files.push(...planRaeaFiles(world, channelId, root));
 
   const manifest: ManifestEntry[] = files.map((file) => ({
     path: file.path,

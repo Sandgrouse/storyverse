@@ -137,7 +137,7 @@ Every setting is an environment variable, read only on the server. Keys never re
 
 ### What's in an agent package
 
-A channel's package includes `AGENT_BRIEF.md`, `manifest.json`, and `canon/` (`world.md`, `timeline.json`, `secrets.json`). It also holds character canon, sheets, cut-outs and voices, plus each scene's brief, art, script and storyboard where you've made them. Only that channel's secret is included, and the others are left out.
+A channel's package includes `AGENT_BRIEF.md`, `manifest.json`, and `canon/` (`world.md`, `timeline.json`, `secrets.json`). It also holds character canon, sheets, cut-outs and voices, plus each scene's brief, art, script and storyboard where you've made them. Only that channel's secret is included, and the others are left out. For a non-game channel, each short also gets an optional `raea/<part>/` folder (`edit.tsx`, `shots.ts`, `media/` art and voice lines, and a README) for creators who have [raea](https://raea.io/) installed and want a faster render of that short on their own machine.
 
 A **game** package instead follows a game studio layout for Godot 4, with `design/` (game concept, narrative, art bible, character files, entity registry), `docs/`, `production/`, `assets/`, `scripts/setup-studio.sh` and `src/`.
 
@@ -317,6 +317,7 @@ Application code was written by Muse Code from the task specs in `docs/tasks/`, 
 | [Fish Audio](https://fish.audio/) | Speech. The app sends it only the chosen voice and the line to speak. | Fish Audio terms |
 | [ElevenLabs](https://elevenlabs.io/) | Optional speech provider, untested | ElevenLabs terms |
 | [Remotion](https://www.remotion.dev/) (`remotion`, `@remotion/player`, `@remotion/media`, `@remotion/web-renderer`) | Short videos in the browser | [Remotion License](https://www.remotion.dev/docs/license): free for individuals and companies of up to three employees |
+| [raea](https://raea.io/) | Optional faster renders of shorts on the creator's own machine; installed separately by the creator, not bundled with Storyverse | Source-available under its own licence (FSL-1.1-ALv2) |
 | [GSAP](https://gsap.com/) (`gsap`, `@gsap/react`) | Landing page animation | [GSAP Standard License](https://gsap.com/standard-license) |
 | [Lenis](https://lenis.darkroom.engineering/) | Landing page scrolling | MIT |
 | [React Flow](https://reactflow.dev/) (`@xyflow/react`) | Agent package map | MIT |

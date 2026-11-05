@@ -566,3 +566,17 @@ export function isPortraitArt(
 export function shotObjectPosition(portrait: boolean, tall: boolean): string {
   return !tall && portrait ? "50% 12%" : "50% 50%";
 }
+
+/** Audio for one shot: the saved line's data URL, if it is playable. */
+export function audioForShot(world: World, shot: ShortShot): string | undefined {
+  const lineId = shot.voice?.lineId;
+  if (!lineId) return undefined;
+  const character = world.characters.find(
+    (entry) => entry.id === shot.voice?.characterId,
+  );
+  const audioPath = character?.lines?.find(
+    (line) => line.id === lineId,
+  )?.audioPath;
+  if (!audioPath || audioPath.startsWith("idb:")) return undefined;
+  return audioPath;
+}
