@@ -18,9 +18,12 @@ export type RaeaShot = {
 /**
  * The exact text of every folder's `edit.tsx`. This file has been
  * rendered with raea 0.1.0-canary.2, at 16:9 and 9:16, with WebP and
- * PNG art, crossfades and voice audio. Do not restyle it.
+ * PNG art, crossfades and voice audio. Do not restyle it. Pass false
+ * when no shot in the short has audio: the `<Audio>` line is left out
+ * so the render has no silent audio track to reject.
  */
-export const RAEA_VIDEO_EDIT = `import { AbsoluteFill, Audio, Composition, Img, Sequence, interpolate, registerRoot, staticFile, useCurrentFrame } from "raea";
+export function raeaVideoEdit(hasAudio: boolean): string {
+  const full = `import { AbsoluteFill, Audio, Composition, Img, Sequence, interpolate, registerRoot, staticFile, useCurrentFrame } from "raea";
 import { HEIGHT, SHOTS, WIDTH } from "./shots";
 
 const FPS = 30;
@@ -73,6 +76,12 @@ function Short() {
 
 registerRoot(() => <Composition id="short" component={Short} width={WIDTH} height={HEIGHT} fps={FPS} durationInFrames={total} />);
 `;
+  if (hasAudio) return full;
+  return full.replace(
+    '      {"audio" in shot && shot.audio ? <Audio src={staticFile(shot.audio)} /> : null}\n',
+    "",
+  );
+}
 
 /**
  * The text of the folder's `shots.ts`. Values go through

@@ -7,10 +7,10 @@ import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { planAgentFiles } from "@/lib/package";
 import {
-  RAEA_VIDEO_EDIT,
   imageIsPortrait,
   mediaExtension,
   raeaShotsTs,
+  raeaVideoEdit,
   raeaVideoReadme,
 } from "@/lib/raea-video";
 import { audioForShot } from "@/lib/video";
@@ -309,15 +309,33 @@ describe("raeaVideoReadme", () => {
   });
 });
 
-describe("RAEA_VIDEO_EDIT", () => {
+describe("raeaVideoEdit", () => {
   it("imports from raea and never from remotion", () => {
-    expect(RAEA_VIDEO_EDIT).toContain('from "raea"');
-    expect(RAEA_VIDEO_EDIT).not.toContain("remotion");
+    for (const hasAudio of [true, false]) {
+      expect(raeaVideoEdit(hasAudio)).toContain('from "raea"');
+      expect(raeaVideoEdit(hasAudio)).not.toContain("remotion");
+    }
   });
 
   it("holds no backticks or backslashes", () => {
-    expect(RAEA_VIDEO_EDIT).not.toContain("`");
-    expect(RAEA_VIDEO_EDIT).not.toContain("\\");
+    for (const hasAudio of [true, false]) {
+      expect(raeaVideoEdit(hasAudio)).not.toContain("`");
+      expect(raeaVideoEdit(hasAudio)).not.toContain("\\");
+    }
+  });
+
+  it("has one <Audio> with voice lines and none without", () => {
+    expect(raeaVideoEdit(false)).not.toContain("<Audio");
+    expect((raeaVideoEdit(true).match(/<Audio/g) ?? [])).toHaveLength(1);
+  });
+
+  it("differs only by the <Audio> line", () => {
+    const line =
+      '      {"audio" in shot && shot.audio ? <Audio src={staticFile(shot.audio)} /> : null}';
+    expect(raeaVideoEdit(true)).toContain(line);
+    expect(raeaVideoEdit(false)).toBe(
+      raeaVideoEdit(true).replace(`${line}\n`, ""),
+    );
   });
 });
 
@@ -607,6 +625,79 @@ describe("raea package folders", () => {
     expect(rows[1]).not.toContain("audio");
     expect(rows[2]).not.toContain("audio");
   });
+
+  it("leaves <Audio> out of edit.tsx when no shot has a voice line", () => {
+    const world = makeWorld({
+      shorts: [shortEntry("shorts", "part-1", "Ada waits")],
+    });
+    const files = planAgentFiles(world, "shorts");
+    const edit = files.find((file) => file.type === "raea-edit");
+    expect(typeof edit?.content).toBe("string");
+    expect(edit?.content as string).toBe(raeaVideoEdit(false));
+    expect(edit?.content as string).not.toContain("<Audio");
+  });
+
+  it("keeps <Audio> in edit.tsx when one shot has a voice line", () => {
+    const world = makeWorld({
+      shorts: [
+        {
+          id: "shorts::part-1",
+          channelId: "shorts",
+          partId: "part-1",
+          title: "Arrival",
+          aspect: "16:9",
+          shots: [
+            {
+              id: "shot-1",
+              imagePath: shotImage(),
+              caption: "Spoken",
+              durationSec: 4,
+              motion: "push",
+              voice: {
+                characterId: "ada",
+                lineId: "line-1",
+                text: "I am here.",
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const files = planAgentFiles(world, "shorts");
+    const edit = files.find((file) => file.type === "raea-edit");
+    expect(typeof edit?.content).toBe("string");
+    expect(edit?.content as string).toBe(raeaVideoEdit(true));
+    expect(edit?.content as string).toContain("<Audio");
+  });
+
+  it("leaves <Audio> out when the only voice line cannot be decoded", () => {
+    const world = makeWorld({
+      shorts: [
+        {
+          id: "shorts::part-1",
+          channelId: "shorts",
+          partId: "part-1",
+          title: "Arrival",
+          aspect: "16:9",
+          shots: [
+            {
+              id: "shot-1",
+              imagePath: shotImage(),
+              caption: "Broken line",
+              durationSec: 4,
+              motion: "push",
+              voice: { characterId: "ada", lineId: "line-bad", text: "Broken." },
+            },
+          ],
+        },
+      ],
+    });
+    const files = planAgentFiles(world, "shorts");
+    const edit = files.find((file) => file.type === "raea-edit");
+    expect(typeof edit?.content).toBe("string");
+    expect(edit?.content as string).toBe(raeaVideoEdit(false));
+    expect(edit?.content as string).not.toContain("<Audio");
+  });
 });
 
 const CRC_TABLE = (() => {
@@ -667,6 +758,38 @@ function realPng(width: number, height: number): Uint8Array {
   return out;
 }
 
+/** A short valid WAV (one sine tone) built in code: real audio, no fixture. */
+function wavBytes(): Uint8Array {
+  const sampleRate = 8000;
+  const count = sampleRate;
+  const data = new Uint8Array(count * 2);
+  const samples = new DataView(data.buffer);
+  for (let i = 0; i < count; i += 1) {
+    samples.setInt16(
+      i * 2,
+      Math.round(12000 * Math.sin((2 * Math.PI * 440 * i) / sampleRate)),
+      true,
+    );
+  }
+  const out = new Uint8Array(44 + data.length);
+  const header = new DataView(out.buffer);
+  out.set([0x52, 0x49, 0x46, 0x46], 0); // RIFF
+  header.setUint32(4, 36 + data.length, true);
+  out.set([0x57, 0x41, 0x56, 0x45], 8); // WAVE
+  out.set([0x66, 0x6d, 0x74, 0x20], 12); // fmt
+  header.setUint32(16, 16, true);
+  header.setUint16(20, 1, true);
+  header.setUint16(22, 1, true);
+  header.setUint32(24, sampleRate, true);
+  header.setUint32(28, sampleRate * 2, true);
+  header.setUint16(32, 2, true);
+  header.setUint16(34, 16, true);
+  out.set([0x64, 0x61, 0x74, 0x61], 36); // data
+  header.setUint32(40, data.length, true);
+  out.set(data, 44);
+  return out;
+}
+
 const hasRaea = (() => {
   try {
     execFileSync("raea", ["help"], { stdio: "ignore" });
@@ -676,62 +799,112 @@ const hasRaea = (() => {
   }
 })();
 
+/** Plan, write and fully render one short folder; GPU-less machines skip. */
+async function renderShortMp4(
+  world: World,
+  ctx: { skip: () => void },
+  expectedEdit: string,
+): Promise<void> {
+  const files = planAgentFiles(world, "shorts");
+  const edit = files.find((file) => file.type === "raea-edit");
+  expect(edit?.content).toBe(expectedEdit);
+  const dir = await mkdtemp(join(tmpdir(), "raea-test-"));
+  for (const file of files) {
+    if (!file.path.includes("/raea/") || file.content === undefined) continue;
+    const target = join(dir, file.path);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(
+      target,
+      typeof file.content === "string" ? file.content : Buffer.from(file.content),
+    );
+  }
+  const cwd = join(dir, "test-story-shorts", "raea", "part-1");
+  try {
+    await execFileAsync(
+      "raea",
+      ["render", "edit.tsx", "-o", "short.mp4", "--quality", "draft"],
+      { cwd, timeout: 240000 },
+    );
+  } catch (error) {
+    // raea renders on the GPU; a machine with the CLI but no graphics
+    // adapter cannot render, so the test skips instead of failing.
+    const output = `${String((error as { stderr?: unknown }).stderr ?? "")} ${String(error)}`;
+    if (/no suitable graphics adapter|unable to find a gpu/i.test(output)) {
+      ctx.skip();
+      return;
+    }
+    throw error;
+  }
+  const rendered = await stat(join(cwd, "short.mp4"));
+  expect(rendered.size).toBeGreaterThan(0);
+}
+
+function silentShortWorld(): World {
+  const art = dataUrl("image/png", realPng(64, 36));
+  return makeWorld({
+    shorts: [
+      {
+        id: "shorts::part-1",
+        channelId: "shorts",
+        partId: "part-1",
+        title: "Arrival",
+        aspect: "16:9",
+        shots: [
+          {
+            id: "shot-1",
+            imagePath: art,
+            caption: "Ada arrives",
+            durationSec: 4,
+            motion: "push",
+          },
+        ],
+      },
+    ],
+  });
+}
+
+function voicedShortWorld(): World {
+  const world = silentShortWorld();
+  const ada = world.characters.find((character) => character.id === "ada");
+  if (ada?.lines) {
+    ada.lines = [
+      {
+        id: "line-1",
+        text: "I am here.",
+        audioPath: dataUrl("audio/wav", wavBytes()),
+      },
+    ];
+  }
+  const short = world.shorts[0];
+  if (short?.shots[0]) {
+    short.shots[0].voice = {
+      characterId: "ada",
+      lineId: "line-1",
+      text: "I am here.",
+    };
+  }
+  return WorldSchema.parse(JSON.parse(JSON.stringify(world)));
+}
+
 it.skipIf(!hasRaea)(
-  "renders a raea folder frame with the raea CLI",
+  "renders a full file for a short with no voice lines",
   async (ctx) => {
-    const art = dataUrl("image/png", realPng(64, 36));
-    const world = makeWorld({
-      shorts: [
-        {
-          id: "shorts::part-1",
-          channelId: "shorts",
-          partId: "part-1",
-          title: "Arrival",
-          aspect: "16:9",
-          shots: [
-            {
-              id: "shot-1",
-              imagePath: art,
-              caption: "Ada arrives",
-              durationSec: 4,
-              motion: "push",
-            },
-          ],
-        },
-      ],
-    });
-    const files = planAgentFiles(world, "shorts");
-    const edit = files.find((file) => file.type === "raea-edit");
-    expect(edit?.content).toBe(RAEA_VIDEO_EDIT);
-    const dir = await mkdtemp(join(tmpdir(), "raea-test-"));
-    for (const file of files) {
-      if (!file.path.includes("/raea/") || file.content === undefined) continue;
-      const target = join(dir, file.path);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(
-        target,
-        typeof file.content === "string" ? file.content : Buffer.from(file.content),
-      );
-    }
-    const cwd = join(dir, "test-story-shorts", "raea", "part-1");
-    try {
-      await execFileAsync(
-        "raea",
-        ["render", "edit.tsx", "-o", "frame.png", "--frame", "0"],
-        { cwd, timeout: 120000 },
-      );
-    } catch (error) {
-      // raea renders on the GPU; a machine with the CLI but no graphics
-      // adapter cannot render, so the test skips instead of failing.
-      const output = `${String((error as { stderr?: unknown }).stderr ?? "")} ${String(error)}`;
-      if (/no suitable graphics adapter|unable to find a gpu/i.test(output)) {
-        ctx.skip();
-        return;
-      }
-      throw error;
-    }
-    const rendered = await stat(join(cwd, "frame.png"));
-    expect(rendered.size).toBeGreaterThan(0);
+    await renderShortMp4(silentShortWorld(), ctx, raeaVideoEdit(false));
   },
-  180000,
+  300000,
+);
+
+it.skipIf(!hasRaea)(
+  "renders a full file for a short with one voice line",
+  async (ctx) => {
+    const world = voicedShortWorld();
+    const media = planAgentFiles(world, "shorts")
+      .filter((file) => file.type === "raea-media")
+      .map((file) => file.path);
+    expect(media).toContain(
+      "test-story-shorts/raea/part-1/media/line-01.wav",
+    );
+    await renderShortMp4(world, ctx, raeaVideoEdit(true));
+  },
+  300000,
 );

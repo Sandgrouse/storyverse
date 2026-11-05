@@ -8,10 +8,10 @@ import {
   type RaeaGameScene,
 } from "@/lib/raea-game";
 import {
-  RAEA_VIDEO_EDIT,
   imageIsPortrait,
   mediaExtension,
   raeaShotsTs,
+  raeaVideoEdit,
   raeaVideoReadme,
   type RaeaShot,
 } from "@/lib/raea-video";
@@ -723,7 +723,7 @@ function planRaeaFiles(
       part: short.partId,
       suggested: false,
       missing: false,
-      content: RAEA_VIDEO_EDIT,
+      content: raeaVideoEdit(shots.some((shot) => shot.audio !== undefined)),
     });
     files.push({
       path: `${base}/shots.ts`,
