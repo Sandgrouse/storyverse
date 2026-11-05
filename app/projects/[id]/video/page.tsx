@@ -24,6 +24,7 @@ import {
   EDIT_SHOT_MAX_SEC,
   EDIT_SHOT_MIN_SEC,
   VIDEO_FPS,
+  audioForShot,
   VIDEO_PLAN_FAILED_MESSAGE,
   availableArtPaths,
   clockLabel,
@@ -159,20 +160,6 @@ function useFrameBox(): {
     return () => observer.disconnect();
   }, [frameEl]);
   return { ref, box };
-}
-
-/** Audio for one shot: the saved line's data URL, if it is playable. */
-function audioForShot(world: World, shot: ShortShot): string | undefined {
-  const lineId = shot.voice?.lineId;
-  if (!lineId) return undefined;
-  const character = world.characters.find(
-    (entry) => entry.id === shot.voice?.characterId,
-  );
-  const audioPath = character?.lines?.find(
-    (line) => line.id === lineId,
-  )?.audioPath;
-  if (!audioPath || audioPath.startsWith("idb:")) return undefined;
-  return audioPath;
 }
 
 type PlanButton = "panel" | "timeline";

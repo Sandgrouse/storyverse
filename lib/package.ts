@@ -1,7 +1,22 @@
 import JSZip from "jszip";
 import { visualStyleLine } from "@/lib/style";
 import { packToMarkdown } from "@/lib/pack";
+import {
+  RAEA_GAME_EDIT,
+  raeaGameReadme,
+  raeaStoryTs,
+  type RaeaGameScene,
+} from "@/lib/raea-game";
+import {
+  RAEA_VIDEO_EDIT,
+  imageIsPortrait,
+  mediaExtension,
+  raeaShotsTs,
+  raeaVideoReadme,
+  type RaeaShot,
+} from "@/lib/raea-video";
 import { hasFullSheet } from "@/lib/readiness";
+import { audioForShot } from "@/lib/video";
 import type { Storyboard, World } from "@/lib/world/schemas";
 
 /**
@@ -43,7 +58,11 @@ export type PackageFileType =
   | "stage"
   | "gitkeep"
   | "agents-readme"
-  | "setup-script";
+  | "setup-script"
+  | "raea-readme"
+  | "raea-edit"
+  | "raea-data"
+  | "raea-media";
 
 export type PackageFile = {
   /** Path inside the ZIP, starting with `<story>-<channel>/`. */
@@ -520,6 +539,105 @@ export function packageChannelTiles(
 }
 
 /**
+ * An raea render folder per short of this non-game channel: `edit.tsx`,
+ * `shots.ts`, a README and the shot art and voice lines under `media/`.
+ * Only shorts of this channel are read, so another channel's captions
+ * never appear. A shot whose image doesn't decode, or has an unknown
+ * image type, is left out and named in the README; a short with no
+ * usable shots gets no folder. Shots sharing one imagePath share one
+ * media file, numbered by first use.
+ */
+function planRaeaFiles(
+  world: World,
+  channelId: string,
+  root: string,
+): PackageFile[] {
+  const files: PackageFile[] = [];
+  for (const short of world.shorts ?? []) {
+    if (short.channelId !== channelId) continue;
+    const base = `${root}/raea/${short.partId}`;
+    const mediaByPath = new Map<string, string>();
+    const media: PackageFile[] = [];
+    const shots: RaeaShot[] = [];
+    const leftOut: number[] = [];
+    short.shots.forEach((shot, index) => {
+      const decoded = shot.imagePath ? dataUrlToBytes(shot.imagePath) : null;
+      const ext = decoded ? mediaExtension(decoded.mime) : null;
+      const imageExt = ext === "webp" || ext === "png" || ext === "jpg" ? ext : null;
+      if (!decoded || !imageExt) {
+        leftOut.push(index + 1);
+        return;
+      }
+      let image = mediaByPath.get(shot.imagePath);
+      if (!image) {
+        image = `shot-${String(mediaByPath.size + 1).padStart(2, "0")}.${imageExt}`;
+        mediaByPath.set(shot.imagePath, image);
+        media.push({
+          path: `${base}/media/${image}`,
+          type: "raea-media",
+          part: short.partId,
+          suggested: false,
+          missing: false,
+          content: decoded.bytes,
+        });
+      }
+      let audio: string | undefined;
+      const line = audioForShot(world, shot);
+      if (line) {
+        const voice = dataUrlToBytes(line);
+        const voiceExt = voice ? mediaExtension(voice.mime) : null;
+        if (voice && (voiceExt === "mp3" || voiceExt === "wav")) {
+          audio = `line-${String(index + 1).padStart(2, "0")}.${voiceExt}`;
+          media.push({
+            path: `${base}/media/${audio}`,
+            type: "raea-media",
+            part: short.partId,
+            suggested: false,
+            missing: false,
+            content: voice.bytes,
+          });
+        }
+      }
+      shots.push({
+        image,
+        caption: shot.caption,
+        durationSec: shot.durationSec,
+        motion: shot.motion,
+        portrait: imageIsPortrait(decoded.bytes),
+        ...(audio ? { audio } : {}),
+      });
+    });
+    if (shots.length === 0) continue;
+    files.push({
+      path: `${base}/README.md`,
+      type: "raea-readme",
+      part: short.partId,
+      suggested: false,
+      missing: false,
+      content: raeaVideoReadme(short.title, leftOut),
+    });
+    files.push({
+      path: `${base}/edit.tsx`,
+      type: "raea-edit",
+      part: short.partId,
+      suggested: false,
+      missing: false,
+      content: RAEA_VIDEO_EDIT,
+    });
+    files.push({
+      path: `${base}/shots.ts`,
+      type: "raea-data",
+      part: short.partId,
+      suggested: false,
+      missing: false,
+      content: raeaShotsTs(shots, short.aspect),
+    });
+    files.push(...media);
+  }
+  return files;
+}
+
+/**
  * Every file the package should hold, including expected-but-missing
  * ones (no content, missing: true). Pure and fully testable.
  */
@@ -680,6 +798,8 @@ export function planAgentFiles(world: World, channelId: string): PackageFile[] {
     }
   }
 
+  files.push(...planRaeaFiles(world, channelId, root));
+
   const manifest: ManifestEntry[] = files.map((file) => ({
     path: file.path,
     type: file.type,
@@ -797,8 +917,13 @@ export function gameAgentsMd(filtered: World, channelId: string): string {
     `Everything else in the wider story is deliberately absent from this package. Do not invent it, import it, or hint at it.`,
     ``,
     `Work from \`design/\` (what the game is), \`docs/\` (how each scene plays), and \`production/\` (what is made and what is next).`,
-    ``,
   );
+  if (gameHasRaeaStarter(filtered)) {
+    lines.push(
+      `\`raea/\` holds an optional starter for the raea engine. Use it only if the owner asks to build in raea; otherwise build in Godot 4.`,
+    );
+  }
+  lines.push(``);
   return lines.join("\n");
 }
 
@@ -818,11 +943,19 @@ export function gameProjectYaml(filtered: World, channelId: string): string {
 /** What this package is and how to open it. */
 export function gameReadmeMd(filtered: World, channelId: string): string {
   const channel = gameOf(filtered, channelId);
-  return [
+  const lines = [
     `# ${filtered.title} — ${channel?.title || channel?.name || channelId} game package`,
     ``,
     `An agent package: everything a coding agent needs to build the game channel of "${filtered.title}" in Godot 4 with GDScript. It holds only this channel's secret.`,
     ``,
+  ];
+  if (gameHasRaeaStarter(filtered)) {
+    lines.push(
+      `An optional starter for building this game in raea instead of Godot is in \`raea/\`; see \`raea/README.md\`.`,
+      ``,
+    );
+  }
+  lines.push(
     `## Opening it`,
     ``,
     `Step 1. Unzip this package and open the folder.`,
@@ -831,7 +964,8 @@ export function gameReadmeMd(filtered: World, channelId: string): string {
     ``,
     `See STUDIO-NOTICE.md for the template this layout follows.`,
     ``,
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 /**
@@ -1123,6 +1257,139 @@ export function gameStageMd(
 }
 
 /**
+ * True when this game channel covers at least one part, so the
+ * package holds the optional `raea/` starter folder.
+ */
+function gameHasRaeaStarter(filtered: World): boolean {
+  return filtered.parts.some((part) =>
+    filtered.beats.some((beat) => beat.partId === part.id),
+  );
+}
+
+/** Image extensions the starter can ship: anything else is left out. */
+const RAEA_GAME_IMAGE_EXTS = new Set(["webp", "png", "jpg"]);
+
+/**
+ * One image the starter can ship, or null when there is nothing to
+ * put in it: no data URL, not decodable, or an unknown type (as if
+ * it had not been made).
+ */
+function raeaGameImage(
+  dataUrl: string | undefined,
+): { bytes: Uint8Array; ext: string } | null {
+  const decoded = dataUrl ? dataUrlToBytes(dataUrl) : null;
+  if (!decoded) return null;
+  const ext = mediaExtension(decoded.mime);
+  if (!ext || !RAEA_GAME_IMAGE_EXTS.has(ext)) return null;
+  return { bytes: decoded.bytes, ext };
+}
+
+/**
+ * The hero image: the first character with any usable image. A
+ * cut-out beats a sheet image, and the `front` view beats other
+ * views. Null when no character has one; the starter then draws a
+ * plain block.
+ */
+function raeaGameHero(
+  filtered: World,
+  world: World,
+): { bytes: Uint8Array; ext: string } | null {
+  for (const character of filtered.characters) {
+    const source = world.characters.find((c) => c.id === character.id);
+    const views = source?.sheet ?? [];
+    const ranked: Array<string | undefined> = [];
+    for (const view of views) {
+      if (view.view === "front") ranked.push(view.cutoutPath);
+    }
+    for (const view of views) {
+      if (view.view !== "front") ranked.push(view.cutoutPath);
+    }
+    for (const view of views) {
+      if (view.view === "front") ranked.push(view.imagePath);
+    }
+    for (const view of views) {
+      if (view.view !== "front") ranked.push(view.imagePath);
+    }
+    for (const candidate of ranked) {
+      const usable = raeaGameImage(candidate);
+      if (usable) return usable;
+    }
+  }
+  return null;
+}
+
+/**
+ * An optional `raea/` starter at the package root: the character
+ * walks through the scenes this channel covers, in `order`. Only the
+ * filtered channel world is read, so an uncovered part never appears
+ * and no secret text of any channel is in any file.
+ */
+function planRaeaGameFiles(world: World, channelId: string): PackageFile[] {
+  const filtered = channelWorld(world, channelId);
+  const channel = channelOf(filtered, channelId);
+  if (!channel) return [];
+  const covered = [...filtered.parts]
+    .sort((a, b) => a.order - b.order)
+    .filter((part) =>
+      filtered.beats.some((beat) => beat.partId === part.id),
+    );
+  if (covered.length === 0) return [];
+  const title = channel.title || channel.name || channelId;
+  const files: PackageFile[] = [];
+  const hero = raeaGameHero(filtered, world);
+  const heroFile = hero ? `hero.${hero.ext}` : null;
+  const scenes: RaeaGameScene[] = [];
+  const media: PackageFile[] = [];
+  if (hero) {
+    media.push({
+      path: `raea/media/${heroFile}`,
+      type: "raea-media",
+      suggested: false,
+      missing: false,
+      content: hero.bytes,
+    });
+  }
+  covered.forEach((part, index) => {
+    const image = raeaGameImage(part.imagePath);
+    let art: string | null = null;
+    if (image) {
+      art = `scene-${String(index + 1).padStart(2, "0")}.${image.ext}`;
+      media.push({
+        path: `raea/media/${art}`,
+        type: "raea-media",
+        suggested: false,
+        missing: false,
+        content: image.bytes,
+      });
+    }
+    scenes.push({ title: part.title, art });
+  });
+  files.push({
+    path: "raea/README.md",
+    type: "raea-readme",
+    suggested: false,
+    missing: false,
+    content: raeaGameReadme(title),
+  });
+  files.push({
+    path: "raea/edit.tsx",
+    type: "raea-edit",
+    suggested: false,
+    missing: false,
+    content: RAEA_GAME_EDIT,
+  });
+  files.push({
+    path: "raea/story.ts",
+    type: "raea-data",
+    suggested: false,
+    missing: false,
+    content: raeaStoryTs(title, heroFile, scenes),
+  });
+  files.push(...media);
+  return files;
+}
+
+/**
  * Game channel ZIP layout, following the open-source "Claude Code Game
  * Studios" template with Claude renamed to Muse (CLAUDE.md becomes
  * AGENTS.md, .claude/ becomes .agents/). Files sit at the ZIP root.
@@ -1285,5 +1552,6 @@ export function planGameFiles(world: World, channelId: string): PackageFile[] {
   text("src/.gitkeep", "gitkeep", "");
   text(".agents/README.md", "agents-readme", gameAgentsReadmeMd());
   text("scripts/setup-studio.sh", "setup-script", gameSetupScript());
+  files.push(...planRaeaGameFiles(world, channelId));
   return files;
 }
